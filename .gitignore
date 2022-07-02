@@ -1,0 +1,8 @@
+build/
+dist/
+*.egg-info
+*.idea
+__pycache__/
+imgui.ini
+export/
+data/

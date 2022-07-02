@@ -1,0 +1,41 @@
+# Access to data and models on disk.
+datasets:
+  amass:
+    "../data/amass"
+  threedpw:
+    ori:
+      "../data/3dpw"
+    smplx:
+      "../data/3dpw_smplx_neutral_pkl"
+smplx_models: "../data/smplx_models"
+
+# Pytorch configuration.
+device: "cuda:0"
+f_precision: 32
+i_precision: 64
+
+# Camera.
+znear: 0.01
+zfar: 1000.0
+camera_zoom_speed: 0.05
+
+# Viewer.
+window_width: 1600
+window_height: 900
+fullscreen: False
+resizable: True
+vsync: True 
+export_dir: "../export"
+playback_fps: 60
+run_animations: False
+draw_edges: False
+flat_rendering: False
+dark_mode: False
+shadows_enabled: True
+show_shadow_map: False
+auto_set_floor: True
+auto_set_camera_target: True
+backface_culling: True
+
+
+
