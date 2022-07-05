@@ -19,7 +19,7 @@ A set of tools to visualize and interact with sequences of 3D data with cross-pl
 ## Installation
 Basic Installation:
 ```commandline
-pip aitviewer
+pip install aitviewer
 ```
 
 Or install locally (if you need to extend or modify code)
