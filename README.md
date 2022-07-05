@@ -1,8 +1,8 @@
-# [![AITV](aitv_logo.svg)](https://github.com/eth-ait/aitviewer) AITViewer
+# [![AITV](https://raw.githubusercontent.com/eth-ait/aitviewer/main/aitv_logo.svg)](https://github.com/eth-ait/aitviewer) AITViewer
 
 A set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and Mac OS X.
 
-![AITV Sample](aitv_sample.png)
+![AITV Sample](https://raw.githubusercontent.com/eth-ait/aitviewer/main/aitv_sample.png)
 
 ## Features
 * Easy to use Python interface.
@@ -14,12 +14,12 @@ A set of tools to visualize and interact with sequences of 3D data with cross-pl
 * Support live data feeds and rendering (e.g., webcam).
 * Modern OpenGL shader-based rendering pipeline for high performance (via ModernGL / ModernGL Window).
 
-![AITV Interface](aitv_screenshot.PNG)
+![AITV Interface](https://raw.githubusercontent.com/eth-ait/aitviewer/main/aitv_screenshot.png)
 
 ## Installation
-Install directly from git:
+Basic Installation:
 ```commandline
-pip install git+https://github.com/eth-ait/aitviewer.git
+pip aitviewer
 ```
 
 Or install locally (if you need to extend or modify code)
