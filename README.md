@@ -14,7 +14,6 @@ A set of tools to visualize and interact with sequences of 3D data with cross-pl
 * Support live data feeds and rendering (e.g., webcam).
 * Modern OpenGL shader-based rendering pipeline for high performance (via ModernGL / ModernGL Window).
 
-<<<<<<< HEAD
 ![AITV Interface](https://raw.githubusercontent.com/eth-ait/aitviewer/main/aitv_screenshot.png)
 
 ## Installation
