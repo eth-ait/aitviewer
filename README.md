@@ -14,7 +14,7 @@ A set of tools to visualize and interact with sequences of 3D data with cross-pl
 * Support live data feeds and rendering (e.g., webcam).
 * Modern OpenGL shader-based rendering pipeline for high performance (via ModernGL / ModernGL Window).
 
-![AITV Interface](aitv_screenshot.PNG)
+![AITV Interface](aitv_screenshot.png)
 
 ## Installation
 Install directly from git:
@@ -83,7 +83,6 @@ The following projects have used the AITViewer:
 - Kaufmann et al., [EM-POSE: 3D Human Pose Estimation from Sparse Electromagnetic Trackers](https://ait.ethz.ch/projects/2021/em-pose/), ICCV 2021
 - Vechev et al., [Computational Design of Kinesthetic Garments](https://ait.ethz.ch/projects/2022/cdkg/), Eurographics 2021
 - Guo et al., [Human Performance Capture from Monocular Video in the Wild](https://ait.ethz.ch/projects/2021/human-performance-capture/index.php), 3DV 2021
-- Christen et al., [D-Grasp: Physically Plausible Dynamic Grasp Synthesis for Hand-Object Interactions](https://eth-ait.github.io/d-grasp/), CVPR 2022
 - Dong and Guo et al., [PINA: Learning a Personalized Implicit Neural Avatar from a Single RGB-D Video Sequence](https://zj-dong.github.io/pina/), CVPR 2022
 
 ## Citation
