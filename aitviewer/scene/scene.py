@@ -66,19 +66,23 @@ class Scene(Node):
         # Collect all renderable nodes
         rs = self.collect_nodes()
 
-        # Turning off backface culling is available for opaque objects only
-        if not self.backface_culling:
-            self.ctx.disable(moderngl.CULL_FACE)
-
         # Draw all opaque objects first
         for r in rs:
             if r.color[3] == 1.0:
-                self.safe_render(r, **kwargs)
-        if not self.backface_culling:
-            self.ctx.enable(moderngl.CULL_FACE)
+                # Turn off backface culling for opaque objects if enabled for the scene
+                # and requested by the current object
+                if self.backface_culling and r.backface_culling:
+                    self.ctx.enable(moderngl.CULL_FACE)
+                else:
+                    self.ctx.disable(moderngl.CULL_FACE)
 
+                self.safe_render(r, **kwargs)
+        
+        
         # Sort transparent objects by distance to camera (Not done here)
-        # Draw all transparent objects
+        
+        # Draw all transparent objects with backface culling enabled
+        self.ctx.enable(moderngl.CULL_FACE)
         for r in rs:
             if r.color[3] < 1.0:
                 self.safe_render(r, **kwargs)

@@ -55,6 +55,8 @@ class Plane(Node):
         self.vertices, self.normals = self._get_renderable_data()
         self.colors = np.full((self.vertices.shape[0], 4), color)
 
+        self.backface_culling = False
+
     def _get_renderable_data(self):
         p0 = self.center + self.v1 * self.size - self.v2 * self.size
         p1 = self.center + self.v1 * self.size + self.v2 * self.size
@@ -135,6 +137,7 @@ class Chessboard(Node):
 
         self.mesh = Meshes(vs, fs, face_colors=fc)
         self.mesh.position = self.position
+        self.mesh.backface_culling = False
         self.add(self.mesh, has_gui=False, show_in_hierarchy=False)
 
     # noinspection PyAttributeOutsideInit
