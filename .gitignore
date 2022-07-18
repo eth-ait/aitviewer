@@ -6,3 +6,4 @@ __pycache__/
 imgui.ini
 export/
 data/
+.vscode/
