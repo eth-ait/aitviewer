@@ -134,7 +134,7 @@ class Node(object):
         return np.array([
             [points[:, :, 0].min(), points[:, :, 0].max()],
             [points[:, :, 1].min(), points[:, :, 1].max()],
-            [points[:, :, 2].min(), points[:, :, 2].max()]])
+            [points[:, :, 2].min(), points[:, :, 2].max()]]) * self.scale
 
     @property
     def n_frames(self):
