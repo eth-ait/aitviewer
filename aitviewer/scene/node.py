@@ -58,6 +58,8 @@ class Node(object):
         # Renderable Attributes
         self.render_priority = render_priority
         self.is_renderable = False
+        self.backface_culling = True
+
         # To render shadows we need a separate VAO.
         self._shadow_vao = None
         self._fragmap_vao = None
