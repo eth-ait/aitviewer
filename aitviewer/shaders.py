@@ -47,3 +47,7 @@ def get_screen_texture_program():
 
 def get_smooth_lit_texturized_program():
     return _load('smooth_lit_tex.glsl')
+
+
+def get_chessboard_program():
+    return _load('chessboard.glsl')
