@@ -18,7 +18,7 @@ import moderngl
 import numpy as np
 
 from aitviewer.renderables.coordinate_system import CoordinateSystem
-from aitviewer.renderables.plane import Chessboard
+from aitviewer.renderables.plane import ChessboardPlane
 from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
 
@@ -48,12 +48,9 @@ class Scene(Node):
 
         # Scene items
         self.origin = CoordinateSystem(name="Origin", length=0.1)
-        self.floor = Chessboard(100.0, 200, name="Floor")
-        self.floor.mesh.material.diffuse = 0.1
-        self.floor.mesh.material._show_edges = False
-        self.floor.c1 = (0.9, 0.9, 0.9, 1.0)
-        self.floor.c2 = (0.82, 0.82, 0.82, 1.0)
-        self.floor._update_colors()
+        
+        self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0),  (0.82, 0.82, 0.82, 1.0), name="Floor")
+        self.floor.material.diffuse = 0.1
 
         self.add(self.origin, has_gui=False)
         self.add(self.floor)
