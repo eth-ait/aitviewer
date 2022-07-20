@@ -18,6 +18,7 @@ import moderngl
 import numpy as np
 
 from aitviewer.renderables.coordinate_system import CoordinateSystem
+from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.plane import ChessboardPlane
 from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
@@ -65,7 +66,9 @@ class Scene(Node):
 
         # Draw all opaque objects first
         for r in rs:
-            if r.color[3] == 1.0:
+            # An object is opaque if it's color alpha is 1.0 
+            # and, if it's a mesh, if also the texture_alpha is 1.0
+            if r.color[3] == 1.0 and (not isinstance(r, Meshes) or r.texture_alpha == 1.0):
                 # Turn off backface culling for opaque objects if enabled for the scene
                 # and requested by the current object
                 if self.backface_culling and r.backface_culling:
@@ -76,13 +79,21 @@ class Scene(Node):
                 self.safe_render(r, **kwargs)
         
         
-        # Sort transparent objects by distance to camera (Not done here)
+        
+        # An object is transparent if it's color alpha is less than 1.0 
+        # or, if it's a mesh, if the texture_alpha is less than 1.0    
+        transparent = [r for r in rs if r.color[3] < 1.0 or (not isinstance(r, Meshes) or r.texture_alpha < 1.0)]
         
         # Draw all transparent objects with backface culling enabled
         self.ctx.enable(moderngl.CULL_FACE)
-        for r in rs:
-            if r.color[3] < 1.0:
-                self.safe_render(r, **kwargs)
+
+        # Draw back to front by sorting transparent objects based on distance to camera.
+        # As an approximation we only sort using the origin of the object 
+        # which may be incorrect for large objects or objects significantly 
+        # offset from their origin, but works in many cases.
+        for r in sorted(transparent, key=lambda r: np.linalg.norm(r.position - self.camera.position), reverse=True):
+            self.safe_render(r, **kwargs)
+            
 
     def safe_render(self, r, **kwargs):
         if not r.is_renderable:
