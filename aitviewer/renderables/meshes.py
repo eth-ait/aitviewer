@@ -265,7 +265,6 @@ class Meshes(Node):
         self.vbo_colors.write(vertex_colors.astype('f4').tobytes())
 
         if self.has_texture:
-            self.texture_prog['texture_alpha'].value = self.texture_alpha
             self.vbo_uvs.write(self.uv_coords.astype('f4').tobytes())
 
     def _clear_buffer(self):
@@ -316,7 +315,6 @@ class Meshes(Node):
             img = self.texture_image
             self.texture = ctx.texture(img.size, 3, img.tobytes())
             self.texture_prog = get_smooth_lit_texturized_program()
-            self.texture_prog['texture_alpha'].value = self.texture_alpha
             self.vbo_uvs = ctx.buffer(self.uv_coords.astype('f4').tobytes())
             self.texture_vao = ctx.vertex_array(self.texture_prog,
                                                 [(self.vbo_vertices, '3f4 /v', 'in_position'),
@@ -336,6 +334,9 @@ class Meshes(Node):
         if flat != self.flat_shading:
             self.flat_shading = flat
             self.redraw()
+        
+        if self.has_texture:
+            self.texture_prog['texture_alpha'].value = self.texture_alpha
         vao = self._prepare_vao(camera, **kwargs)
         vao.render(moderngl.TRIANGLES)
 

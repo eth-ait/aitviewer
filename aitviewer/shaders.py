@@ -17,7 +17,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from moderngl_window import resources
 from moderngl_window.meta import ProgramDescription
 
+import functools
 
+# Add an LRU cache to this function to avoid recompiling shaders when they are reused
+@functools.lru_cache(maxsize=128, typed=False)
 def _load(name):
     return resources.programs.load(ProgramDescription(path=name))
 
