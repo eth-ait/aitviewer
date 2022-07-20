@@ -55,7 +55,6 @@ class Webcam(Streamable):
         self.ctx = ctx
         self.quad = geometry.quad_2d(pos=self.pos, size=self.size, normals=False)  # (2,2) is Full Screen i.e. -1 to 1 in x/y
         self.prog = get_screen_texture_program()
-        self.prog['transparency'].value = self.transparency
 
     def capture(self):
         ret, frame = self._cap.read()
