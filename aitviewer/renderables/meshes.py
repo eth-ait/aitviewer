@@ -190,17 +190,21 @@ class Meshes(Node):
 
     @Node.color.setter
     def color(self, color):
-        alpha_changed = np.abs((np.array(color) - np.array(self.color)))[-1] > 0
-        self.material.color = color
-        if self.is_renderable:
-            # If alpha changed, don't update all colors
-            if alpha_changed:
-                self._vertex_colors[..., -1] = color[-1]
-            # Otherwise, if no face colors, then override the existing vertex colors
-            elif self.face_colors is None:
-                self.vertex_colors = color
+        only_alpha_changed = (np.abs((np.array(color) - np.array(self.color)))[-1] > 0 
+                              and (np.array(color)[:3] == np.array(self.color[:3])).all())
 
-        self.redraw()
+        self.material.color = color
+
+        # If only alpha changed, don't update all colors
+        if only_alpha_changed:
+            self._vertex_colors[..., -1] = color[-1]
+        # Otherwise, if no face colors, then override the existing vertex colors
+        elif self.face_colors is None:
+            self.vertex_colors = color
+            
+        if self.is_renderable:
+            # Update color buffer
+            self.redraw()
 
     @property
     def current_vertices(self):
@@ -451,6 +455,10 @@ class VariableTopologyMeshes(Node):
             for f in range(self.n_frames):
                 m = self._construct_mesh_at_frame(f)
                 self._all_meshes.append(m)
+        # Set to true after changing the color and used when preloading 
+        # is not enabled to override the current mesh color with the new color
+        self._override_color = False 
+        
 
         self.show_texture = True
         self.norm_coloring = False
@@ -466,7 +474,6 @@ class VariableTopologyMeshes(Node):
                    self.uv_coords[frame_id] if self.uv_coords is not None else None,
                    self.texture_paths[frame_id] if self.texture_paths is not None else None,
                    **self.mesh_kwargs)
-        self.material = m.material
         return m
 
     @classmethod
@@ -497,7 +504,7 @@ class VariableTopologyMeshes(Node):
 
     @property
     def current_mesh(self):
-        if self.preload:
+        if self.preload: 
             return self._all_meshes[self.current_frame_id]
         else:
             m = self._current_mesh.get(self.current_frame_id, None)
@@ -506,6 +513,15 @@ class VariableTopologyMeshes(Node):
                 for k in self._current_mesh:
                     self._current_mesh[k].release()
                 m = self._construct_mesh_at_frame(self.current_frame_id)
+
+                # Set mesh position and scale
+                m.position = self.position
+                m.scale = self.scale
+
+                # Override the mesh color only if it has been changed by the user
+                if self._override_color:
+                    m.color = self.color
+
                 m.make_renderable(self.ctx)
                 self._current_mesh = {self.current_frame_id: m}
             return m
@@ -535,24 +551,45 @@ class VariableTopologyMeshes(Node):
 
     def gui_position(self, imgui):
         # Position controls
-        u, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.current_mesh.position, 0.1, format='%.2f')
+        u, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
         if u:
-            for m in self._all_meshes:
-                m.position = pos
+            self.position = pos
+            # If meshes are already loaded go through all and update the positions
+            if self.preload:
+                for m in self._all_meshes:
+                    m.position = pos
+            # Otherwise only update the current mesh, other meshes will be updated when loaded
+            else:
+                self.current_mesh.position = pos
 
     def gui_scale(self, imgui):
         # Scale controls
-        u, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.current_mesh.scale, 0.01, min_value=0.001,
+        u, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
                                     max_value=10.0, format='%.3f')
         if u:
-            self.current_mesh.scale = scale
+            self.scale = scale
+            # If meshes are already loaded go through all and update the scale factors
+            if self.preload:
+                for m in self._all_meshes:
+                    m.scale = scale
+            # Otherwise only update the current mesh, other meshes will be updated when loaded
+            else:
+                self.current_mesh.scale = scale
+
 
     def gui_material(self, imgui, show_advanced=True):
         # Color Control
-        uc, color = imgui.color_edit4("Color##color{}'".format(self.unique_name), *self.current_mesh.material.color, show_alpha=True)
+        uc, color = imgui.color_edit4("Color##color{}'".format(self.unique_name), *self.material.color, show_alpha=True)
         if uc:
-            for m in self._all_meshes:
-                m.color = color
+            self.color = color
+            # If meshes are already loaded go through all and update the vertex colors
+            if self.preload:
+                for m in self._all_meshes:
+                    m.color = color
+            # Otherwise only update the current mesh and enable color override for other meshes
+            else:
+                self.current_mesh.color = color
+                self._override_color = True
 
         _, self.show_texture = imgui.checkbox('Render Texture', self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring', self.norm_coloring)
