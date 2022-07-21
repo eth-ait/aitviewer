@@ -389,5 +389,16 @@ class Node(object):
         self._fragmap_vao.render(prog)
 
     def release(self):
-        """Release all resources occupied by this node."""
-        pass
+        """
+        Release all OpenGL resources used by this node. 
+        Subclasses that instantiate OpenGL objects should 
+        implement this method with '@hooked' to avoid leaking resources.
+
+        :param ctx: The moderngl context.
+        """
+        
+
+        if self._shadow_vao:
+            self._shadow_vao.release()
+        if self._fragmap_vao:
+            self._fragmap_vao.release()
