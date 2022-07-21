@@ -28,6 +28,7 @@ from aitviewer.scene.node import Node
 from aitviewer.shaders import get_smooth_lit_with_edges_program
 from aitviewer.shaders import get_flat_lit_with_edges_program
 from aitviewer.shaders import get_smooth_lit_texturized_program
+from aitviewer.utils.decorators import hooked
 from aitviewer.utils.utils import compute_vertex_and_face_normals
 from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
@@ -322,11 +323,21 @@ class Meshes(Node):
                                                  (self.vbo_uvs, '2f4 /v', 'in_uv')],
                                                 self.vbo_indices)
 
+    @hooked
     def release(self):
         self.smooth_vao.release()
         self.flat_vao.release()
+
+        self.vbo_vertices.release()
+        self.vbo_normals.release()
+        self.vbo_indices.release()
+        self.vbo_colors.release()
+
         if self.has_texture:
+            self.vbo_uvs.release()
+
             self.texture_vao.release()
+            self.texture.release()
 
     def render(self, camera, **kwargs):
         # Check if flat shading changed, in which case we need to update the VBOs.
