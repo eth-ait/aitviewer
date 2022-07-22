@@ -162,7 +162,7 @@ class Viewer(moderngl_window.WindowConfig):
 
         self._pan_camera = False
         self._rotate_camera = False
-        self._past_framerates = np.zeros([60]) - 1.0
+        self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
 
         self.mmi = None  # Mesh mouse intersection result
@@ -248,8 +248,8 @@ class Viewer(moderngl_window.WindowConfig):
             self.offscreen_quad.render(self.frag_map_prog)
 
         # FPS accounting.
-        self._past_framerates[:-1] = self._past_framerates[1:]
-        self._past_framerates[-1] = 1 / frame_time if frame_time > 0 else 9000.0
+        self._past_frametimes[:-1] = self._past_frametimes[1:]
+        self._past_frametimes[-1] = frame_time
 
         # Render the UI components.
         self.gui()
@@ -420,11 +420,12 @@ class Viewer(moderngl_window.WindowConfig):
                                                 self.run_animations)
 
         # Plot FPS
-        fps_avg = np.mean(self._past_framerates[self._past_framerates > 0.0])
-        ms_avg = 1000.0 / fps_avg
-
+        frametime_avg = np.mean(self._past_frametimes[self._past_frametimes > 0.0])
+        fps_avg = 1 / frametime_avg
+        ms_avg = frametime_avg * 1000.0 
+        
         imgui.plot_lines("Internal {:.1f} fps @ {:.2f} ms/frame".format(fps_avg, ms_avg),
-                         array('f', self._past_framerates.tolist()),
+                         array('f', (1.0 / self._past_frametimes).tolist()),
                          scale_min=0, scale_max=100.0, graph_size=(100, 20))
 
         _, self.playback_fps = imgui.drag_float('Target Playback fps##playback_fps', self.playback_fps, 0.1,
