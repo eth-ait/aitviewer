@@ -64,6 +64,8 @@ class Scene(Node):
         # Collect all renderable nodes
         rs = self.collect_nodes()
 
+        transparent = []
+
         # Draw all opaque objects first
         for r in rs:
             # An object is opaque if it's color alpha is 1.0 
@@ -77,12 +79,10 @@ class Scene(Node):
                     self.ctx.disable(moderngl.CULL_FACE)
 
                 self.safe_render(r, **kwargs)
+            else:
+                # Otherwise append to transparent list
+                transparent.append(r)
         
-        
-        
-        # An object is transparent if it's color alpha is less than 1.0 
-        # or, if it's a mesh, if the texture_alpha is less than 1.0    
-        transparent = [r for r in rs if r.color[3] < 1.0 or (not isinstance(r, Meshes) or r.texture_alpha < 1.0)]
         
         # Draw all transparent objects with backface culling enabled
         self.ctx.enable(moderngl.CULL_FACE)
