@@ -391,7 +391,8 @@ class Meshes(Node):
     def gui(self, imgui):
         super(Meshes, self).gui(imgui)
 
-        _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name), self.texture_alpha,  0.0, 1.0, '%.2f')
+        if self.has_texture:
+            _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name), self.texture_alpha,  0.0, 1.0, '%.2f')
         _, self.show_texture = imgui.checkbox('Render Texture##render_texture{}'.format(self.unique_name), self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name), self.norm_coloring)
 
