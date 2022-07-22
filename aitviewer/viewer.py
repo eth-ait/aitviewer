@@ -29,17 +29,17 @@ from aitviewer.configuration import CONFIG as C
 from aitviewer.scene.camera import PinholeCamera
 from aitviewer.scene.scene import Scene
 from aitviewer.streamables.streamable import Streamable
-from aitviewer.utils import images_to_video
+from aitviewer.utils import images_to_video, PerfTimer
 from collections import namedtuple
 from moderngl_window import activate_context
 from moderngl_window import geometry
 from moderngl_window import get_local_window_cls
 from moderngl_window.integrations.imgui import ModernglWindowRenderer
-from moderngl_window.timers.clock import Timer
 from moderngl_window.opengl.vao import VAO
 from pathlib import Path
 from PIL import Image
 from tqdm import tqdm
+
 
 
 MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')
@@ -78,7 +78,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.window.print_context_info()
         activate_context(window=self.window)
         # self.window.config = self
-        self.timer = Timer()
+        self.timer = PerfTimer()
         self.ctx = self.window.ctx
         super().__init__(self.ctx, self.window, self.timer)
 
