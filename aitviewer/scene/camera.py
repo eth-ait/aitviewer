@@ -56,10 +56,6 @@ class PinholeCamera(object):
         dir = self.target - self.position
         return dir / np.linalg.norm(dir)
 
-    def view(self):
-        """Return the current view matrix."""
-        return look_at(self.position, self.target, self.up)
-
     def save_cam(self):
         """Saves the current camera parameters"""
         cam_dir = C.export_dir + '/camera_params/'
@@ -94,31 +90,48 @@ class PinholeCamera(object):
             self.near = cam_dict['near']
             self.far = cam_dict['far']
 
-    def get_projection_matrix(self, width, height):
-        """
-        Returns the matrix that projects 3D coordinates in camera space to the image plane.
-        :param width: Width of the image in pixels.
-        :param height: Height of the image in pixels.
-        :return: The camera projection matrix as a 4x4 np array.
-        """
+    def update_matrices(self, width, height):
+        #Compute projection matrix
         if self.is_ortho:
             yscale = self.ortho_size
             xscale = width / height * yscale
-            return orthographic_projection(xscale, yscale, self.near, self.far)
+            P = orthographic_projection(xscale, yscale, self.near, self.far)
         else:
-            return perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
+            P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
+        
+        #Compute view matrix
+        V = look_at(self.position, self.target, self.up)
 
-    def get_view_projection_matrix(self, width, height):
+        #Update camera matrices
+        self.projection_matrix = P
+        self.view_matrix = V
+        self.view_projection_matrix = np.matmul(P, V)
+
+    def get_projection_matrix(self):
+        """
+        Returns the matrix that projects 3D coordinates in camera space to the image plane.
+        """
+        if self.projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the projection matrix")
+        return self.view_projection_matrix
+    
+    def get_view_matrix(self):
+        """
+        Returns the matrix that projects 3D coordinates in camera space to the image plane.
+        """
+        if self.view_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view matrix")
+        return self.view_matrix
+
+
+    def get_view_projection_matrix(self):
         """
         Returns the view-projection matrix, i.e. the 4x4 matrix that maps from homogenous world coordinates to image
         space.
-        :param width: Width of the image in pixels.
-        :param height: Height of the image in pixels.
-        :return: The view-projection matrix as a 4x4 np array.
         """
-        V = self.view()
-        P = self.get_projection_matrix(width, height)
-        return np.matmul(P, V)
+        if self.view_projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
+        return self.view_projection_matrix
 
     def dolly_zoom(self, speed):
         """Zoom by moving the camera along its view direction."""
@@ -152,7 +165,7 @@ class PinholeCamera(object):
 
     def rotate_azimuth_elevation(self, mouse_dx, mouse_dy):
         """Rotate the camera left-right and up-down (roll is not allowed)."""
-        cam_pose = np.linalg.inv(self.view())
+        cam_pose = np.linalg.inv(self.view_matrix)
 
         z_axis = cam_pose[:3, 2]
         dot = np.dot(z_axis, self.up)
@@ -176,7 +189,7 @@ class PinholeCamera(object):
         """Rotate around camera's up-axis by given angle (in radians)."""
         if np.abs(angle) < 1e-8:
             return
-        cam_pose = np.linalg.inv(self.view())
+        cam_pose = np.linalg.inv(self.view_matrix)
         y_axis = cam_pose[:3, 1]
         rot = rotation_matrix(angle, y_axis, self.target)
         self.position = _transform_vector(rot, self.position)
@@ -195,7 +208,7 @@ class PinholeCamera(object):
         screen_y *= scale
 
         pixel_2d = np.array([screen_x, screen_y, 0 if self.is_ortho else -1])
-        cam2world = np.linalg.inv(self.view())
+        cam2world = np.linalg.inv(self.view_matrix)
         pixel_3d = _transform_vector(cam2world, pixel_2d)
         if self.is_ortho:
             ray_origin = pixel_3d

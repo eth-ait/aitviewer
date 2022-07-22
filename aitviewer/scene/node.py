@@ -14,6 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+from functools import lru_cache
 import numpy as np
 
 from aitviewer.configuration import CONFIG as C
@@ -106,15 +107,25 @@ class Node(object):
     def scale(self, scale):
         self._scale = scale
 
+    @staticmethod
+    @lru_cache
+    def _compute_model_matrix(pos, rot, scale):
+        rotation = np.eye(4)
+        rotation[:3, :3] = np.array(rot)
+
+        trans = np.eye(4)
+        trans[:3, 3] = np.array(pos)
+
+        scale = np.diag([scale, scale, scale, 1])
+        
+        return (rotation @ trans @ scale).astype('f4')
+
     def model_matrix(self):
         """Construct model matrix from this node's orientation and position."""
-        rotation = np.eye(4)
-        rotation[:3, :3] = self.rotation
-        trans = np.eye(4)
-        trans[:3, 3] = self.position
-        scale = np.eye(4)
-        scale[([0, 1, 2], [0, 1, 2])] = self.scale
-        return (rotation @ trans @ scale).astype('f4')
+        return self._compute_model_matrix(
+               tuple(self.position), 
+               tuple(map(tuple, self.rotation)), 
+               self.scale)
 
     @property
     def color(self):
@@ -321,8 +332,7 @@ class Node(object):
 
     def set_camera_matrices(self, prog, camera, **kwargs):
         """Set the model view projection matrix in the given program."""
-        w, h = kwargs['window_size'][0], kwargs['window_size'][1]
-        mvp = np.matmul(camera.get_view_projection_matrix(w, h), self.model_matrix())
+        mvp = np.matmul(camera.get_view_projection_matrix(), self.model_matrix())
         # Transpose because np is row-major but OpenGL expects column-major.
         prog['mvp'].write(mvp.T.astype('f4').tobytes())
 
@@ -378,8 +388,8 @@ class Node(object):
         if self._fragmap_vao is None:
             return
 
-        p = camera.get_projection_matrix(window_size[0], window_size[1])
-        mv = camera.view() @ self.model_matrix()
+        p = camera.get_projection_matrix()
+        mv = camera.get_view_matrix() @ self.model_matrix()
 
         # Transpose because np is row-major but OpenGL expects column-major.
         prog['projection'].write(p.T.astype('f4').tobytes())

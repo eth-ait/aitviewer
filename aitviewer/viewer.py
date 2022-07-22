@@ -216,6 +216,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.timer.start()
         while not self.window.is_closing:
             current_time, delta = self.timer.next_frame()
+
             self.window.clear()
             self.window.render(current_time, delta)
             self.window.swap_buffers()
@@ -231,6 +232,10 @@ class Viewer(moderngl_window.WindowConfig):
         if self.run_animations and time - self._last_frame_rendered_at > 1.0 / self.playback_fps:
             self.scene.next_frame()
             self._last_frame_rendered_at = time
+
+        
+        #Update camera matrices that will be used for rendering
+        self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
 
         self.streamable_capture()
         self.render_fragmap()
@@ -262,8 +267,10 @@ class Viewer(moderngl_window.WindowConfig):
         self.offscreen.use()
         if self.shadows_enabled:
             rs = self.scene.collect_nodes()
+            
+            light_matrix = self.scene.lights[0].mvp()
             for r in rs:
-                r.render_shadowmap(self.scene.lights[0].mvp(), self.shadowmap_prog)
+                r.render_shadowmap(light_matrix, self.shadowmap_prog)
 
     def render_fragmap(self):
         """A pass to render the fragment picking map, i.e. render the scene with world coords as colors."""
@@ -460,7 +467,7 @@ class Viewer(moderngl_window.WindowConfig):
         if obj_id > 0 and tri_id > 0:
             node = self.scene.get_node_by_uid(obj_id)
             # Camera space to world space
-            point_world = np.array(np.linalg.inv(self.scene.camera.view()) @ np.array((x, y, z, 1.0)))[:-1]
+            point_world = np.array(np.linalg.inv(self.scene.camera.view_matrix) @ np.array((x, y, z, 1.0)))[:-1]
             point_local = (np.linalg.inv(node.model_matrix()) @ np.append(point_world, 1.0))[:-1]
             vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
             bc_coords = node.get_bc_coords_from_points(tri_id, [point_local])
@@ -616,6 +623,8 @@ class Viewer(moderngl_window.WindowConfig):
 
         for i, f in enumerate(range(self.animation_range[0], self.animation_range[-1]+1)):
             self.scene.camera.rotate_azimuth(az_delta)
+            self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
+
             self.scene.current_frame_id = f
             self.render_shadowmap()
             self.render_prepare()
@@ -658,6 +667,7 @@ class Viewer(moderngl_window.WindowConfig):
         progress_bar = tqdm(total=n_frames, desc='Rendering frames')
         for f in range(circle.shape[0]):
             self.scene.camera.position = circle[f]
+            self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
             self.render_shadowmap()
             self.render_prepare()
             self.render_scene()
