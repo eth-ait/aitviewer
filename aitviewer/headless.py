@@ -118,6 +118,8 @@ class HeadlessRenderer(Viewer):
         return not self.n_frames_rendered < self.max_frame
 
     def render(self, time, frame_time):
+        self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
+
         self.render_shadowmap()
         self.render_prepare()
         self.render_scene()
