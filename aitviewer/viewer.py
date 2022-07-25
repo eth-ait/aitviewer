@@ -104,7 +104,7 @@ class Viewer(moderngl_window.WindowConfig):
         )
         # Shaders for rendering the shadow map
         self.raw_depth_prog = self.load_program('shadow_mapping/raw_depth.glsl')
-        self.shadowmap_prog = self.load_program('shadow_mapping/shadowmap.glsl')
+        self.depth_only_prog = self.load_program('shadow_mapping/depth_only.glsl')
 
         # Mesh mouse intersection
         self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
@@ -270,7 +270,7 @@ class Viewer(moderngl_window.WindowConfig):
             
             light_matrix = self.scene.lights[0].mvp()
             for r in rs:
-                r.render_shadowmap(light_matrix, self.shadowmap_prog)
+                r.render_shadowmap(light_matrix, self.depth_only_prog)
 
     def render_fragmap(self):
         """A pass to render the fragment picking map, i.e. render the scene with world coords as colors."""
@@ -288,7 +288,8 @@ class Viewer(moderngl_window.WindowConfig):
                           flat_rendering=self.flat_rendering,
                           offscreen_depth=self.offscreen_depth,
                           light_mvp=self.scene.lights[0].mvp(),
-                          shadows_enabled=self.shadows_enabled)
+                          shadows_enabled=self.shadows_enabled,
+                          depth_prepass_prog=self.depth_only_prog)
 
     def render_prepare(self):
         """Prepare the framebuffer."""
