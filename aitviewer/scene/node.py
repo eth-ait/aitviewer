@@ -64,6 +64,7 @@ class Node(object):
         # To render shadows we need a separate VAO.
         self._shadow_vao = None
         self._fragmap_vao = None
+        self._depth_prepass_vao = None
 
         # GUI
         self.name = name if name is not None else type(self).__name__
@@ -363,6 +364,23 @@ class Node(object):
                 self._shadow_vao.index_buffer(index_buffer)
         else:
             raise ValueError('Shadow VAO already created.')
+    
+    
+    def allow_depth_prepass(self, vertex_buffer, index_buffer=None):
+        """
+        Call this function if the renderable is to use a depth prepass when it's color or texture is transparent
+        to avoid transparency artifacts that depend on rendering order of triangles.
+
+        :param vertex_buffer: All the vertex data that makes up this renderable. Can be a ModernGL VBO or a numpy array.
+        :param index_buffer: Optional index buffer if this renderable uses indexed rendering.
+        """
+        if self._depth_prepass_vao is None:
+            self._depth_prepass_vao = VAO('{}:shadow'.format(self.unique_name))
+            self._depth_prepass_vao.buffer(vertex_buffer, '3f', ['in_position'])
+            if index_buffer is not None:
+                self._depth_prepass_vao.index_buffer(index_buffer)
+        else:
+            raise ValueError('Shadow VAO already created.')
 
     def receive_shadow(self, program, **kwargs):
         """
@@ -397,6 +415,17 @@ class Node(object):
         prog['obj_id'] = self.uid
 
         self._fragmap_vao.render(prog)
+    
+
+    def render_depth_prepass(self, camera, **kwargs):
+        if self._depth_prepass_vao is None:
+            return
+
+        program = kwargs['depth_prepass_prog']
+        mvp = camera.get_view_projection_matrix() @ self.model_matrix()
+        program['mvp'].write(mvp.T.tobytes())
+
+        self._depth_prepass_vao.render(program)
 
     def release(self):
         """

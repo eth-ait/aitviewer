@@ -71,7 +71,7 @@ class Scene(Node):
             # An object is opaque if it's color alpha is 1.0 
             # and, if it's a mesh, if also the texture_alpha is 1.0
             if r.color[3] == 1.0 and (not isinstance(r, Meshes) or r.texture_alpha == 1.0):
-                # Turn off backface culling for opaque objects if enabled for the scene
+                # Turn off backface culling if enabled for the scene
                 # and requested by the current object
                 if self.backface_culling and r.backface_culling:
                     self.ctx.enable(moderngl.CULL_FACE)
@@ -83,17 +83,35 @@ class Scene(Node):
                 # Otherwise append to transparent list
                 transparent.append(r)
         
-        
-        # Draw all transparent objects with backface culling enabled
-        self.ctx.enable(moderngl.CULL_FACE)
-
         # Draw back to front by sorting transparent objects based on distance to camera.
         # As an approximation we only sort using the origin of the object 
         # which may be incorrect for large objects or objects significantly 
         # offset from their origin, but works in many cases.
         for r in sorted(transparent, key=lambda r: np.linalg.norm(r.position - self.camera.position), reverse=True):
+            # Render to depth buffer only
+            self.ctx.depth_func = '<'
+            self.safe_render_depth_prepass(r, **kwargs)
+
+            # Turn off backface culling if enabled for the scene
+            # and requested by the current object
+            if self.backface_culling and r.backface_culling:
+                self.ctx.enable(moderngl.CULL_FACE)
+            else:
+                self.ctx.disable(moderngl.CULL_FACE)
+
+            # Render normally with less equal depth comparison function,
+            # drawing only the pixels closer to the camera to avoid
+            # order dependent blending artifacts
+            self.ctx.depth_func = '<='
             self.safe_render(r, **kwargs)
-            
+
+        # Restore the default depth comparison function
+        self.ctx.depth_func = '<'
+    
+    def safe_render_depth_prepass(self, r, **kwargs):
+        if not r.is_renderable:
+            r.make_renderable(self.ctx)
+        r.render_depth_prepass(self.camera, **kwargs)
 
     def safe_render(self, r, **kwargs):
         if not r.is_renderable:
@@ -174,7 +192,7 @@ class Scene(Node):
         self.gui_camera(imgui)
         self.gui_lights(imgui)
         self.gui_renderables(imgui, self.nodes)
-
+        
     def gui_camera(self, imgui):
         # Camera GUI
         imgui.push_font(self.custom_font)

@@ -316,6 +316,8 @@ class Meshes(Node):
 
         self.make_pickable(self.vbo_vertices, self.vbo_indices)
 
+        self.allow_depth_prepass(self.vbo_vertices, self.vbo_indices)
+
         if self.has_texture:
             img = self.texture_image
             self.texture = ctx.texture(img.size, 3, img.tobytes())
