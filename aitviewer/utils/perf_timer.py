@@ -4,7 +4,7 @@ from typing import Tuple
 
 """
 Timer class adapted from moderngl_window.timers.clock.Timer.
-Users time.perf_counter() instead of time.time() for higher resolution timestamps.
+Uses time.perf_counter() instead of time.time() for higher resolution timestamps.
 """
 class PerfTimer(BaseTimer):
     """Timer based on python ``time``."""
