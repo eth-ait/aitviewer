@@ -103,9 +103,9 @@ class PinholeCamera(object):
         V = look_at(self.position, self.target, self.up)
 
         #Update camera matrices
-        self.projection_matrix = P
-        self.view_matrix = V
-        self.view_projection_matrix = np.matmul(P, V)
+        self.projection_matrix = P.astype('f4')
+        self.view_matrix = V.astype('f4')
+        self.view_projection_matrix = np.matmul(P, V).astype('f4')
 
     def get_projection_matrix(self):
         """
