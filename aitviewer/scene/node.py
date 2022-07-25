@@ -432,11 +432,7 @@ class Node(object):
         Release all OpenGL resources used by this node. 
         Subclasses that instantiate OpenGL objects should 
         implement this method with '@hooked' to avoid leaking resources.
-
-        :param ctx: The moderngl context.
         """
-        
-
         if self._shadow_vao:
             self._shadow_vao.release()
         if self._fragmap_vao:
