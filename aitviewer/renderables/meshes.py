@@ -549,6 +549,9 @@ class VariableTopologyMeshes(Node):
         self.current_mesh.norm_coloring = self.norm_coloring
         self.current_mesh.render(camera, **kwargs)
 
+    def render_depth_prepass(self, camera, **kwargs):
+        self.current_mesh.render_depth_prepass(camera, **kwargs)
+
     def render_shadowmap(self, light_mvp, program):
         self.current_mesh.render_shadowmap(light_mvp, program)
 

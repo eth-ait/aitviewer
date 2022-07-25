@@ -441,3 +441,5 @@ class Node(object):
             self._shadow_vao.release()
         if self._fragmap_vao:
             self._fragmap_vao.release()
+        if self._depth_prepass_vao:
+            self._depth_prepass_vao.release()
