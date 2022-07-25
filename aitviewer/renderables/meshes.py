@@ -100,13 +100,22 @@ class Meshes(Node):
 
     @vertices.setter
     def vertices(self, vertices):
+        # Update vertices and redraw
+        self.set_vertices(vertices, redraw=True)
+        
+    def set_vertices(self, vertices, redraw=True):
         self._vertices = vertices
         self.n_frames = len(vertices)
+
         # If vertex normals were supplied, they are no longer valid.
         self._vertex_normals = None
+
         # Must clear all LRU caches where the vertices are used.
         self.compute_vertex_and_face_normals.cache_clear()
-        self.redraw()
+
+        if redraw:
+            self.redraw()       
+
 
     @property
     def n_faces(self):

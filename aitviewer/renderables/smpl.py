@@ -297,7 +297,11 @@ class SMPLSequence(Node):
         self.vertices, self.joints, self.faces, self.skeleton = self.fk()
         if self._is_rigged:
             self.skeleton_seq.joint_positions = self.joints
-        self.mesh_seq.vertices = self.vertices
+
+        # Update vertices of underlying mesh without redrawing,
+        # 'redraw' will be called by super().redraw() since it propagates 
+        # to all children nodes
+        self.mesh_seq.set_vertices(self.vertices, redraw=False)
         super().redraw()
 
     def gui(self, imgui):
