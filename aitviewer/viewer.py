@@ -94,12 +94,10 @@ class Viewer(moderngl_window.WindowConfig):
         # Setup shadow mapping
         offscreen_size = 8192, 8192
         self.offscreen_depth = self.ctx.depth_texture(offscreen_size)
-        self.offscreen_depth.compare_func = ''
+        self.offscreen_depth.compare_func = '>'
         self.offscreen_depth.repeat_x = False
         self.offscreen_depth.repeat_y = False
-        self.offscreen_color = self.ctx.texture(offscreen_size, 4)
         self.offscreen = self.ctx.framebuffer(
-            color_attachments=[self.offscreen_color],
             depth_attachment=self.offscreen_depth
         )
         # Shaders for rendering the shadow map
