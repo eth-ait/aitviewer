@@ -50,6 +50,7 @@ class Meshes(Node):
                  uv_coords=None,
                  path_to_texture=None,
                  texture_alpha=1.0,
+                 cast_shadow=True,
                  **kwargs):
         """
         Initializer.
@@ -101,6 +102,7 @@ class Meshes(Node):
         self.show_texture = self.has_texture
         self.norm_coloring = False
         self.normals_r = None
+        self._cast_shadow = cast_shadow
 
 
     @property
@@ -330,7 +332,8 @@ class Meshes(Node):
                                           (self.vbo_colors, '4f4 /v', 'in_color')],
                                          self.vbo_indices)
 
-        self.cast_shadow(self.vbo_vertices, self.vbo_indices)
+        if self._cast_shadow:
+            self.cast_shadow(self.vbo_vertices, self.vbo_indices)
 
         self.make_pickable(self.vbo_vertices, self.vbo_indices)
 

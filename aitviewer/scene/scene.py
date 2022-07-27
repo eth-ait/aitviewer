@@ -46,6 +46,7 @@ class Scene(Node):
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
         self.lights.append(Light(name='Back Light', position=(0.0, 10.0, 15.0), color=(1.0, 1.0, 1.0, 1.0)))
         self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0)))
+        self.add(*self.lights, show_in_hierarchy=False)
 
         # Scene items
         self.origin = CoordinateSystem(name="Origin", length=0.1)
