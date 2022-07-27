@@ -20,6 +20,8 @@ import moderngl
 import numpy as np
 import trimesh
 import tqdm
+import re
+import pickle
 
 from functools import lru_cache
 from PIL import Image
@@ -83,8 +85,15 @@ class Meshes(Node):
         # Texture handling.
         self.has_texture = uv_coords is not None
         self.uv_coords = uv_coords
-        self.texture_image = Image.open(path_to_texture).transpose(method=Image.FLIP_TOP_BOTTOM).convert(
-            "RGB") if self.has_texture else None
+        
+        if self.has_texture:
+            self.use_pickle_texture = path_to_texture.endswith((".pickle", "pkl"))
+            if self.use_pickle_texture:
+                self.texture_image = pickle.load(open(path_to_texture, "rb"))
+            else:
+                self.texture_image = Image.open(path_to_texture).transpose(method=Image.FLIP_TOP_BOTTOM).convert("RGB")
+        else:
+            self.texture_image = None
         self.texture_alpha = texture_alpha
 
         # Misc.
@@ -329,7 +338,10 @@ class Meshes(Node):
 
         if self.has_texture:
             img = self.texture_image
-            self.texture = ctx.texture(img.size, 3, img.tobytes())
+            if self.use_pickle_texture:
+                self.texture = ctx.texture(img.shape[:2], img.shape[2], img.tobytes())
+            else:
+                self.texture = ctx.texture(img.size, 3, img.tobytes())
             self.texture_prog = get_smooth_lit_texturized_program()
             self.vbo_uvs = ctx.buffer(self.uv_coords.astype('f4').tobytes())
             self.texture_vao = ctx.vertex_array(self.texture_prog,
@@ -514,6 +526,98 @@ class VariableTopologyMeshes(Node):
             vertex_colors.append(m.visual.vertex_colors / 255.0)
         return cls(vertices, faces, vertex_normals, vertex_colors=vertex_colors)
 
+
+    @classmethod
+    def from_directory(cls, path, preload=False, vertex_scale=1.0, high_quality=False, **kwargs):
+        """ 
+        Initialize from a directory containing mesh and texture data.
+
+        Mesh files must be in pickle (.pkl) or obj (.obj) format, their name
+        must start with 'mesh' and end with a frame number.
+
+        Texture files must be in pickle (.pkl), png (.png) or jpeg (.jpg or .jpeg) format
+        and their name must match the respective mesh filename with 'atlas' instead of 'mesh' 
+        at the start of the filename.
+
+        Example:
+        path/mesh_001.obj
+        path/mesh_002.obj
+        path/atlas_001.png
+        path/atlas_002.png
+
+        A mesh pickle file must be a dictionary of numpy array with the following shapes:
+        {
+            'vertices': (V, 3)
+            'normals':  (V, 3)
+            'uvs':      (V, 2)
+            'faces':    (F, 3)
+        }
+
+        A texture pickle file must be a raw RGB image stored as a numpy array of shape (width, height, 3)
+        """
+        
+        files = os.listdir(path)
+        
+        # Supported mesh formats in order of preference (fastest to slowest)
+        mesh_supported_formats = [".pkl", ".obj"]
+
+        mesh_format = None
+        for format in mesh_supported_formats:
+            if any(map(lambda x: x.startswith("mesh") and x.endswith(format), files)):
+                mesh_format = format
+                break
+
+        if mesh_format is None:
+            raise ValueError(f'Unable to find mesh with supported extensions ({", ".join(mesh_supported_formats)}) at {path}')
+            
+        
+        # Supported texture formats in order of preference (fastest to slowest)
+        texture_supported_formats = [".pkl", ".jpg", ".jpeg", ".png"]
+
+        # If high_quality is set to true prioritize PNGs
+        if high_quality:
+            texture_supported_formats = [".png", ".pkl", ".jpg", ".jpeg"]
+        
+        texture_format = None
+        for format in texture_supported_formats:
+            if any(map(lambda x: x.startswith("atlas") and x.endswith(format), files)):
+                texture_format = format
+                break
+        
+        if texture_format is None:
+            raise ValueError(f'Unable to find atlas with supported extensions ({", ".join(texture_supported_formats)}) at {path}')
+        
+        # Load all objects sorted by the keyframe number specified in the file name
+        regex = re.compile(r"(\d*)$")
+        def sort_key(x):
+            name = os.path.splitext(x)[0]
+            return int(regex.search(name).group(0))
+
+        obj_names = filter(lambda x: x.startswith("mesh") and x.endswith(mesh_format), files)
+        obj_names = sorted(obj_names, key=sort_key)
+
+        vertices, faces, vertex_normals, uvs = [], [], [], []
+        texture_paths = []
+
+        for obj_name in tqdm.tqdm(obj_names):
+            if mesh_format == ".pkl":
+                mesh = pickle.load(open(os.path.join(path, obj_name), "rb"))
+                vertices.append(mesh['vertices'] * vertex_scale)
+                faces.append(mesh['faces'])
+                vertex_normals.append(mesh['normals'])
+                uvs.append(mesh['uvs'])
+            else: 
+                mesh = trimesh.load(os.path.join(path, obj_name), process=False)
+                vertices.append(mesh.vertices * vertex_scale)
+                faces.append(mesh.faces)
+                vertex_normals.append(mesh.vertex_normals)
+                uvs.append(np.array(mesh.visual.uv).squeeze())
+
+            texture_paths.append(os.path.join(path, obj_name.replace("mesh", "atlas").replace(mesh_format, texture_format)))
+
+        return cls(vertices, faces, vertex_normals, uv_coords=uvs, 
+            texture_paths=texture_paths, preload = preload, **kwargs)
+    
     @property
     def current_mesh(self):
         if self.preload: 
