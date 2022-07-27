@@ -368,7 +368,7 @@ class Node(object):
     
     def allow_depth_prepass(self, vertex_buffer, index_buffer=None):
         """
-        Call this function if the renderable is to use a depth prepass when it's color or texture is transparent
+        Call this function if the renderable is to use a depth prepass when its color or texture is transparent
         to avoid transparency artifacts that depend on rendering order of triangles.
 
         :param vertex_buffer: All the vertex data that makes up this renderable. Can be a ModernGL VBO or a numpy array.
@@ -432,11 +432,7 @@ class Node(object):
         Release all OpenGL resources used by this node. 
         Subclasses that instantiate OpenGL objects should 
         implement this method with '@hooked' to avoid leaking resources.
-
-        :param ctx: The moderngl context.
         """
-        
-
         if self._shadow_vao:
             self._shadow_vao.release()
         if self._fragmap_vao:
