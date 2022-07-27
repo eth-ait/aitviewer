@@ -634,6 +634,9 @@ class VariableTopologyMeshes(Node):
                 m.position = self.position
                 m.scale = self.scale
 
+                # Set mesh material
+                m.material = self.material
+
                 # Override the mesh color only if it has been changed by the user
                 if self._override_color:
                     m.color = self.color
@@ -718,15 +721,28 @@ class VariableTopologyMeshes(Node):
                 # Diffuse
                 ud, diffuse = imgui.slider_float('Diffuse##diffuse{}'.format(self.unique_name), self.current_mesh.material.diffuse,
                                                  0.0, 1.0, '%.2f')
+                
                 if ud:
-                    for m in self._all_meshes:
-                        m.material.diffuse = diffuse
+                    self.material.diffuse = diffuse
+                    # If meshes are already loaded go through all and update the diffuse value
+                    if self.preload:
+                        for m in self._all_meshes:
+                            m.material.diffuse = diffuse
+                    # Otherwise only update the current mesh, other meshes will be updated when loaded
+                    else:
+                        self.current_mesh.material.diffuse = diffuse
 
                 # Ambient
                 ua, ambient = imgui.slider_float('Ambient##ambient{}'.format(self.unique_name), self.current_mesh.material.ambient,
-                                                 0.0, 1.0, '%.2f')
+                                                 0.0, 1.0, '%.2f')                
                 if ua:
-                    for m in self._all_meshes:
-                        m.material.ambient = ambient
+                    self.material.ambient = ambient
+                    # If meshes are already loaded go through all and update the ambient value
+                    if self.preload:
+                        for m in self._all_meshes:
+                            m.material.ambient = ambient
+                    # Otherwise only update the current mesh, other meshes will be updated when loaded
+                    else:
+                        self.current_mesh.material.ambient = ambient
 
                 imgui.tree_pop()
