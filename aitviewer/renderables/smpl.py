@@ -301,7 +301,7 @@ class SMPLSequence(Node):
         # Update vertices of underlying mesh without redrawing,
         # 'redraw' will be called by super().redraw() since it propagates 
         # to all children nodes
-        self.mesh_seq.set_vertices(self.vertices, redraw=False)
+        self.mesh_seq.vertices = self.vertices
         super().redraw()
 
     def gui(self, imgui):

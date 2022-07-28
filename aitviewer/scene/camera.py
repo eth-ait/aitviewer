@@ -113,7 +113,7 @@ class PinholeCamera(object):
         """
         if self.projection_matrix is None:
             raise ValueError("update_matrices() must be called before to update the projection matrix")
-        return self.view_projection_matrix
+        return self.projection_matrix
     
     def get_view_matrix(self):
         """

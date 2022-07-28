@@ -61,10 +61,10 @@ class Node(object):
         self.is_renderable = False
         self.backface_culling = True
 
-        # To render shadows we need a separate VAO.
-        self._shadow_vao = None
-        self._fragmap_vao = None
-        self._depth_prepass_vao = None
+        # Flags to enable rendering passes
+        self.cast_shadow = False
+        self.fragmap = False
+        self.depth_prepass = False
 
         # GUI
         self.name = name if name is not None else type(self).__name__
@@ -109,7 +109,7 @@ class Node(object):
         self._scale = scale
 
     @staticmethod
-    @lru_cache
+    @lru_cache()
     def _compute_model_matrix(pos, rot, scale):
         rotation = np.eye(4)
         rotation[:3, :3] = np.array(rot)
@@ -326,6 +326,13 @@ class Node(object):
         """Render the current frame in this sequence."""
         pass
 
+    def render_positions(self):
+        """
+        Render with a VAO with only positions bound, 
+        used for shadow mapping, fragmap and depth prepass.
+        """
+        pass
+
     def redraw(self, **kwargs):
         """ Perform update and redraw operations. Push to the GPU when finished. Recursively redraw child nodes"""
         for n in self.nodes:
@@ -336,51 +343,6 @@ class Node(object):
         mvp = np.matmul(camera.get_view_projection_matrix(), self.model_matrix())
         # Transpose because np is row-major but OpenGL expects column-major.
         prog['mvp'].write(mvp.T.astype('f4').tobytes())
-
-    def make_pickable(self, vertex_buffer, index_buffer=None):
-        """
-        Call this function if the renderable can be clicked on.
-        :param vertex_buffer: All the vertex data that makes up this renderable. Can be a ModernGL VBO or a numpy array.
-        :param index_buffer: Optional index buffer if this renderable uses indexed rendering.
-        """
-        if self._fragmap_vao is None:
-            self._fragmap_vao = VAO('{}:fragmap'.format(self.unique_name))
-            self._fragmap_vao.buffer(vertex_buffer, '3f', ['in_position'])
-            if index_buffer is not None:
-                self._fragmap_vao.index_buffer(index_buffer)
-        else:
-            raise ValueError('Fragment map VAO already created.')
-
-    def cast_shadow(self, vertex_buffer, index_buffer=None):
-        """
-        Call this function if the renderable is to cast a shadow.
-        :param vertex_buffer: All the vertex data that makes up this renderable. Can be a ModernGL VBO or a numpy array.
-        :param index_buffer: Optional index buffer if this renderable uses indexed rendering.
-        """
-        if self._shadow_vao is None:
-            self._shadow_vao = VAO('{}:shadow'.format(self.unique_name))
-            self._shadow_vao.buffer(vertex_buffer, '3f', ['in_position'])
-            if index_buffer is not None:
-                self._shadow_vao.index_buffer(index_buffer)
-        else:
-            raise ValueError('Shadow VAO already created.')
-    
-    
-    def allow_depth_prepass(self, vertex_buffer, index_buffer=None):
-        """
-        Call this function if the renderable is to use a depth prepass when its color or texture is transparent
-        to avoid transparency artifacts that depend on rendering order of triangles.
-
-        :param vertex_buffer: All the vertex data that makes up this renderable. Can be a ModernGL VBO or a numpy array.
-        :param index_buffer: Optional index buffer if this renderable uses indexed rendering.
-        """
-        if self._depth_prepass_vao is None:
-            self._depth_prepass_vao = VAO('{}:shadow'.format(self.unique_name))
-            self._depth_prepass_vao.buffer(vertex_buffer, '3f', ['in_position'])
-            if index_buffer is not None:
-                self._depth_prepass_vao.index_buffer(index_buffer)
-        else:
-            raise ValueError('Shadow VAO already created.')
 
     def receive_shadow(self, program, **kwargs):
         """
@@ -393,17 +355,17 @@ class Node(object):
             program['light_mvp'].write(light_mvp.T.tobytes())
             kwargs['offscreen_depth'].use(location=0)
 
-    def render_shadowmap(self, light_mvp, program):
-        if self._shadow_vao is None:
+    def render_shadowmap(self, light_mvp, prog):
+        if not self.cast_shadow:
             return
 
         mvp = light_mvp @ self.model_matrix()
-        program['mvp'].write(mvp.T.tobytes())
+        prog['mvp'].write(mvp.T.tobytes())
 
-        self._shadow_vao.render(program)
+        self.render_positions(prog)
 
     def render_fragmap(self, camera, prog, window_size):
-        if self._fragmap_vao is None:
+        if not self.fragmap:
             return
 
         p = camera.get_projection_matrix()
@@ -414,18 +376,17 @@ class Node(object):
         prog['modelview'].write(mv.T.astype('f4').tobytes())
         prog['obj_id'] = self.uid
 
-        self._fragmap_vao.render(prog)
-    
+        self.render_positions(prog)    
 
     def render_depth_prepass(self, camera, **kwargs):
-        if self._depth_prepass_vao is None:
+        if not self.depth_prepass:
             return
 
-        program = kwargs['depth_prepass_prog']
+        prog = kwargs['depth_prepass_prog']
         mvp = camera.get_view_projection_matrix() @ self.model_matrix()
-        program['mvp'].write(mvp.T.tobytes())
+        prog['mvp'].write(mvp.T.tobytes())
 
-        self._depth_prepass_vao.render(program)
+        self.render_positions(prog)  
 
     def release(self):
         """
@@ -433,9 +394,3 @@ class Node(object):
         Subclasses that instantiate OpenGL objects should 
         implement this method with '@hooked' to avoid leaking resources.
         """
-        if self._shadow_vao:
-            self._shadow_vao.release()
-        if self._fragmap_vao:
-            self._fragmap_vao.release()
-        if self._depth_prepass_vao:
-            self._depth_prepass_vao.release()

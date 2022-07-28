@@ -94,12 +94,10 @@ class Viewer(moderngl_window.WindowConfig):
         # Setup shadow mapping
         offscreen_size = 8192, 8192
         self.offscreen_depth = self.ctx.depth_texture(offscreen_size)
-        self.offscreen_depth.compare_func = ''
+        self.offscreen_depth.compare_func = '>'
         self.offscreen_depth.repeat_x = False
         self.offscreen_depth.repeat_y = False
-        self.offscreen_color = self.ctx.texture(offscreen_size, 4)
         self.offscreen = self.ctx.framebuffer(
-            color_attachments=[self.offscreen_color],
             depth_attachment=self.offscreen_depth
         )
         # Shaders for rendering the shadow map
@@ -469,7 +467,7 @@ class Viewer(moderngl_window.WindowConfig):
         if obj_id > 0 and tri_id > 0:
             node = self.scene.get_node_by_uid(obj_id)
             # Camera space to world space
-            point_world = np.array(np.linalg.inv(self.scene.camera.view_matrix) @ np.array((x, y, z, 1.0)))[:-1]
+            point_world = np.array(np.linalg.inv(self.scene.camera.get_view_matrix()) @ np.array((x, y, z, 1.0)))[:-1]
             point_local = (np.linalg.inv(node.model_matrix()) @ np.append(point_world, 1.0))[:-1]
             vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
             bc_coords = node.get_bc_coords_from_points(tri_id, [point_local])

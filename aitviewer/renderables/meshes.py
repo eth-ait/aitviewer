@@ -17,9 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 
 import moderngl
+from moderngl_window.opengl.vao import VAO
 import numpy as np
 import trimesh
 import tqdm
+import re
+import pickle
 
 from functools import lru_cache
 from PIL import Image
@@ -48,6 +51,7 @@ class Meshes(Node):
                  uv_coords=None,
                  path_to_texture=None,
                  texture_alpha=1.0,
+                 cast_shadow=True,
                  **kwargs):
         """
         Initializer.
@@ -83,16 +87,28 @@ class Meshes(Node):
         # Texture handling.
         self.has_texture = uv_coords is not None
         self.uv_coords = uv_coords
-        self.texture_image = Image.open(path_to_texture).transpose(method=Image.FLIP_TOP_BOTTOM).convert(
-            "RGB") if self.has_texture else None
+
+        if self.has_texture:
+            self.use_pickle_texture = path_to_texture.endswith((".pickle", "pkl"))
+            if self.use_pickle_texture:
+                self.texture_image = pickle.load(open(path_to_texture, "rb"))
+            else:
+                self.texture_image = Image.open(path_to_texture).transpose(method=Image.FLIP_TOP_BOTTOM).convert("RGB")
+        else:
+            self.texture_image = None
         self.texture_alpha = texture_alpha
+
+        # Enable rendering passes
+        self.cast_shadow = cast_shadow
+        self.fragmap = True
+        self.depth_prepass = True
 
         # Misc.
         self.flat_shading = False
         self.show_texture = self.has_texture
         self.norm_coloring = False
         self.normals_r = None
-
+        self.need_upload = True
 
     @property
     def vertices(self):
@@ -101,9 +117,6 @@ class Meshes(Node):
     @vertices.setter
     def vertices(self, vertices):
         # Update vertices and redraw
-        self.set_vertices(vertices, redraw=True)
-        
-    def set_vertices(self, vertices, redraw=True):
         self._vertices = vertices
         self.n_frames = len(vertices)
 
@@ -113,9 +126,7 @@ class Meshes(Node):
         # Must clear all LRU caches where the vertices are used.
         self.compute_vertex_and_face_normals.cache_clear()
 
-        if redraw:
-            self.redraw()       
-
+        self.redraw()
 
     @property
     def n_faces(self):
@@ -185,6 +196,7 @@ class Meshes(Node):
             self._vertex_colors = np.full((self.n_frames, self.n_vertices, 4), vertex_colors)
         else:
             self._vertex_colors = vertex_colors
+        self.redraw()
 
     @property
     def face_colors(self):
@@ -199,7 +211,7 @@ class Meshes(Node):
 
     @Node.color.setter
     def color(self, color):
-        only_alpha_changed = (np.abs((np.array(color) - np.array(self.color)))[-1] > 0 
+        only_alpha_changed = (np.abs((np.array(color) - np.array(self.color)))[-1] > 0
                               and (np.array(color)[:3] == np.array(self.color[:3])).all())
 
         self.material.color = color
@@ -210,10 +222,9 @@ class Meshes(Node):
         # Otherwise, if no face colors, then override the existing vertex colors
         elif self.face_colors is None:
             self.vertex_colors = color
-            
-        if self.is_renderable:
-            # Update color buffer
-            self.redraw()
+
+        # Update color buffer
+        self.redraw()
 
     @property
     def current_vertices(self):
@@ -255,10 +266,12 @@ class Meshes(Node):
         super().on_frame_update()
         self.redraw()
 
-    def redraw(self):
+    def _upload_buffers(self):
         """Upload the current frame data to the GPU for rendering."""
-        if not self.is_renderable:
+        if not self.is_renderable or not self._need_upload:
             return
+
+        self._need_upload = False
 
         # Each write call takes about 1-2 ms
         vertices = self.current_vertices
@@ -281,11 +294,8 @@ class Meshes(Node):
         if self.has_texture:
             self.vbo_uvs.write(self.uv_coords.astype('f4').tobytes())
 
-    def _clear_buffer(self):
-        self.vbo_vertices.clear()
-        self.vbo_colors.clear()
-        if self.has_texture:
-            self.vbo_uvs.clear()
+    def redraw(self):
+        self._need_upload = True
 
     # noinspection PyAttributeOutsideInit
     @Node.once
@@ -321,15 +331,18 @@ class Meshes(Node):
                                           (self.vbo_colors, '4f4 /v', 'in_color')],
                                          self.vbo_indices)
 
-        self.cast_shadow(self.vbo_vertices, self.vbo_indices)
-
-        self.make_pickable(self.vbo_vertices, self.vbo_indices)
+        self.positions_vao = VAO('{}:positions'.format(self.unique_name))
+        self.positions_vao.buffer(self.vbo_vertices, '3f', ['in_position'])
+        self.positions_vao.index_buffer(self.vbo_indices)
 
         self.allow_depth_prepass(self.vbo_vertices, self.vbo_indices)
 
         if self.has_texture:
             img = self.texture_image
-            self.texture = ctx.texture(img.size, 3, img.tobytes())
+            if self.use_pickle_texture:
+                self.texture = ctx.texture(img.shape[:2], img.shape[2], img.tobytes())
+            else:
+                self.texture = ctx.texture(img.size, 3, img.tobytes())
             self.texture_prog = get_smooth_lit_texturized_program()
             self.vbo_uvs = ctx.buffer(self.uv_coords.astype('f4').tobytes())
             self.texture_vao = ctx.vertex_array(self.texture_prog,
@@ -342,16 +355,18 @@ class Meshes(Node):
     def release(self):
         self.smooth_vao.release()
         self.flat_vao.release()
+        self.positions_vao.release(buffer=False)
 
         self.vbo_vertices.release()
-        self.vbo_normals.release()
         self.vbo_indices.release()
+        self.vbo_normals.release()
         self.vbo_colors.release()
 
         if self.has_texture:
             self.vbo_uvs.release()
 
             self.texture_vao.release()
+            self.vbo_uvs.release()
             self.texture.release()
 
     def render(self, camera, **kwargs):
@@ -360,14 +375,21 @@ class Meshes(Node):
         if flat != self.flat_shading:
             self.flat_shading = flat
             self.redraw()
-        
+            
         if self.has_texture:
             self.texture_prog['texture_alpha'].value = self.texture_alpha
         vao = self._prepare_vao(camera, **kwargs)
         vao.render(moderngl.TRIANGLES)
 
+    def render_positions(self, prog):
+        if self.is_renderable:
+            self._upload_buffers()
+            self.positions_vao.render(prog)
+
     def _prepare_vao(self, camera, **kwargs):
         """Prepare the shader pipeline and the VAO."""
+        self._upload_buffers()
+
         if self.has_texture and self.show_texture:
             prog, vao = self.texture_prog, self.texture_vao
             self.texture.use(1)
@@ -403,15 +425,18 @@ class Meshes(Node):
         super(Meshes, self).gui(imgui)
 
         if self.has_texture:
-            _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name), self.texture_alpha,  0.0, 1.0, '%.2f')
-        _, self.show_texture = imgui.checkbox('Render Texture##render_texture{}'.format(self.unique_name), self.show_texture)
-        _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name), self.norm_coloring)
+            _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name),
+                                                       self.texture_alpha, 0.0, 1.0, '%.2f')
+        _, self.show_texture = imgui.checkbox('Render Texture##render_texture{}'.format(self.unique_name),
+                                              self.show_texture)
+        _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
+                                               self.norm_coloring)
 
         # TODO: Add  export workflow for all nodes
         if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
             mesh = trimesh.Trimesh(vertices=self.current_vertices, faces=self.faces, process=False)
             mesh.export('../export/' + self.name + '.obj')
-        
+
         if self.normals_r is None:
             if imgui.button('Show Normals ##show_normals{}'.format(self.unique_name)):
                 self._show_normals()
@@ -469,8 +494,7 @@ class VariableTopologyMeshes(Node):
                 self._all_meshes.append(m)
         # Set to true after changing the color and used when preloading 
         # is not enabled to override the current mesh color with the new color
-        self._override_color = False 
-        
+        self._override_color = False
 
         self.show_texture = True
         self.norm_coloring = False
@@ -514,6 +538,100 @@ class VariableTopologyMeshes(Node):
             vertex_colors.append(m.visual.vertex_colors / 255.0)
         return cls(vertices, faces, vertex_normals, vertex_colors=vertex_colors)
 
+    @classmethod
+    def from_directory(cls, path, preload=False, vertex_scale=1.0, high_quality=False, **kwargs):
+        """ 
+        Initialize from a directory containing mesh and texture data.
+
+        Mesh files must be in pickle (.pkl) or obj (.obj) format, their name
+        must start with 'mesh' and end with a frame number.
+
+        Texture files must be in pickle (.pkl), png (.png) or jpeg (.jpg or .jpeg) format
+        and their name must match the respective mesh filename with 'atlas' instead of 'mesh' 
+        at the start of the filename.
+
+        Example:
+        path/mesh_001.obj
+        path/mesh_002.obj
+        path/atlas_001.png
+        path/atlas_002.png
+
+        A mesh pickle file must be a dictionary of numpy array with the following shapes:
+        {
+            'vertices': (V, 3)
+            'normals':  (V, 3)
+            'uvs':      (V, 2)
+            'faces':    (F, 3)
+        }
+
+        A texture pickle file must be a raw RGB image stored as a numpy array of shape (width, height, 3)
+        """
+
+        files = os.listdir(path)
+
+        # Supported mesh formats in order of preference (fastest to slowest)
+        mesh_supported_formats = [".pkl", ".obj"]
+
+        mesh_format = None
+        for format in mesh_supported_formats:
+            if any(map(lambda x: x.startswith("mesh") and x.endswith(format), files)):
+                mesh_format = format
+                break
+
+        if mesh_format is None:
+            raise ValueError(
+                f'Unable to find mesh with supported extensions ({", ".join(mesh_supported_formats)}) at {path}')
+
+        # Supported texture formats in order of preference (fastest to slowest)
+        texture_supported_formats = [".pkl", ".jpg", ".jpeg", ".png"]
+
+        # If high_quality is set to true prioritize PNGs
+        if high_quality:
+            texture_supported_formats = [".png", ".jpg", ".jpeg", ".pkl"]
+
+        texture_format = None
+        for format in texture_supported_formats:
+            if any(map(lambda x: x.startswith("atlas") and x.endswith(format), files)):
+                texture_format = format
+                break
+
+        if texture_format is None:
+            raise ValueError(
+                f'Unable to find atlas with supported extensions ({", ".join(texture_supported_formats)}) at {path}')
+
+        # Load all objects sorted by the keyframe number specified in the file name
+        regex = re.compile(r"(\d*)$")
+
+        def sort_key(x):
+            name = os.path.splitext(x)[0]
+            return int(regex.search(name).group(0))
+
+        obj_names = filter(lambda x: x.startswith("mesh") and x.endswith(mesh_format), files)
+        obj_names = sorted(obj_names, key=sort_key)
+
+        vertices, faces, vertex_normals, uvs = [], [], [], []
+        texture_paths = []
+
+        for obj_name in tqdm.tqdm(obj_names):
+            if mesh_format == ".pkl":
+                mesh = pickle.load(open(os.path.join(path, obj_name), "rb"))
+                vertices.append(mesh['vertices'] * vertex_scale)
+                faces.append(mesh['faces'])
+                vertex_normals.append(mesh['normals'])
+                uvs.append(mesh['uvs'])
+            else:
+                mesh = trimesh.load(os.path.join(path, obj_name), process=False)
+                vertices.append(mesh.vertices * vertex_scale)
+                faces.append(mesh.faces)
+                vertex_normals.append(mesh.vertex_normals)
+                uvs.append(np.array(mesh.visual.uv).squeeze())
+
+            texture_paths.append(
+                os.path.join(path, obj_name.replace("mesh", "atlas").replace(mesh_format, texture_format)))
+
+        return cls(vertices, faces, vertex_normals, uv_coords=uvs,
+                   texture_paths=texture_paths, preload=preload, **kwargs)
+
     @property
     def current_mesh(self):
         if self.preload: 
@@ -529,6 +647,9 @@ class VariableTopologyMeshes(Node):
                 # Set mesh position and scale
                 m.position = self.position
                 m.scale = self.scale
+
+                # Set mesh material
+                m.material = self.material
 
                 # Override the mesh color only if it has been changed by the user
                 if self._override_color:
@@ -591,7 +712,6 @@ class VariableTopologyMeshes(Node):
             else:
                 self.current_mesh.scale = scale
 
-
     def gui_material(self, imgui, show_advanced=True):
         # Color Control
         uc, color = imgui.color_edit4("Color##color{}'".format(self.unique_name), *self.material.color, show_alpha=True)
@@ -612,17 +732,32 @@ class VariableTopologyMeshes(Node):
         if show_advanced:
             if imgui.tree_node("Advanced material##advanced_material{}'".format(self.unique_name)):
                 # Diffuse
-                ud, diffuse = imgui.slider_float('Diffuse##diffuse{}'.format(self.unique_name), self.current_mesh.material.diffuse,
+                ud, diffuse = imgui.slider_float('Diffuse##diffuse{}'.format(self.unique_name),
+                                                 self.current_mesh.material.diffuse,
                                                  0.0, 1.0, '%.2f')
+
                 if ud:
-                    for m in self._all_meshes:
-                        m.material.diffuse = diffuse
+                    self.material.diffuse = diffuse
+                    # If meshes are already loaded go through all and update the diffuse value
+                    if self.preload:
+                        for m in self._all_meshes:
+                            m.material.diffuse = diffuse
+                    # Otherwise only update the current mesh, other meshes will be updated when loaded
+                    else:
+                        self.current_mesh.material.diffuse = diffuse
 
                 # Ambient
-                ua, ambient = imgui.slider_float('Ambient##ambient{}'.format(self.unique_name), self.current_mesh.material.ambient,
+                ua, ambient = imgui.slider_float('Ambient##ambient{}'.format(self.unique_name),
+                                                 self.current_mesh.material.ambient,
                                                  0.0, 1.0, '%.2f')
                 if ua:
-                    for m in self._all_meshes:
-                        m.material.ambient = ambient
+                    self.material.ambient = ambient
+                    # If meshes are already loaded go through all and update the ambient value
+                    if self.preload:
+                        for m in self._all_meshes:
+                            m.material.ambient = ambient
+                    # Otherwise only update the current mesh, other meshes will be updated when loaded
+                    else:
+                        self.current_mesh.material.ambient = ambient
 
                 imgui.tree_pop()
