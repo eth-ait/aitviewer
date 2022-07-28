@@ -335,6 +335,8 @@ class Meshes(Node):
         self.positions_vao.buffer(self.vbo_vertices, '3f', ['in_position'])
         self.positions_vao.index_buffer(self.vbo_indices)
 
+        self.allow_depth_prepass(self.vbo_vertices, self.vbo_indices)
+
         if self.has_texture:
             img = self.texture_image
             if self.use_pickle_texture:
@@ -361,6 +363,8 @@ class Meshes(Node):
         self.vbo_colors.release()
 
         if self.has_texture:
+            self.vbo_uvs.release()
+
             self.texture_vao.release()
             self.vbo_uvs.release()
             self.texture.release()
@@ -371,7 +375,7 @@ class Meshes(Node):
         if flat != self.flat_shading:
             self.flat_shading = flat
             self.redraw()
-
+            
         if self.has_texture:
             self.texture_prog['texture_alpha'].value = self.texture_alpha
         vao = self._prepare_vao(camera, **kwargs)
@@ -630,7 +634,7 @@ class VariableTopologyMeshes(Node):
 
     @property
     def current_mesh(self):
-        if self.preload:
+        if self.preload: 
             return self._all_meshes[self.current_frame_id]
         else:
             m = self._current_mesh.get(self.current_frame_id, None)
