@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 
 import moderngl
+from moderngl_window.opengl.vao import VAO
 import numpy as np
 import trimesh
 import tqdm
@@ -97,12 +98,17 @@ class Meshes(Node):
             self.texture_image = None
         self.texture_alpha = texture_alpha
 
+        # Enable rendering passes
+        self.cast_shadow = cast_shadow
+        self.fragmap = True
+        self.depth_prepass = True
+
         # Misc.
         self.flat_shading = False
         self.show_texture = self.has_texture
         self.norm_coloring = False
         self.normals_r = None
-        self._cast_shadow = cast_shadow
+        self.need_upload = True
 
 
     @property
@@ -112,9 +118,6 @@ class Meshes(Node):
     @vertices.setter
     def vertices(self, vertices):
         # Update vertices and redraw
-        self.set_vertices(vertices, redraw=True)
-        
-    def set_vertices(self, vertices, redraw=True):
         self._vertices = vertices
         self.n_frames = len(vertices)
 
@@ -124,10 +127,8 @@ class Meshes(Node):
         # Must clear all LRU caches where the vertices are used.
         self.compute_vertex_and_face_normals.cache_clear()
 
-        if redraw:
-            self.redraw()       
-
-
+        self.redraw() 
+        
     @property
     def n_faces(self):
         return self.faces.shape[0]
@@ -196,6 +197,7 @@ class Meshes(Node):
             self._vertex_colors = np.full((self.n_frames, self.n_vertices, 4), vertex_colors)
         else:
             self._vertex_colors = vertex_colors
+        self.redraw()
 
     @property
     def face_colors(self):
@@ -222,9 +224,8 @@ class Meshes(Node):
         elif self.face_colors is None:
             self.vertex_colors = color
             
-        if self.is_renderable:
-            # Update color buffer
-            self.redraw()
+        # Update color buffer
+        self.redraw()
 
     @property
     def current_vertices(self):
@@ -266,10 +267,13 @@ class Meshes(Node):
         super().on_frame_update()
         self.redraw()
 
-    def redraw(self):
+    
+    def _upload_buffers(self):
         """Upload the current frame data to the GPU for rendering."""
-        if not self.is_renderable:
+        if not self.is_renderable or not self._need_upload:
             return
+
+        self._need_upload = False
 
         # Each write call takes about 1-2 ms
         vertices = self.current_vertices
@@ -292,11 +296,8 @@ class Meshes(Node):
         if self.has_texture:
             self.vbo_uvs.write(self.uv_coords.astype('f4').tobytes())
 
-    def _clear_buffer(self):
-        self.vbo_vertices.clear()
-        self.vbo_colors.clear()
-        if self.has_texture:
-            self.vbo_uvs.clear()
+    def redraw(self):
+        self._need_upload = True
 
     # noinspection PyAttributeOutsideInit
     @Node.once
@@ -332,12 +333,10 @@ class Meshes(Node):
                                           (self.vbo_colors, '4f4 /v', 'in_color')],
                                          self.vbo_indices)
 
-        if self._cast_shadow:
-            self.cast_shadow(self.vbo_vertices, self.vbo_indices)
-
-        self.make_pickable(self.vbo_vertices, self.vbo_indices)
-
-        self.allow_depth_prepass(self.vbo_vertices, self.vbo_indices)
+        self.positions_vao = VAO('{}:positions'.format(self.unique_name))
+        self.positions_vao.buffer(self.vbo_vertices, '3f', ['in_position'])
+        self.positions_vao.index_buffer(self.vbo_indices)
+            
 
         if self.has_texture:
             img = self.texture_image
@@ -357,6 +356,7 @@ class Meshes(Node):
     def release(self):
         self.smooth_vao.release()
         self.flat_vao.release()
+        self.positions_vao.release()
 
         self.vbo_vertices.release()
         self.vbo_normals.release()
@@ -380,9 +380,17 @@ class Meshes(Node):
             self.texture_prog['texture_alpha'].value = self.texture_alpha
         vao = self._prepare_vao(camera, **kwargs)
         vao.render(moderngl.TRIANGLES)
-
+    
+    def render_positions(self, prog):
+        if self.is_renderable:        
+            self._upload_buffers()
+            self.positions_vao.render(prog)
+    
+    
     def _prepare_vao(self, camera, **kwargs):
         """Prepare the shader pipeline and the VAO."""
+        self._upload_buffers()
+    
         if self.has_texture and self.show_texture:
             prog, vao = self.texture_prog, self.texture_vao
             self.texture.use(1)
