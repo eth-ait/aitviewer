@@ -109,7 +109,7 @@ class Node(object):
         self._scale = scale
 
     @staticmethod
-    @lru_cache
+    @lru_cache()
     def _compute_model_matrix(pos, rot, scale):
         rotation = np.eye(4)
         rotation[:3, :3] = np.array(rot)
