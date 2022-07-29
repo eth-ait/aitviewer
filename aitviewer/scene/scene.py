@@ -22,6 +22,7 @@ from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.plane import ChessboardPlane
 from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
+from aitviewer.renderables.lines import Lines
 
 
 class Scene(Node):
@@ -50,17 +51,28 @@ class Scene(Node):
 
         # Scene items
         self.origin = CoordinateSystem(name="Origin", length=0.1)
+        self.add(self.origin, has_gui=False)
         
         self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0),  (0.82, 0.82, 0.82, 1.0), name="Floor")
         self.floor.material.diffuse = 0.1
-
-        self.add(self.origin, has_gui=False)
         self.add(self.floor)
+
+        # Camera cursor rendered at the camera target when moving the camera
+        self.camera_target = Lines(np.array([
+            [-1, 0, 0], [1, 0, 0],
+            [0, -1, 0], [0, 1, 0],
+            [0, 0, -1], [0, 0, 1],
+        ]) * 0.1, color=(0, 0.5, 0, 1), mode='lines', cast_shadow=False)
+        self.add(self.camera_target, show_in_hierarchy=False)
 
         self.custom_font = None
 
     def render(self, **kwargs):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
+
+        # Setup the camera target cursor for rendering
+        self.camera_target.position = self.camera.target
+        self.camera_target.enabled = kwargs['show_camera_target']
 
         # Collect all renderable nodes
         rs = self.collect_nodes()
