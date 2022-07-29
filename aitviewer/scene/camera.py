@@ -123,7 +123,6 @@ class PinholeCamera(object):
             raise ValueError("update_matrices() must be called before to update the view matrix")
         return self.view_matrix
 
-
     def get_view_projection_matrix(self):
         """
         Returns the view-projection matrix, i.e. the 4x4 matrix that maps from homogenous world coordinates to image
@@ -133,29 +132,44 @@ class PinholeCamera(object):
             raise ValueError("update_matrices() must be called before to update the view-projection matrix")
         return self.view_projection_matrix
 
-    def dolly_zoom(self, speed):
-        """Zoom by moving the camera along its view direction."""
+    def dolly_zoom(self, speed, move_target=False):
+        """
+        Zoom by moving the camera along its view direction.
+        If move_target is true the camera target will also move rigidly with the camera.
+        """
         # We update both the orthographic and perspective projection so that the transition is seamless when
         # transitioning between them.
         self.ortho_size -= 0.1 * np.sign(speed)
         self.ortho_size = max(0.0001, self.ortho_size)
 
         # Scale the speed in proportion to the norm (i.e. camera moves slower closer to the target)
-        norm = np.linalg.norm(self.position - self.target)
-        fwd = self.dir / np.linalg.norm(self.dir)
+        norm = max(np.linalg.norm(self.position - self.target), 2)
+        fwd = self.dir
 
         # Adjust speed according to config
         speed *= C.camera_zoom_speed
 
-        self.position += fwd * speed * norm
+        if move_target:
+            self.position += fwd * speed * norm
+            self.target += fwd * speed * norm
+        else:
+            # Clamp movement size to avoid surpassing the target
+            movement_length = speed * norm 
+            max_movement_length = max(np.linalg.norm(self.target - self.position) - 0.01, 0.0)
 
+            # Update position
+            self.position += fwd * min(movement_length, max_movement_length)
+        
     def pan(self, mouse_dx, mouse_dy):
         """Move the camera in the image plane."""
         sideways = np.cross(self.dir, self.up)
         up = np.cross(sideways, self.dir)
 
-        speed_x = mouse_dx * self.PAN_FACTOR
-        speed_y = mouse_dy * self.PAN_FACTOR
+        # scale speed according to distance from target
+        speed = max(np.linalg.norm(self.target - self.position) * 0.1, 0.1)
+        
+        speed_x = mouse_dx * self.PAN_FACTOR * speed
+        speed_y = mouse_dy * self.PAN_FACTOR * speed
 
         self.position -= sideways * speed_x
         self.target -= sideways * speed_x

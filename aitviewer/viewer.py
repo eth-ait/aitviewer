@@ -278,6 +278,7 @@ class Viewer(moderngl_window.WindowConfig):
                           flat_rendering=self.flat_rendering,
                           lights=self.scene.lights,
                           shadows_enabled=self.shadows_enabled,
+                          show_camera_target=self.wnd.modifiers.shift or self._pan_camera or self._rotate_camera,
                           depth_prepass_prog=self.depth_only_prog)
 
     def render_prepare(self):
@@ -552,7 +553,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.imgui.mouse_scroll_event(x_offset, y_offset)
 
         if not self.imgui_user_interacting:
-            self.scene.camera.dolly_zoom(np.sign(y_offset))
+            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift)
 
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
