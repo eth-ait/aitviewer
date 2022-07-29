@@ -361,8 +361,6 @@ class Meshes(Node):
         self.vbo_colors.release()
 
         if self.has_texture:
-            self.vbo_uvs.release()
-
             self.texture_vao.release()
             self.vbo_uvs.release()
             self.texture.release()
