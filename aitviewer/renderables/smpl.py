@@ -33,7 +33,6 @@ from aitviewer.utils import to_torch
 from aitviewer.utils import local_to_global
 from aitviewer.utils import interpolate_positions
 from aitviewer.utils import to_numpy as c2c
-from scipy.spatial.transform import Rotation as R
 
 
 class SMPLSequence(Node):
@@ -73,6 +72,7 @@ class SMPLSequence(Node):
           frame is zero and the global root orientation is the identity.
         :param is_rigged: Whether or not to display the joints as a skeleton.
         :param show_joint_angles: Whether or not the coordinate frames at the joints should be visualized.
+        :param z_up: Whether or not the input data assumes Z is up. If so, the data will be rotated such that Y is up.
         :param kwargs: Remaining arguments for rendering.
         """
         assert len(poses_body.shape) == 2
@@ -258,7 +258,9 @@ class SMPLSequence(Node):
                                         betas=self.betas,
                                         trans=self.trans)
                                         
-        #Transform output vertices and joints into our viewer's coordinate system (where Y is up).
+        # Transform output vertices and joints into our viewer's coordinate system (where Y is up).
+        # We do this on the joints and not on the root pose of SMPL because the SMPL root does not correspond
+        # to the SMPL origin as pointed out by: https://github.com/eth-ait/aitviewer/issues/5
         if self._z_up:
             to_y_up = torch.Tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]]).to(self.betas.device)
             verts = torch.matmul(to_y_up.unsqueeze(0), verts.unsqueeze(-1)).squeeze(-1)
