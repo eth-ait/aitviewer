@@ -398,7 +398,7 @@ class Meshes(Node):
         prog['win_size'].value = kwargs['window_size']
 
         self.set_camera_matrices(prog, camera, **kwargs)
-        set_lights_in_program(prog, kwargs['lights'])
+        set_lights_in_program(prog, kwargs['lights'], kwargs['shadows_enabled'])
         set_material_properties(prog, self.material)
         self.receive_shadow(prog, **kwargs)
         return vao
