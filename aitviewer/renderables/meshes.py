@@ -388,8 +388,8 @@ class Meshes(Node):
 
         if self.has_texture and self.show_texture:
             prog, vao = self.texture_prog, self.texture_vao
-            self.texture.use(1)
-            prog['diffuse_texture'].value = 1
+            prog['diffuse_texture'] = 0
+            self.texture.use(0)
         else:
             prog, vao = (self.flat_prog, self.flat_vao) if self.flat_shading else (self.smooth_prog, self.smooth_vao)
             prog['norm_coloring'].value = self.norm_coloring

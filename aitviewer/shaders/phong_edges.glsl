@@ -1,13 +1,10 @@
-#include directional_lights.glsl
 #include utils.glsl
 #include shadow_calculation.glsl
-
-uniform DirLight dirLight[NR_DIR_LIGHTS];
 
 in vec3 g_vert;
 in vec3 g_norm;
 in vec4 g_color;
-in vec4 g_vert_light;
+in vec4 g_vert_light[NR_DIR_LIGHTS];
 
 out vec4 f_color;
 
@@ -24,7 +21,6 @@ void main() {
     ei = ei * ei * ei * ei * draw_edges;
 
     vec3 normal = normalize(g_norm);
-    float shadow = shadow_calculation(g_vert_light, dirLight[0].pos, normal);
 
     vec3 color = vec3(0.0, 0.0, 0.0);
 
@@ -33,9 +29,10 @@ void main() {
     } else {
         for (int i = 0; i < NR_DIR_LIGHTS; i++){
             // We only have shadows for the first light in the scene.
-            float s = i == 0 ? shadow : 0.0f;
-            color += directionalLight(dirLight[i], g_color.rgb, g_vert, normal, s);
+            float shadow = dirLights[i].shadow_enabled ? shadow_calculation(shadow_maps[i], g_vert_light[i], dirLights[i].pos, normal) : 0.0;
+            color += directionalLight(dirLights[i], g_color.rgb, g_vert, normal, shadow);
         }
+        
         f_color = vec4(color, g_color.w);
     }
     f_color = ei * edge_color + (1.0 - ei) * f_color;

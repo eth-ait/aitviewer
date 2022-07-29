@@ -1,9 +1,8 @@
-uniform sampler2DShadow shadow_map;
-
+uniform sampler2DShadow shadow_maps[NR_DIR_LIGHTS];
 
 // Gratefully adopted from https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping
 
-float shadow_calculation(vec4 frag_pos_light_space, vec3 light_dir, vec3 normal) {
+float shadow_calculation(sampler2DShadow shadow_map, vec4 frag_pos_light_space, vec3 light_dir, vec3 normal) {
     // perform perspective divide (not needed for orthographic projection)
     vec3 projCoords = frag_pos_light_space.xyz / frag_pos_light_space.w;
     // transform to [0,1] range

@@ -3,8 +3,12 @@ struct DirLight {
     vec3 color;
     float intensity_ambient;
     float intensity_diffuse;
+    bool shadow_enabled;
+    mat4 matrix;
 };
+
 #define NR_DIR_LIGHTS 2
+uniform DirLight dirLights[NR_DIR_LIGHTS];
 
 uniform float diffuse_coeff;
 uniform float ambient_coeff;

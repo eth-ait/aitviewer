@@ -182,10 +182,11 @@ def compute_vertex_and_face_normals(vertices, faces, vertex_faces, normalize=Fal
 def set_lights_in_program(prog, lights):
     """Set program lighting from scene lights"""
     for i, light in enumerate(lights):
-        prog['dirLight[{}].pos'.format(i)].value = light.position
-        prog['dirLight[{}].color'.format(i)].value = light.color[:3]
-        prog['dirLight[{}].intensity_ambient'.format(i)].value = light.intensity_ambient
-        prog['dirLight[{}].intensity_diffuse'.format(i)].value = light.intensity_diffuse
+        prog[f'dirLights[{i}].pos'].value = light.position
+        prog[f'dirLights[{i}].color'].value = light.color[:3]
+        prog[f'dirLights[{i}].intensity_ambient'].value = light.intensity_ambient
+        prog[f'dirLights[{i}].intensity_diffuse'].value = light.intensity_diffuse
+        prog[f'dirLights[{i}].shadow_enabled'].value = light.shadow_enabled
 
 
 def set_material_properties(prog, material):

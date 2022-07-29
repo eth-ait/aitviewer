@@ -1,4 +1,4 @@
-#version 330
+#version 400
 
 #if defined VERTEX_SHADER
 
@@ -140,8 +140,6 @@
     #include directional_lights.glsl
     #include utils.glsl
 
-    uniform DirLight dirLight[NR_DIR_LIGHTS];
-
     in vec3 g_vert;
     in vec3 g_norm;
     in vec4 g_color;
@@ -153,7 +151,7 @@
 
         vec3 color = vec3(0.0, 0.0, 0.0);
         for(int i = 0; i < NR_DIR_LIGHTS; i++){
-            color += directionalLight(dirLight[i], g_color.rgb, g_vert, normal, 0.0f);
+            color += directionalLight(dirLights[i], g_color.rgb, g_vert, normal, 0.0f);
         }
         f_color = vec4(color, g_color.w);
     }

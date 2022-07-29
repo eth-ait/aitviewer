@@ -351,15 +351,26 @@ class Node(object):
         :param kwargs: The render kwargs.
         """
         if kwargs.get('shadows_enabled', False):
-            light_mvp = kwargs['light_mvp'] @ self.model_matrix()
-            program['light_mvp'].write(light_mvp.T.tobytes())
-            kwargs['offscreen_depth'].use(location=0)
+            lights = kwargs['lights']
 
-    def render_shadowmap(self, light_mvp, prog):
+            for i, light in enumerate(lights):
+                if light.shadow_enabled and light.shadow_map:
+                    light_matrix = light.mvp() @ self.model_matrix()
+                    program[f'dirLights[{i}].matrix'].write(light_matrix.T.tobytes())
+
+                    # Bind shadowmap to slot i + 1, we reserve slot 0 for the mesh texture
+                    # and use slots 1 to (#lights + 1) for shadow maps
+                    light.shadow_map.use(location=i + 1)
+            
+            # Set sampler uniforms
+            uniform = program[f'shadow_maps']
+            uniform.value = 1 if uniform.array_length == 1 else [*range(1, len(lights) + 1)]
+
+    def render_shadowmap(self, light_matrix, prog):
         if not self.cast_shadow:
             return
 
-        mvp = light_mvp @ self.model_matrix()
+        mvp = light_matrix @ self.model_matrix()
         prog['mvp'].write(mvp.T.tobytes())
 
         self.render_positions(prog)

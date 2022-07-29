@@ -44,8 +44,8 @@ class Scene(Node):
         # If you update the number of lights, make sure to change the respective `define` statement in
         # directional_lights.glsl as well!
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
-        self.lights.append(Light(name='Back Light', position=(0.0, 10.0, 15.0), color=(1.0, 1.0, 1.0, 1.0)))
-        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0)))
+        self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
+        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0), shadow_enabled=False))
         self.add(*self.lights, show_in_hierarchy=False)
 
         # Scene items
@@ -117,7 +117,7 @@ class Scene(Node):
     def safe_render(self, r, **kwargs):
         if not r.is_renderable:
             r.make_renderable(self.ctx)
-        r.render(self.camera, lights=self.lights, **kwargs)
+        r.render(self.camera, **kwargs)
 
     def make_renderable(self, ctx):
         self.ctx = ctx

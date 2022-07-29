@@ -1,9 +1,10 @@
-#version 330
+#version 400
+
+#include directional_lights.glsl
 
 #if defined VERTEX_SHADER
 
     uniform mat4 mvp;
-    uniform mat4 light_mvp;
 
     in vec3 in_position;
     in vec3 in_normal;
@@ -12,26 +13,25 @@
     out vec3 v_vert;
     out vec3 v_norm;
     out vec2 v_uv;
-    out vec4 v_vert_light;
+    out vec4 v_vert_light[NR_DIR_LIGHTS];
 
     void main() {
         v_vert = in_position;
         v_norm = in_normal;
         v_uv = in_uv;
         gl_Position = mvp * vec4(in_position, 1.0);
-        v_vert_light = light_mvp * vec4(in_position, 1.0);
+        for(int i = 0; i < NR_DIR_LIGHTS; i++) {
+            v_vert_light[i] = dirLights[i].matrix * vec4(in_position, 1.0);
+        }
     }
 
 
 
 #elif defined FRAGMENT_SHADER
 
-
-    #include directional_lights.glsl
     #include utils.glsl
     #include shadow_calculation.glsl
 
-    uniform DirLight dirLight[NR_DIR_LIGHTS];
     uniform vec4 color_1;
     uniform vec4 color_2;
     uniform float n_tiles;
@@ -40,7 +40,7 @@
     in vec3 v_vert;
     in vec3 v_norm;
     in vec2 v_uv;
-    in vec4 v_vert_light;
+    in vec4 v_vert_light[NR_DIR_LIGHTS];
 
     out vec4 f_color;
 
@@ -66,12 +66,11 @@
         }
 
         // Compute shadow value
-        float shadow = shadow_calculation(v_vert_light, dirLight[0].pos, normal);
         vec3 color = vec3(0.0, 0.0, 0.0);
         for(int i = 0; i < NR_DIR_LIGHTS; i++){
             // We only have shadows for the first light in the scene.
-            float s = i == 0 ? shadow : 0.0f;
-            color += directionalLight(dirLight[i], t_color.rgb, v_vert, normal, s);
+            float shadow = dirLights[i].shadow_enabled ? shadow_calculation(shadow_maps[i], v_vert_light[i], dirLights[i].pos, normal) : 0.0;
+            color += directionalLight(dirLights[i], t_color.rgb, v_vert, normal, shadow);
         }
 
         // Output resulting color with the original alpha value

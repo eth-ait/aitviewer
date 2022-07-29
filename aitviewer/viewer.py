@@ -91,15 +91,6 @@ class Viewer(moderngl_window.WindowConfig):
         self.scene = Scene()
         self.scene.camera = PinholeCamera(45.0)
 
-        # Setup shadow mapping
-        offscreen_size = 8192, 8192
-        self.offscreen_depth = self.ctx.depth_texture(offscreen_size)
-        self.offscreen_depth.compare_func = '>'
-        self.offscreen_depth.repeat_x = False
-        self.offscreen_depth.repeat_y = False
-        self.offscreen = self.ctx.framebuffer(
-            depth_attachment=self.offscreen_depth
-        )
         # Shaders for rendering the shadow map
         self.raw_depth_prog = self.load_program('shadow_mapping/raw_depth.glsl')
         self.depth_only_prog = self.load_program('shadow_mapping/depth_only.glsl')
@@ -261,14 +252,15 @@ class Viewer(moderngl_window.WindowConfig):
     def render_shadowmap(self):
         """A pass to render the shadow map, i.e. render the entire scene once from the view of the light."""
         self.ctx.enable_only(moderngl.DEPTH_TEST)
-        self.offscreen.clear()
-        self.offscreen.use()
         if self.shadows_enabled:
             rs = self.scene.collect_nodes()
             
-            light_matrix = self.scene.lights[0].mvp()
-            for r in rs:
-                r.render_shadowmap(light_matrix, self.depth_only_prog)
+            for light in self.scene.lights:
+                if light.shadow_enabled:
+                    light.use(self.ctx)
+                    light_matrix = light.mvp()
+                    for r in rs:
+                        r.render_shadowmap(light_matrix, self.depth_only_prog)
 
     def render_fragmap(self):
         """A pass to render the fragment picking map, i.e. render the scene with world coords as colors."""
@@ -284,8 +276,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.scene.render(window_size=self.window.size,
                           draw_edges=self.draw_edges,
                           flat_rendering=self.flat_rendering,
-                          offscreen_depth=self.offscreen_depth,
-                          light_mvp=self.scene.lights[0].mvp(),
+                          lights=self.scene.lights,
                           shadows_enabled=self.shadows_enabled,
                           depth_prepass_prog=self.depth_only_prog)
 

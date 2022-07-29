@@ -1,22 +1,27 @@
-#version 330
+#version 400
+
+#include directional_lights.glsl
 
 #if defined VERTEX_SHADER
 
     uniform mat4 mvp;
-    uniform mat4 light_mvp;
 
     in vec3 in_position;
     in vec4 in_color;
 
-    out vec3 v_vert;
-    out vec4 v_color;
-    out vec4 v_vert_light;
-
+    out VS_OUT {
+        vec3 vert;
+        vec4 color;
+        vec4 vert_light[NR_DIR_LIGHTS];
+    } vs_out;
     void main() {
-        v_vert = in_position;
-        v_color = in_color;
+        vs_out.vert = in_position;
+        vs_out.color = in_color;
         gl_Position = mvp * vec4(in_position, 1.0);
-        v_vert_light = light_mvp * vec4(in_position, 1.0);
+
+        for(int i = 0; i < NR_DIR_LIGHTS; i++) {
+            vs_out.vert_light[i] = dirLights[i].matrix * vec4(in_position, 1.0);
+        }
     }
 
 #elif defined GEOMETRY_SHADER
@@ -25,18 +30,21 @@
     layout (triangle_strip, max_vertices=3) out;
 
     uniform vec2 win_size;
-    noperspective out vec3 dist;
 
+    // computed variables
+    noperspective out vec3 dist;
     out vec3 g_norm;
 
-    in vec4 v_color[3];
+    // pass-through variables
+    in VS_OUT {
+        vec3 vert;
+        vec4 color;
+        vec4 vert_light[NR_DIR_LIGHTS];
+    } gs_in[];
+
     out vec4 g_color;
-
-    in vec3 v_vert[3];
     out vec3 g_vert;
-
-    in vec4 v_vert_light[3];
-    out vec4 g_vert_light;
+    out vec4 g_vert_light[NR_DIR_LIGHTS];
 
     #include utils.glsl
 
@@ -44,30 +52,42 @@
         vec3 edge_dist = distanceToEdge(gl_in[0].gl_Position, gl_in[1].gl_Position, gl_in[2].gl_Position, win_size);
         //vec4 color = (v_color[0] + v_color[1] + v_color[2]) / 3.0;
 
-        vec3 norm = normalize(cross(v_vert[1] - v_vert[0], v_vert[2] - v_vert[0]));
+        vec3 dist_vecs[3] = vec3[3] (
+            vec3(edge_dist[0], 0, 0),
+            vec3(0, edge_dist[1], 0),
+            vec3(0, 0, edge_dist[2])
+        );
 
-        dist = vec3(edge_dist[0], 0, 0);
+        vec3 norm = normalize(cross(gs_in[1].vert - gs_in[0].vert, gs_in[2].vert - gs_in[0].vert));
+
+        dist = dist_vecs[0];
         gl_Position = gl_in[0].gl_Position;
+        g_vert = gs_in[0].vert;
         g_norm = norm;
-        g_vert = v_vert[0];
-        g_color = v_color[0];
-        g_vert_light = v_vert_light[0];
+        g_color = gs_in[0].color;
+        for(int j = 0; j < NR_DIR_LIGHTS; j++) {
+            g_vert_light[j] = gs_in[0].vert_light[j];
+        } 
         EmitVertex();
 
-        dist = vec3(0, edge_dist[1], 0);
+        dist = dist_vecs[1];
         gl_Position = gl_in[1].gl_Position;
+        g_vert = gs_in[1].vert;
         g_norm = norm;
-        g_vert = v_vert[1];
-        g_color = v_color[1];
-        g_vert_light = v_vert_light[1];
+        g_color = gs_in[1].color;
+        for(int j = 0; j < NR_DIR_LIGHTS; j++) {
+            g_vert_light[j] = gs_in[1].vert_light[j];
+        } 
         EmitVertex();
-
-        dist = vec3(0, 0, edge_dist[2]);
+        
+        dist = dist_vecs[2];
         gl_Position = gl_in[2].gl_Position;
+        g_vert = gs_in[2].vert;
         g_norm = norm;
-        g_vert = v_vert[2];
-        g_color = v_color[2];
-        g_vert_light = v_vert_light[2];
+        g_color = gs_in[2].color;
+        for(int j = 0; j < NR_DIR_LIGHTS; j++) {
+            g_vert_light[j] = gs_in[2].vert_light[j];
+        } 
         EmitVertex();
 
         EndPrimitive();
