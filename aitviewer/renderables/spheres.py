@@ -149,6 +149,7 @@ class Spheres(Node):
         self.set_camera_matrices(self.prog, camera, **kwargs)
         set_lights_in_program(self.prog, kwargs['lights'], kwargs['shadows_enabled'])
         set_material_properties(self.prog, self.material)
+        self.receive_shadow(self.prog, **kwargs)
         self.prog['draw_edges'].value = 1.0 if kwargs['draw_edges'] and self.material._show_edges else 0.0
         self.prog['norm_coloring'].value = False
         self.prog['win_size'].value = kwargs['window_size']
