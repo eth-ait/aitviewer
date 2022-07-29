@@ -55,6 +55,7 @@ class SMPLSequence(Node):
                  normalize_root=False,
                  is_rigged=True,
                  show_joint_angles=False,
+                 z_up=False,
                  **kwargs):
         """
         Initializer.
@@ -99,6 +100,7 @@ class SMPLSequence(Node):
         self._show_joint_angles = show_joint_angles
         self._is_rigged = is_rigged or show_joint_angles
         self._render_kwargs = kwargs
+        self._z_up = z_up
 
         if not self._include_root:
             self.poses_root = torch.zeros_like(self.poses_root)
@@ -148,7 +150,7 @@ class SMPLSequence(Node):
         self._add_node(self.mesh_seq, gui_elements=['material'])
 
     @classmethod
-    def from_amass(cls, npz_data_path, start_frame=None, end_frame=None, log=True, fps_out=None, **kwargs):
+    def from_amass(cls, npz_data_path, start_frame=None, end_frame=None, log=True, fps_out=None, z_up=True, **kwargs):
         """Load a sequence downloaded from the AMASS website."""
         body_data = np.load(npz_data_path)
         smpl_layer = SMPLLayer(model_type='smplh', gender=body_data['gender'].item(), device=C.device)
@@ -174,12 +176,6 @@ class SMPLSequence(Node):
                 poses = np.reshape(ps_new, [-1, poses.shape[1]])
                 trans = resample_positions(trans, fps_in, fps_out)
 
-        # Transform root orientation and translation into our viewer's coordinate system (where Y is up).
-        to_y_up = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
-        poses_root = R.as_matrix(R.from_rotvec(poses[:, 0:3]))
-        poses_root = np.matmul(to_y_up[np.newaxis], poses_root)
-        poses[:, 0:3] = R.as_rotvec(R.from_matrix(poses_root))
-        trans = np.matmul(to_y_up[np.newaxis], trans[..., np.newaxis]).squeeze()
         i_root_end = 3
         i_body_end = i_root_end + smpl_layer.bm.NUM_BODY_JOINTS*3
         i_left_hand_end = i_body_end + smpl_layer.bm.NUM_HAND_JOINTS*3
@@ -191,7 +187,7 @@ class SMPLSequence(Node):
                    poses_right_hand=poses[:, i_left_hand_end: i_right_hand_end],
                    smpl_layer=smpl_layer,
                    betas=body_data['betas'][np.newaxis],
-                   trans=trans, **kwargs)
+                   trans=trans, z_up=z_up, **kwargs)
 
     @classmethod
     def from_3dpw(cls, pkl_data_path, smplx_neutral=False, **kwargs):
@@ -261,6 +257,13 @@ class SMPLSequence(Node):
                                         poses_right_hand=self.poses_right_hand,
                                         betas=self.betas,
                                         trans=self.trans)
+                                        
+        #Transform output vertices and joints into our viewer's coordinate system (where Y is up).
+        if self._z_up:
+            to_y_up = torch.Tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]]).to(self.betas.device)
+            verts = torch.matmul(to_y_up.unsqueeze(0), verts.unsqueeze(-1)).squeeze(-1)
+            joints = torch.matmul(to_y_up.unsqueeze(0), joints.unsqueeze(-1)).squeeze(-1)
+        
         skeleton = self.smpl_layer.skeletons()['body'].T
         faces = self.smpl_layer.bm.faces.astype(np.int64)
         joints = joints[:, :skeleton.shape[0]]
