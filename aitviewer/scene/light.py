@@ -72,6 +72,13 @@ class Light(Node):
             self._debug_lines.lines = lines
             self._debug_lines.redraw()
 
+    @Node.position.setter
+    def position(self, position):
+        self._position = position
+        for n in self.nodes:
+            n.position = position
+        self._update_debug_lines()
+
     def redraw(self, **kwargs):
         if self._debug_lines:
             self._debug_lines.redraw(**kwargs)
