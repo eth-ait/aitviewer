@@ -1,12 +1,13 @@
 from setuptools import setup, find_packages
+from aitviewer import __version__
 
 setup(name='aitviewer',
       description='Viewing and rendering of sequences of 3D data.',
       long_description=open('README.md').read(),
       long_description_content_type='text/markdown',
       url="https://github.com/eth-ait/aitviewer",
-      version='1.1',
-      author='Manuel Kaufmann, Velko Vechev',
+      version=__version__,
+      author='Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos',
       packages=find_packages(),
       include_package_data=True,
       keywords=['viewer', 'moderngl', 'machine learning', 'sequences', 'smpl', 'computer graphics', 'computer vision',
