@@ -89,17 +89,16 @@ The following projects have used the AITViewer:
 If you use this software, please cite it as below.
 ```commandline
 @software{Kaufmann_Vechev_AITViewer_2022,
-  author = {Kaufmann, Manuel and Vechev, Velko},
+  author = {Kaufmann, Manuel and Vechev, Velko and Mylonopoulos, Dario},
   doi = {10.5281/zenodo.1234},
   month = {7},
   title = {{AITViewer}},
   url = {https://github.com/eth-ait/aitviewer},
-  version = {1.0},
   year = {2022}
 }
 ```
 
 ## Contact & Contributions
-This software was developed by [Manuel Kaufmann](mailto:manuel.kaufmann@inf.ethz.ch) and [Velko Vechev](mailto:velko.vechev@inf.ethz.ch). 
+This software was developed by [Manuel Kaufmann](mailto:manuel.kaufmann@inf.ethz.ch) and [Velko Vechev](mailto:velko.vechev@inf.ethz.ch) and Dario Mylonopoulos.
 For questions please create an issue.
 We welcome and encourage module and feature contributions from the community.
