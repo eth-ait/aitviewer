@@ -473,6 +473,10 @@ class Viewer(moderngl_window.WindowConfig):
 
     def key_event(self, key, action, modifiers):
         self.imgui.key_event(key, action, modifiers)
+
+        if self.imgui.io.want_capture_keyboard:
+            return
+
         if action == self.wnd.keys.ACTION_PRESS:
 
             if key == self._pause_key:
