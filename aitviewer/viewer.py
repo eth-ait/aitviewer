@@ -217,11 +217,16 @@ class Viewer(moderngl_window.WindowConfig):
 
     def render(self, time, frame_time):
         """The main drawing function."""
-        # Check if we need to advance the sequences.
-        if self.run_animations and time - self._last_frame_rendered_at > 1.0 / self.playback_fps:
-            self.scene.next_frame()
-            self._last_frame_rendered_at = time
 
+        # Advance up to 100 frames to avoid looping for too long if the playback speed is too high
+        for _ in range(100):
+            # Check if we need to advance the sequences. 
+            if self.run_animations and time - self._last_frame_rendered_at > 1.0 / self.playback_fps:
+                self.scene.next_frame()
+                self._last_frame_rendered_at += 1.0 / self.playback_fps
+            else:
+                break
+        
         
         #Update camera matrices that will be used for rendering
         self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
@@ -420,7 +425,7 @@ class Viewer(moderngl_window.WindowConfig):
                          scale_min=0, scale_max=100.0, graph_size=(100, 20))
 
         _, self.playback_fps = imgui.drag_float('Target Playback fps##playback_fps', self.playback_fps, 0.1,
-                                                min_value=0.0, max_value=120.0, format='%.1f')
+                                                min_value=1.0, max_value=120.0, format='%.1f')
 
         # Sequence Control
         # For simplicity, we allow the global sequence slider to only go as far as the shortest known sequence.
