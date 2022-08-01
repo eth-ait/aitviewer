@@ -333,7 +333,9 @@ class Meshes(Node):
 
         self.positions_vao = VAO('{}:positions'.format(self.unique_name))
         self.positions_vao.buffer(self.vbo_vertices, '3f', ['in_position'])
-        self.positions_vao.index_buffer(self.vbo_indices)
+
+        if self.face_colors is None:
+            self.positions_vao.index_buffer(self.vbo_indices)
 
         if self.has_texture:
             img = self.texture_image
