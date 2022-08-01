@@ -29,9 +29,6 @@
 
 #elif defined FRAGMENT_SHADER
 
-    #include utils.glsl
-    #include shadow_calculation.glsl
-
     uniform vec4 color_1;
     uniform vec4 color_2;
     uniform float n_tiles;
@@ -66,13 +63,8 @@
         }
 
         // Compute shadow value
-        vec3 color = vec3(0.0, 0.0, 0.0);
-        for(int i = 0; i < NR_DIR_LIGHTS; i++){
-            // We only have shadows for the first light in the scene.
-            float shadow = dirLights[i].shadow_enabled ? shadow_calculation(shadow_maps[i], v_vert_light[i], dirLights[i].pos, normal) : 0.0;
-            color += directionalLight(dirLights[i], t_color.rgb, v_vert, normal, shadow);
-        }
-
+        vec3 color = compute_lighting(t_color.rgb, v_vert, normal, v_vert_light);
+        
         // Output resulting color with the original alpha value
         f_color = vec4(color, t_color.a);
     }

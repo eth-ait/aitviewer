@@ -19,35 +19,40 @@ from moderngl_window.meta import ProgramDescription
 
 import functools
 
-# Add an LRU cache to this function to avoid recompiling shaders when they are reused
-@functools.lru_cache(maxsize=128, typed=False)
-def _load(name):
-    return resources.programs.load(ProgramDescription(path=name))
+def _load(name, defines={}):
+    return resources.programs.load(ProgramDescription(path=name, defines=defines))
 
 
+@functools.lru_cache()
+def get_smooth_lit_with_edges_program():
+    return _load('lit_with_edges.glsl', defines={ 'SMOOTH_SHADING': 1, 'TEXTURE': 0 })
+
+
+@functools.lru_cache()
+def get_flat_lit_with_edges_program():
+    return _load('lit_with_edges.glsl', defines={ 'SMOOTH_SHADING': 0, 'TEXTURE': 0 })
+
+
+@functools.lru_cache()
+def get_smooth_lit_texturized_program():
+    return _load('lit_with_edges.glsl', defines={ 'SMOOTH_SHADING': 1, 'TEXTURE': 1 })
+
+
+@functools.lru_cache()
 def get_simple_unlit_program():
     return _load('simple_unlit.glsl')
 
 
-def get_smooth_lit_with_edges_program():
-    return _load('smooth_lit_with_edges.glsl')
-
-
-def get_flat_lit_with_edges_program():
-    return _load('flat_lit_with_edges.glsl')
-
-
+@functools.lru_cache()
 def get_cylinder_program():
     return _load('cylinder.glsl')
 
 
+@functools.lru_cache()
 def get_screen_texture_program():
     return _load('screen_texture.glsl')
 
 
-def get_smooth_lit_texturized_program():
-    return _load('smooth_lit_tex.glsl')
-
-
+@functools.lru_cache()
 def get_chessboard_program():
     return _load('chessboard.glsl')
