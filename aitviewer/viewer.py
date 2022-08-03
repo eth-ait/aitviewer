@@ -203,6 +203,8 @@ class Viewer(moderngl_window.WindowConfig):
         self.animation_range[-1] = self.scene.n_frames - 1
 
         self.timer.start()
+        self._last_frame_rendered_at = self.timer.time
+
         while not self.window.is_closing:
             current_time, delta = self.timer.next_frame()
 
@@ -305,6 +307,11 @@ class Viewer(moderngl_window.WindowConfig):
                            imgui.is_any_item_hovered(),
                            ])
         self.imgui_user_interacting = True if imgui_hover else self.imgui_user_interacting
+
+    def toggle_animation(self, run: bool):
+        self.run_animations = run
+        if self.run_animations:
+            self._last_frame_rendered_at = self.timer.time
 
     def gui(self):
         imgui.new_frame()
@@ -412,8 +419,10 @@ class Viewer(moderngl_window.WindowConfig):
     def gui_playback(self):
         """GUI to control playback settings."""
         imgui.begin("Playback", True)
-        _, self.run_animations = imgui.checkbox("Run animations [{}]".format(self._shortcut_names[self._pause_key]),
+        u, run_animations = imgui.checkbox("Run animations [{}]".format(self._shortcut_names[self._pause_key]),
                                                 self.run_animations)
+        if u:
+            self.toggle_animation(run_animations)
 
         # Plot FPS
         frametime_avg = np.mean(self._past_frametimes[self._past_frametimes > 0.0])
@@ -485,7 +494,7 @@ class Viewer(moderngl_window.WindowConfig):
         if action == self.wnd.keys.ACTION_PRESS:
 
             if key == self._pause_key:
-                self.run_animations = not self.run_animations
+                self.toggle_animation(not self.run_animations)
 
             elif key == self._next_frame_key:
                 if not self.run_animations:

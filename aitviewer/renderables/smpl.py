@@ -262,7 +262,7 @@ class SMPLSequence(Node):
         # We do this on the joints and not on the root pose of SMPL because the SMPL root does not correspond
         # to the SMPL origin as pointed out by: https://github.com/eth-ait/aitviewer/issues/5
         if self._z_up:
-            to_y_up = torch.Tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]]).to(self.betas.device)
+            to_y_up = torch.Tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]]).to(verts.device, dtype=verts.dtype)
             verts = torch.matmul(to_y_up.unsqueeze(0), verts.unsqueeze(-1)).squeeze(-1)
             joints = torch.matmul(to_y_up.unsqueeze(0), joints.unsqueeze(-1)).squeeze(-1)
         
