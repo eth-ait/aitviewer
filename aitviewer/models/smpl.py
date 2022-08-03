@@ -144,8 +144,8 @@ class SMPLLayer(nn.Module, ABC):
         has_face = hasattr(self.bm, 'NUM_FACE_JOINTS')
         if has_hands:
             if self.bm.use_pca:
-                assert poses_left_hand is None or poses_left_hand.shape[1] == 6
-                assert poses_right_hand is None or poses_right_hand.shape[1] == 6
+                assert poses_left_hand is None or poses_left_hand.shape[1] == self.bm.num_pca_comps
+                assert poses_right_hand is None or poses_right_hand.shape[1] == self.bm.num_pca_comps
             else:
                 assert poses_left_hand is None or poses_left_hand.shape[1] == self.bm.NUM_HAND_JOINTS*3
                 assert poses_right_hand is None or poses_right_hand.shape[1] == self.bm.NUM_HAND_JOINTS*3
