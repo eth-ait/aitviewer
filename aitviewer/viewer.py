@@ -150,6 +150,8 @@ class Viewer(moderngl_window.WindowConfig):
         self.auto_set_camera_target = C.auto_set_camera_target
         self.backface_culling = C.backface_culling
 
+        self.show_camera_target = False
+
         self._pan_camera = False
         self._rotate_camera = False
         self._past_frametimes = np.zeros([60]) - 1.0
@@ -176,6 +178,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._left_mouse_button = 1  # left
         self._save_cam_key = self.wnd.keys.C
         self._load_cam_key = self.wnd.keys.L
+        self._show_camera_target_key = self.wnd.keys.T
         self._shortcut_names = {self.wnd.keys.SPACE: "Space",
                                 self.wnd.keys.C: "C",
                                 self.wnd.keys.D: "D",
@@ -185,7 +188,8 @@ class Viewer(moderngl_window.WindowConfig):
                                 self.wnd.keys.L: "L",
                                 self.wnd.keys.O: "O",
                                 self.wnd.keys.P: "P",
-                                self.wnd.keys.S: "S"}
+                                self.wnd.keys.S: "S",
+                                self.wnd.keys.T: "T"}
 
     def run(self, *args, log=True):
         """
@@ -286,7 +290,7 @@ class Viewer(moderngl_window.WindowConfig):
                           flat_rendering=self.flat_rendering,
                           lights=self.scene.lights,
                           shadows_enabled=self.shadows_enabled,
-                          show_camera_target=self.wnd.modifiers.shift or self._pan_camera or self._rotate_camera,
+                          show_camera_target=self.show_camera_target,
                           depth_prepass_prog=self.depth_only_prog)
 
     def render_prepare(self):
@@ -372,6 +376,8 @@ class Viewer(moderngl_window.WindowConfig):
                 # _, self.show_shadow_map = imgui.menu_item("Show Shadow Map", None, self.show_shadow_map, True)
                 _, self.dark_mode = imgui.menu_item("Dark Mode", self._shortcut_names[self._dark_mode_key],
                                                     self.dark_mode, True)
+                _, self.show_camera_target = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
+                                                    self.show_camera_target, True)
                 _, self.scene.camera.is_ortho = imgui.menu_item("Orthographic Camera",
                                                                 self._shortcut_names[self._orthographic_camera_key],
                                                                 self.scene.camera.is_ortho, True)
@@ -510,6 +516,9 @@ class Viewer(moderngl_window.WindowConfig):
 
             elif key == self._shadow_key:
                 self.shadows_enabled = not self.shadows_enabled
+
+            elif key == self._show_camera_target_key:
+                self.show_camera_target = not self.show_camera_target
 
             elif key == self._orthographic_camera_key:
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
