@@ -233,8 +233,6 @@ class Node(object):
     @enabled.setter
     def enabled(self, enabled):
         self._enabled = enabled
-        for n in self.nodes:
-            n.enabled = enabled
 
     @property
     def expanded(self):
