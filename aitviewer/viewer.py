@@ -135,7 +135,8 @@ class Viewer(moderngl_window.WindowConfig):
             'menu': self.gui_menu,
             'scene': self.gui_scene,
             'playback': self.gui_playback,
-            'inspect': self.gui_inspect
+            'inspect': self.gui_inspect,
+            'exit': self.gui_exit,
         }
 
         # Settings
@@ -163,6 +164,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.video_rotate = False
 
         # Key Shortcuts
+        self._exit_key = self.wnd.keys.ESCAPE
         self._pause_key = self.wnd.keys.SPACE
         self._next_frame_key = self.wnd.keys.PERIOD
         self._previous_frame_key = self.wnd.keys.COMMA
@@ -190,6 +192,10 @@ class Viewer(moderngl_window.WindowConfig):
                                 self.wnd.keys.P: "P",
                                 self.wnd.keys.S: "S",
                                 self.wnd.keys.T: "T"}
+
+        # Disable exit on escape key
+        self.window.exit_key = None
+        self._exit_popup_open = False
 
     def run(self, *args, log=True):
         """
@@ -311,7 +317,7 @@ class Viewer(moderngl_window.WindowConfig):
         imgui_hover = any([imgui.is_window_hovered(),
                            imgui.is_any_item_hovered(),
                            ])
-        self.imgui_user_interacting = True if imgui_hover else self.imgui_user_interacting
+        self.imgui_user_interacting = self.imgui.io.want_capture_mouse
 
     def toggle_animation(self, run: bool):
         self.run_animations = run
@@ -464,6 +470,38 @@ class Viewer(moderngl_window.WindowConfig):
             self.prevent_background_interactions()
             imgui.end()
 
+    def gui_exit(self):
+        if self._exit_popup_open:    
+            imgui.open_popup("Exit##exit-popup")
+
+        if imgui.begin_popup_modal("Exit##exit-popup", flags=imgui.WINDOW_NO_RESIZE)[0]:
+            if self._exit_popup_open:    
+                imgui.text("Are you sure you want to exit?")
+                imgui.spacing()
+
+                # Draw a cancel and exit button on the same line using the available space
+                button_width = (imgui.get_content_region_available()[0] - imgui.get_style().item_spacing[0]) * 0.5
+                
+                # Style the cancel with a grey color
+                imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
+
+                if imgui.button("cancel", width=button_width):
+                    imgui.close_current_popup()
+                    self._exit_popup_open = False
+
+                imgui.pop_style_color()
+                imgui.pop_style_color()
+                imgui.pop_style_color()
+
+                imgui.same_line()
+                if imgui.button("exit", button_width):
+                    self.window.close()
+            else:
+                imgui.close_current_popup()
+            imgui.end_popup()
+
     def mesh_mouse_intersection(self, x: int, y: int):
         """Given an x/y screen coordinate, get the intersected object, triangle id, and xyz point in camera space"""
 
@@ -495,10 +533,20 @@ class Viewer(moderngl_window.WindowConfig):
     def key_event(self, key, action, modifiers):
         self.imgui.key_event(key, action, modifiers)
 
+        # Handle keyboard shortcuts when the exit modal is open
+        if action == self.wnd.keys.ACTION_PRESS and self._exit_popup_open:
+            if key == self.wnd.keys.ENTER:
+                self.window.close()
+            elif key == self._exit_key:
+                self._exit_popup_open = False
+            return
+
         if self.imgui.io.want_capture_keyboard:
             return
 
         if action == self.wnd.keys.ACTION_PRESS:
+            if key == self._exit_key:
+                self._exit_popup_open = True
 
             if key == self._pause_key:
                 self.toggle_animation(not self.run_animations)
