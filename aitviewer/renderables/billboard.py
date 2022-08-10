@@ -19,19 +19,28 @@ class Billboard(Node):
                  texture_paths,
                  **kwargs):
         """ Initializer.
-        :param vertices: A np array of 4 billboard vertices in world space coordinates of shape (4, 3)
+        :param vertices:
+            A np array of 4 billboard vertices in world space coordinates of shape (4, 3)
+            or an array of shape (N, 4, 3) containing 4 vertices for each frame of the sequence
         :param texture_paths: A list of length N containing paths to the textures as image files.
         """
-
         super(Billboard, self).__init__(n_frames=len(texture_paths), **kwargs)
         
+        if len(vertices.shape) == 2:
+            vertices = vertices[np.newaxis]
+        else:
+            assert vertices.shape[0] == len(texture_paths), "the length of the sequence of vertices must be 1 or match the number of textures"
+
         self.vertices = vertices
-        self.uvs = np.array([
+
+        # Tile the uv buffer to match the size of the vertices buffer,
+        # we do this so that we can use the same vertex array for all draws
+        self.uvs = np.repeat(np.array([[
             [0.0, 0.0],
             [0.0, 1.0],
             [1.0, 0.0],
             [1.0, 1.0],
-        ], np.float32)
+        ]], np.float32), self.vertices.shape[0], axis=0)
 
         self.texture_paths = texture_paths
 
@@ -104,7 +113,10 @@ class Billboard(Node):
         self.texture.use(0)
 
         self.set_camera_matrices(self.prog, camera, **kwargs)
-        self.vao.render(moderngl.TRIANGLE_STRIP)
+        
+        # Compute the index of the first vertex to use if we have a sequence of vertices of length > 1
+        first = 4 * self.current_frame_id if self.vertices.shape[0] > 1 else 0
+        self.vao.render(moderngl.TRIANGLE_STRIP, vertices=4, first=first)
 
     @hooked
     def release(self):
