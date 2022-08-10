@@ -29,6 +29,112 @@ def _transform_vector(transform, vector):
     return (transform @ np.concatenate([vector, np.array([1])]))[:3]
 
 
+class OpenCVCamera(object):
+    def __init__(self, K, Rt, cols, rows, near=C.znear, far=C.zfar):
+        self.K = K
+        self.Rt = Rt
+
+        self.cols = cols
+        self.rows = rows
+    
+        self.near = near
+        self.far = far
+
+        self.position = -Rt[:3, :3].T @ Rt[:, 3]
+
+    @property
+    def forward(self):
+        return self.Rt[2, :3]
+    
+    @property
+    def up(self):
+        return -self.Rt[1, :3]
+    
+    @property
+    def right(self):
+        return self.Rt[0, :3]
+    
+    def compute_opengl_view_projection(self, width, height):
+        # Construct view and projection matrices which follow OpenGL conventions.
+        # Adapted from https://amytabb.com/tips/tutorials/2019/06/28/OpenCV-to-OpenGL-tutorial-essentials/
+
+        # Compute view matrix V
+        lookat = np.copy(self.Rt)
+        # Invert Y -> flip image bottom to top
+        # Invert Z -> OpenCV has positive Z forward, we use negative Z forward
+        lookat[1:3, :] *= -1.0
+        V = np.vstack((lookat, np.array([0, 0, 0, 1])))
+
+        # Compute projection matrix P
+        K = self.K
+        rows, cols = self.rows, self.cols
+        near, far = self.near, self.far
+
+        # Compute number of columns that we would need in the image to preserve the aspect ratio
+        window_cols =  width / height * rows
+
+        # Offset to center the image on the x direction
+        x_offset = (window_cols - cols) * 0.5
+        
+        # Calibration matrix with added Z information and adapted to OpenGL coordinate
+        # system which has (0,0) at center and Y pointing up
+        Kgl = np.array([
+            [-K[0,0],       0, -(cols - K[0, 2]) - x_offset,            0],
+            [      0, -K[1,1],             (rows - K[1, 2]),            0],
+            [      0,       0,                -(near + far),-(near * far)],
+            [      0,       0,                           -1,            0],
+        ])
+
+        # Transformation from pixel coordinates to normalized device coordinates used by OpenGL
+        NDC = np.array([
+            [-2 / window_cols,         0,                 0,                             1],
+            [               0, -2 / rows,                 0,                            -1],
+            [               0,         0,  2 / (far - near),  -(far + near) / (far - near)],
+            [               0,         0,                 0,                             1],
+        ])
+
+        P = NDC @ Kgl
+
+        return V, P
+
+    def update_matrices(self, width, height):
+        V, P = self.compute_opengl_view_projection(width, height)
+
+        #Update camera matrices
+        self.projection_matrix = P.astype('f4')
+        self.view_matrix = V.astype('f4')
+        self.view_projection_matrix = np.matmul(P, V).astype('f4')
+
+    def get_projection_matrix(self):
+        """
+        Returns the matrix that projects 3D coordinates in camera space to the image plane.
+        """
+        if self.projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the projection matrix")
+        return self.projection_matrix
+    
+    def get_view_matrix(self):
+        """
+        Returns the matrix that projects 3D coordinates in camera space to the image plane.
+        """
+        if self.view_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view matrix")
+        return self.view_matrix
+
+    def get_view_projection_matrix(self):
+        """
+        Returns the view-projection matrix, i.e. the 4x4 matrix that maps from homogenous world coordinates to image
+        space.
+        """
+        if self.view_projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
+        return self.view_projection_matrix
+    
+    def gui(self, imgui):
+        pass
+
+
+
 class PinholeCamera(object):
     """
     Your classic pinhole camera.
@@ -52,9 +158,9 @@ class PinholeCamera(object):
         self.far = zfar
 
     @property
-    def dir(self):
-        dir = self.target - self.position
-        return dir / np.linalg.norm(dir)
+    def forward(self):
+        forward = self.target - self.position
+        return forward / np.linalg.norm(forward)
 
     def save_cam(self):
         """Saves the current camera parameters"""
@@ -144,7 +250,7 @@ class PinholeCamera(object):
 
         # Scale the speed in proportion to the norm (i.e. camera moves slower closer to the target)
         norm = max(np.linalg.norm(self.position - self.target), 2)
-        fwd = self.dir
+        fwd = self.forward
 
         # Adjust speed according to config
         speed *= C.camera_zoom_speed
@@ -162,8 +268,8 @@ class PinholeCamera(object):
         
     def pan(self, mouse_dx, mouse_dy):
         """Move the camera in the image plane."""
-        sideways = np.cross(self.dir, self.up)
-        up = np.cross(sideways, self.dir)
+        sideways = np.cross(self.forward, self.up)
+        up = np.cross(sideways, self.forward)
 
         # scale speed according to distance from target
         speed = max(np.linalg.norm(self.target - self.position) * 0.1, 0.1)
@@ -226,7 +332,7 @@ class PinholeCamera(object):
         pixel_3d = _transform_vector(cam2world, pixel_2d)
         if self.is_ortho:
             ray_origin = pixel_3d
-            ray_dir = self.dir
+            ray_dir = self.forward
         else:
             eye_origin = np.zeros(3)
             ray_origin = _transform_vector(cam2world, eye_origin)

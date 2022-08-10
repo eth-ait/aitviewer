@@ -119,7 +119,7 @@ class Node(object):
 
         scale = np.diag([scale, scale, scale, 1])
         
-        return (rotation @ trans @ scale).astype('f4')
+        return (trans @ rotation @ scale).astype('f4')
 
     def model_matrix(self):
         """Construct model matrix from this node's orientation and position."""
@@ -217,6 +217,11 @@ class Node(object):
         """Add multiple nodes"""
         for n in nodes:
             self._add_node(n, **kwargs)
+
+    def remove(self, *nodes):
+        for n in nodes:
+            n.release()
+            self.nodes.remove(n)
 
     @property
     def has_gui(self):
@@ -399,7 +404,9 @@ class Node(object):
 
     def release(self):
         """
-        Release all OpenGL resources used by this node. 
+        Release all OpenGL resources used by this node and any of its children. 
         Subclasses that instantiate OpenGL objects should 
         implement this method with '@hooked' to avoid leaking resources.
         """
+        for n in self.nodes:
+            n.release()
