@@ -380,7 +380,7 @@ class Viewer(moderngl_window.WindowConfig):
                     "Save as video..", None, False, True)
 
                 clicked_export360, _ = imgui.menu_item(
-                    "Save as 360 video..", None, False, True)
+                    "Save as 360 video..", None, False, enabled=isinstance(self.scene.camera, PinholeCamera))
                 if clicked_export360:
                     self.to_360_deg_video()
 
@@ -440,7 +440,7 @@ class Viewer(moderngl_window.WindowConfig):
 
         if clicked_export:
             imgui.open_popup("Export Video")
-        if imgui.begin_popup_modal("Export Video")[0]:
+        if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
             imgui.text("Enter Range for Video Export.")
             rcu, animation_range = imgui.drag_int2('Range##range_control', *self.animation_range,
                                                    min_value=0,  max_value=self.scene.n_frames-1)
@@ -448,11 +448,37 @@ class Viewer(moderngl_window.WindowConfig):
                 self.animation_range[0] = max(animation_range[0], 0)
                 self.animation_range[1] = min(animation_range[-1], self.scene.n_frames-1)
             _, self.video_as_gif = imgui.checkbox("GIF instead of MP4", self.video_as_gif)
-            _, self.video_rotate = imgui.checkbox("Animate and rotate", self.video_rotate)
-            if imgui.button("OK"):
+            
+            if isinstance(self.scene.camera, PinholeCamera):
+                _, self.video_rotate = imgui.checkbox("Animate and rotate", self.video_rotate)
+            else:
+                imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
+                imgui.checkbox("Animate and rotate", False)
+                imgui.pop_style_var(1)
+
+            
+            imgui.spacing()
+
+            # Draw a cancel and exit button on the same line using the available space
+            button_width = (imgui.get_content_region_available()[0] - imgui.get_style().item_spacing[0]) * 0.5
+            
+            # Style the cancel with a grey color
+            imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
+            imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
+            imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
+
+            if imgui.button("cancel", width=button_width):
                 imgui.close_current_popup()
-                # Export with applied settings
+
+            imgui.pop_style_color()
+            imgui.pop_style_color()
+            imgui.pop_style_color()
+
+            imgui.same_line()
+            if imgui.button("export", button_width):
+                imgui.close_current_popup()
                 self.to_video(self.video_rotate)
+
             self.prevent_background_interactions()
             imgui.end_popup()
 
@@ -501,7 +527,7 @@ class Viewer(moderngl_window.WindowConfig):
         if self._exit_popup_open:    
             imgui.open_popup("Exit##exit-popup")
 
-        if imgui.begin_popup_modal("Exit##exit-popup", flags=imgui.WINDOW_NO_RESIZE)[0]:
+        if imgui.begin_popup_modal("Exit##exit-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
             if self._exit_popup_open:    
                 imgui.text("Are you sure you want to exit?")
                 imgui.spacing()
@@ -714,8 +740,9 @@ class Viewer(moderngl_window.WindowConfig):
             print("No frames rendered.")
             return
 
-        if self._using_temp_camera:
-            self.reset_camera()
+        if rotate and not isinstance(self.scene.camera, PinholeCamera):
+            print("Cannot export an animated video while using a camera that is not a PinholeCamera")
+            return 
 
         # Start all sequences from 0 but remember where we left off.
         saved_curr_frame = self.scene.current_frame_id
@@ -724,18 +751,23 @@ class Viewer(moderngl_window.WindowConfig):
         frame_dir = tempfile.TemporaryDirectory().name
         os.makedirs(frame_dir)
 
-        saved_camera = copy.deepcopy(self.scene.camera)
-        az_delta = 2 * np.pi / (self.animation_range[-1]+1) if rotate else 0.0
+        # Store the current camera and create a copy of if required
+        saved_camera = self.scene.camera
+        if rotate:
+            self.scene.camera = copy.deepcopy(self.scene.camera)
+
+        az_delta = 2 * np.pi / (self.animation_range[-1]+1)
 
         # Render each frame to an image file.
         print("Saving frames to {}".format(frame_dir))
         progress_bar = tqdm(total=self.animation_range[-1]-self.animation_range[0], desc='Rendering frames')
 
         for i, f in enumerate(range(self.animation_range[0], self.animation_range[-1]+1)):
-            self.scene.camera.rotate_azimuth(az_delta)
-            self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
+            if rotate:
+                self.scene.camera.rotate_azimuth(az_delta)
 
             self.scene.current_frame_id = f
+            self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
             self.render_shadowmap()
             self.render_prepare()
             self.render_scene()
@@ -759,8 +791,9 @@ class Viewer(moderngl_window.WindowConfig):
 
     def to_360_deg_video(self):
         """Matrix shot. Keeps the look-at point fixed and rotates the camera around it."""
-        if self._using_temp_camera:
-            self.reset_camera()
+        if not isinstance(self.scene.camera, PinholeCamera):
+            print("Cannot export a 360 video while using a camera that is not a PinholeCamera")
+            return
 
         n_frames = 360
         saved_camera = copy.deepcopy(self.scene.camera)

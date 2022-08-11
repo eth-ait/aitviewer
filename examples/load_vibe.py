@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from aitviewer.viewer import Viewer
+from aitviewer.headless import HeadlessRenderer
 from aitviewer.scene.camera import WeakPerspectiveCamera
 from aitviewer.renderables.billboard import Billboard
 from aitviewer.renderables.smpl import SMPLSequence
@@ -26,6 +27,10 @@ import os
 import joblib
 import numpy as np
 
+# Set to True for rendering in headless mode, no window will be created and
+# a video will be exported to 'headless/test.mp4' in the export directory
+HEADLESS=False
+        
 if __name__ == '__main__':
     # Load camera and SMPL data from the output of the VIBE demo from https://github.com/mkocabas/VIBE
     data = joblib.load(open("resources/vibe/vibe_output.pkl", 'rb'))
@@ -34,12 +39,15 @@ if __name__ == '__main__':
     betas = data[1]['betas']
 
     # Create the viewer, set a size that has 16:9 aspect ratio to match the input data
-    viewer = Viewer(size=(1600, 900))
+    if HEADLESS:
+        viewer = HeadlessRenderer(size=(1600, 900))
+    else:
+        viewer = Viewer(size=(1600, 900))
 
     # Instantiate an SMPL sequence using the parameters from the data file.
     # We rotate the sequence by 180 degrees around the x axis to flip the y and z axis
     # because VIBE outputs the pose in a different coordinate system
-    smpl_layer = SMPLLayer(model_type='smpl', device=C.device)
+    smpl_layer = SMPLLayer(model_type='smpl', gender='neutral', device=C.device)
     smpl_sequence = SMPLSequence(poses_body=poses[:, 3:24 * 3],
                                  poses_root=poses[:, 0:3],
                                  betas=betas,
@@ -70,4 +78,7 @@ if __name__ == '__main__':
     viewer.scene.origin.enabled = False
     viewer.shadows_enabled = False
 
-    viewer.run()
+    if HEADLESS:
+        viewer.run(video_dir=os.path.join(C.export_dir, 'headless/test.mp4'))
+    else:
+        viewer.run()
