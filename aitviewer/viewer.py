@@ -51,18 +51,23 @@ class Viewer(moderngl_window.WindowConfig):
     size_mult = 1.0
     samples = 4
 
-    def __init__(self, title="AITViewer", **kwargs):
+    def __init__(self, title="AITViewer", size=None, **kwargs):
         """
         Initializer.
         :param title: Window title
+        :param size: Window size as (width, height) tuple, if None uses the size from the configuration file
         :param kwargs: kwargs.
         """
 
         # Window Setup (Following `moderngl_window.run_window_config`).
         base_window_cls = get_local_window_cls(self.window_type)
 
+        # If no size is provided use the size from the configuration file
+        if size is None:
+            size = C.window_width, C.window_height
+
         # Calculate window size
-        size = int(C.window_width * self.size_mult), int(C.window_height * self.size_mult)
+        size = int(size[0] * self.size_mult), int(size[1] * self.size_mult)
 
         self.window = base_window_cls(
             title=title,
@@ -315,9 +320,6 @@ class Viewer(moderngl_window.WindowConfig):
 
     def prevent_background_interactions(self):
         """Prevent background interactions when hovering over any imgui window."""
-        imgui_hover = any([imgui.is_window_hovered(),
-                           imgui.is_any_item_hovered(),
-                           ])
         self.imgui_user_interacting = self.imgui.io.want_capture_mouse
 
     def toggle_animation(self, run: bool):
