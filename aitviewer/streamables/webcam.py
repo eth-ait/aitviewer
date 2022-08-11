@@ -20,7 +20,7 @@ from aitviewer.streamables.streamable import Streamable
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_screen_texture_program
 from moderngl_window import geometry
-
+import numpy as np
 
 class Webcam(Streamable):
     """
@@ -65,6 +65,7 @@ class Webcam(Streamable):
     def render(self, camera, **kwargs):
         self._texture.use(0)
         self.prog['transparency'].value = self.transparency
+        self.prog['mvp'].write(np.eye(4).astype("f4").tobytes())
         self.quad.render(self.prog)
 
     @property

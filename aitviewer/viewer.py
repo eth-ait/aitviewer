@@ -51,18 +51,23 @@ class Viewer(moderngl_window.WindowConfig):
     size_mult = 1.0
     samples = 4
 
-    def __init__(self, title="AITViewer", **kwargs):
+    def __init__(self, title="AITViewer", size=None, **kwargs):
         """
         Initializer.
         :param title: Window title
+        :param size: Window size as (width, height) tuple, if None uses the size from the configuration file
         :param kwargs: kwargs.
         """
 
         # Window Setup (Following `moderngl_window.run_window_config`).
         base_window_cls = get_local_window_cls(self.window_type)
 
+        # If no size is provided use the size from the configuration file
+        if size is None:
+            size = C.window_width, C.window_height
+
         # Calculate window size
-        size = int(C.window_width * self.size_mult), int(C.window_height * self.size_mult)
+        size = int(size[0] * self.size_mult), int(size[1] * self.size_mult)
 
         self.window = base_window_cls(
             title=title,
@@ -155,6 +160,7 @@ class Viewer(moderngl_window.WindowConfig):
 
         self._pan_camera = False
         self._rotate_camera = False
+        self._using_temp_camera = False
         self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
 
@@ -296,7 +302,7 @@ class Viewer(moderngl_window.WindowConfig):
                           flat_rendering=self.flat_rendering,
                           lights=self.scene.lights,
                           shadows_enabled=self.shadows_enabled,
-                          show_camera_target=self.show_camera_target,
+                          show_camera_target=self.show_camera_target and not self._using_temp_camera,
                           depth_prepass_prog=self.depth_only_prog)
 
     def render_prepare(self):
@@ -314,15 +320,28 @@ class Viewer(moderngl_window.WindowConfig):
 
     def prevent_background_interactions(self):
         """Prevent background interactions when hovering over any imgui window."""
-        imgui_hover = any([imgui.is_window_hovered(),
-                           imgui.is_any_item_hovered(),
-                           ])
         self.imgui_user_interacting = self.imgui.io.want_capture_mouse
 
     def toggle_animation(self, run: bool):
         self.run_animations = run
         if self.run_animations:
             self._last_frame_rendered_at = self.timer.time
+
+    def reset_camera(self):
+        if self._using_temp_camera:
+            self._using_temp_camera = False
+
+            fwd = self.scene.camera.forward
+            pos = self.scene.camera.position
+
+            self.scene.camera = PinholeCamera(45)
+            self.scene.camera.position = np.copy(pos)
+            self.scene.camera.target = pos + fwd * 3
+            self.scene.camera.update_matrices(self.window_size[0], self.window_size[1])
+            
+    def set_temp_camera(self, camera):
+        self.scene.camera = camera
+        self._using_temp_camera = True
 
     def gui(self):
         imgui.new_frame()
@@ -384,13 +403,20 @@ class Viewer(moderngl_window.WindowConfig):
                                                     self.dark_mode, True)
                 _, self.show_camera_target = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
                                                     self.show_camera_target, True)
-                _, self.scene.camera.is_ortho = imgui.menu_item("Orthographic Camera",
+
+                is_ortho = False if self._using_temp_camera else self.scene.camera.is_ortho
+                _, is_ortho = imgui.menu_item("Orthographic Camera",
                                                                 self._shortcut_names[self._orthographic_camera_key],
-                                                                self.scene.camera.is_ortho, True)
+                                                is_ortho, True)
+                if is_ortho and self._using_temp_camera:
+                    self.reset_camera()
+                self.scene.camera.is_ortho = is_ortho
+
                 clicked_save_cam, selected_save_cam = imgui.menu_item("Save Camera",
                                                                 self._shortcut_names[self._save_cam_key],
                                                                 False, True)
                 if clicked_save_cam:
+                    self.reset_camera()
                     self.scene.camera.save_cam()
 
                 clicked_load_cam, selected_load_cam = imgui.menu_item("Load Camera",
@@ -398,6 +424,7 @@ class Viewer(moderngl_window.WindowConfig):
                                                                 False, True)
 
                 if clicked_load_cam:
+                    self.reset_camera()
                     self.scene.camera.load_cam()
 
                 imgui.end_menu()
@@ -569,6 +596,8 @@ class Viewer(moderngl_window.WindowConfig):
                 self.show_camera_target = not self.show_camera_target
 
             elif key == self._orthographic_camera_key:
+                if self._using_temp_camera:
+                    self.reset_camera()
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
 
             elif key == self._flat_rendering_key:
@@ -587,8 +616,12 @@ class Viewer(moderngl_window.WindowConfig):
             elif key == self._screenshot_key:
                 self.take_screenshot()
             elif key == self._save_cam_key:
+                if self._using_temp_camera:
+                    self.reset_camera()
                 self.scene.camera.save_cam()
             elif key == self._load_cam_key:
+                if self._using_temp_camera:
+                    self.reset_camera()
                 self.scene.camera.load_cam()
 
         if action == self.wnd.keys.ACTION_RELEASE:
@@ -620,15 +653,21 @@ class Viewer(moderngl_window.WindowConfig):
 
         if not self.imgui_user_interacting :
             if self._pan_camera:
+                if self._using_temp_camera:
+                    self.reset_camera()
                 self.scene.camera.pan(dx, dy)
 
             if self._rotate_camera:
+                if self._using_temp_camera:
+                    self.reset_camera()
                 self.scene.camera.rotate_azimuth_elevation(dx, dy)
 
     def mouse_scroll_event(self, x_offset: float, y_offset: float):
         self.imgui.mouse_scroll_event(x_offset, y_offset)
 
         if not self.imgui_user_interacting:
+            if self._using_temp_camera:
+                self.reset_camera()
             self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift)
 
     def unicode_char_entered(self, char):
@@ -675,6 +714,9 @@ class Viewer(moderngl_window.WindowConfig):
             print("No frames rendered.")
             return
 
+        if self._using_temp_camera:
+            self.reset_camera()
+
         # Start all sequences from 0 but remember where we left off.
         saved_curr_frame = self.scene.current_frame_id
 
@@ -717,6 +759,9 @@ class Viewer(moderngl_window.WindowConfig):
 
     def to_360_deg_video(self):
         """Matrix shot. Keeps the look-at point fixed and rotates the camera around it."""
+        if self._using_temp_camera:
+            self.reset_camera()
+
         n_frames = 360
         saved_camera = copy.deepcopy(self.scene.camera)
 

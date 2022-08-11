@@ -71,8 +71,9 @@ class Scene(Node):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
 
         # Setup the camera target cursor for rendering
-        self.camera_target.position = self.camera.target
         self.camera_target.enabled = kwargs['show_camera_target']
+        if self.camera_target.enabled:
+            self.camera_target.position = self.camera.target
 
         # Collect all renderable nodes
         rs = self.collect_nodes()
