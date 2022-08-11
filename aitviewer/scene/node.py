@@ -247,6 +247,13 @@ class Node(object):
     def expanded(self, expanded):
         self._expanded = expanded
 
+    def is_transparent(self):
+        """ 
+        Returns true if the object is transparent and should thus be sorted when rendering.
+        Subclasses should implement this method to be rendered correctly when transparent.
+        """
+        return False
+
     def gui_animation(self, imgui):
         # Animation Control
         if self.n_frames > 1 and 'animation' in self._gui_elements:

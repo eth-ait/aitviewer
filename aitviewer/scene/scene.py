@@ -82,9 +82,7 @@ class Scene(Node):
 
         # Draw all opaque objects first
         for r in rs:
-            # An object is opaque if it's color alpha is 1.0 
-            # and, if it's a mesh, if also the texture_alpha is 1.0
-            if r.color[3] == 1.0 and (not isinstance(r, Meshes) or r.texture_alpha == 1.0):
+            if not r.is_transparent():
                 # Turn off backface culling if enabled for the scene
                 # and requested by the current object
                 if self.backface_culling and r.backface_culling:

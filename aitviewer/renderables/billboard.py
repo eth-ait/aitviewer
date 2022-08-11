@@ -60,6 +60,7 @@ class Billboard(Node):
         self.texture_paths = texture_paths
 
         self.texture = None
+        self.texture_alpha = 1.0
         self._current_texture_id = None
 
         self.backface_culling = False
@@ -133,7 +134,7 @@ class Billboard(Node):
                 self.texture = self.ctx.texture(img.size, 3, img.tobytes())
             self._current_texture_id = self.current_frame_id
 
-        self.prog['transparency'] = 1.0
+        self.prog['transparency'] = self.texture_alpha
         self.prog['texture0'].value = 0
         self.texture.use(0)
 
@@ -151,3 +152,10 @@ class Billboard(Node):
             self.vao.release()
             if self.texture:
                 self.texture.release()
+    
+    def is_transparent(self):
+        return self.texture_alpha < 1.0
+
+    def gui_material(self, imgui, show_advanced=True):
+        _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name),
+                                                    self.texture_alpha, 0.0, 1.0, '%.2f')

@@ -261,6 +261,12 @@ class Meshes(Node):
     def bounds(self):
         return self.get_bounds(self.vertices)
 
+    def is_transparent(self):
+        if self.has_texture and self.show_texture:
+            return self.texture_alpha < 1.0
+        else:
+            return self.color[3] < 1.0
+
     def on_frame_update(self):
         """Called whenever a new frame must be displayed."""
         super().on_frame_update()
