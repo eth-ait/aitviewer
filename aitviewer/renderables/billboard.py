@@ -1,15 +1,30 @@
-import moderngl
-import numpy as np
+"""
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
+from aitviewer.scene.camera import Camera
 from aitviewer.scene.node import Node
-from aitviewer.shaders import get_screen_texture_program, get_smooth_lit_with_edges_program, get_chessboard_program
-from aitviewer.utils import set_lights_in_program
-from aitviewer.utils import set_material_properties
+from aitviewer.shaders import get_screen_texture_program
+from aitviewer.utils.decorators import hooked
 
+from typing import List
 from PIL import Image
 import pickle
-
-from aitviewer.utils.decorators import hooked
+import moderngl
+import numpy as np
 
 class Billboard(Node):
     """ A billboard for displaying a sequence of images as an object in the world"""
@@ -29,7 +44,7 @@ class Billboard(Node):
         if len(vertices.shape) == 2:
             vertices = vertices[np.newaxis]
         else:
-            assert vertices.shape[0] == len(texture_paths), "the length of the sequence of vertices must be 1 or match the number of textures"
+            assert vertices.shape[0] == 1 or vertices.shape[0] == len(texture_paths), "the length of the sequence of vertices must be 1 or match the number of textures"
 
         self.vertices = vertices
 
@@ -50,38 +65,48 @@ class Billboard(Node):
         self.backface_culling = False
 
     @classmethod
-    def from_opencv_camera_and_distance(cls, camera, distance, cols, rows, texture_paths):
+    def from_camera_and_distance(cls, camera: Camera, distance: float, cols: int, rows:int, texture_paths: List[str]):
         """
-        Initialize from an OpenCV camera object, a distance from the camera 
-        and the size of the image in pixels as expected by the camera intrinsics matrix
+        Initialize a Billboard from an OpenCV camera object, a distance from the camera, the size of the image in pixels and the set of images.
         """
+        frames = camera.n_frames
+        frame_id = camera.current_frame_id
 
-        V, P = camera.compute_opengl_view_projection(cols, rows)
-        ndc_from_world = P @ V
-        
-        # Comput z coordinate of a point at the given distance
-        world_p = camera.position + camera.forward * distance
-        ndc_p = (ndc_from_world @ np.concatenate([world_p, np.array([1])]))
+        all_corners = np.zeros((frames, 4, 3))
+        for i in range(frames):
+            camera.current_frame_id = i
+            camera.update_matrices(cols, rows)
+            V = camera.get_view_matrix()
+            P = camera.get_projection_matrix()
+            ndc_from_world = P @ V
 
-        # Compute z after perspective division
-        z = ndc_p[2] / ndc_p[3]
+            # Comput z coordinate of a point at the given distance
+            world_p = camera.position + camera.forward * distance
+            ndc_p = ndc_from_world @ np.append(world_p, 1.0)
 
-        # Compute world coordinates of NDC corners at the computed distance
-        corners = np.array([
-            [ 1,  1, z], 
-            [ 1, -1, z], 
-            [-1,  1, z], 
-            [-1, -1, z],
-        ])
+            # Perspective division
+            z = ndc_p[2] / ndc_p[3]
 
-        world_from_ndc = np.linalg.inv(ndc_from_world)
-        def transform(x):
-            v = world_from_ndc @ np.append(x, 1.0)
-            v = v[:3] / v[3]
-            return v
-        corners = np.apply_along_axis(transform, 1, corners)
+            # NDC of corners at the computed distance
+            corners = np.array([
+                [ 1,  1, z], 
+                [ 1, -1, z], 
+                [-1,  1, z], 
+                [-1, -1, z],
+            ])
 
-        return cls(corners, texture_paths)
+            # Transform ndc coordinates to world coordinates
+            world_from_ndc = np.linalg.inv(ndc_from_world)
+            def transform(x):
+                v = world_from_ndc @ np.append(x, 1.0)
+                v = v[:3] / v[3]
+                return v
+            corners = np.apply_along_axis(transform, 1, corners)
+
+            all_corners[i] = corners
+
+        camera.current_frame_id = frame_id
+        return cls(all_corners, texture_paths)
 
     # noinspection PyAttributeOutsideInit
     @Node.once

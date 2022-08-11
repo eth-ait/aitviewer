@@ -1,7 +1,22 @@
+"""
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 from aitviewer.scene.camera import OpenCVCamera
 from aitviewer.scene.node import Node
-from aitviewer.renderables.meshes import Meshes
-from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.billboard import Billboard
 
 import numpy as np
@@ -18,9 +33,9 @@ class MultiViewSystem(Node):
         and the path to a directory with M subdirectories, containing N images each.
 
         :param camera_info_path: path to a camera info .npz file with the following file entries
-            'ids':        Array of camera ids (M)
-            'extrinsics': Array of camera extrinsics in the format used by OpenCV (M, 3, 4)
-            'intrinsics': Array of camera intrinsics in the format used by OpenCV (M, 3, 3)
+            'ids':        A np array of camera ids (M)
+            'intrinsics': A np array of camera intrinsics in the format used by OpenCV (M, 3, 3)
+            'extrinsics': A np array of camera extrinsics in the format used by OpenCV (M, 3, 4)
         :param camera_images_path: path to a directory with M subdirectories, one for each camera
             with the camera id as name. Each directory contains N images for the respective camera
             with a filename ending with the frame number.
@@ -48,55 +63,18 @@ class MultiViewSystem(Node):
         # Initialize node
         super(MultiViewSystem, self).__init__(n_frames=n_frames, **kwargs)
 
-        # Vertices and faces for drawing cameras
-        vertices = np.array([
-            [ 0,  0, 0],
-            [-1, -1, 1],
-            [-1,  1, 1],
-            [ 1, -1, 1],
-            [ 1,  1, 1],
-            
-            [ 0.5,  1.1, 1],
-            [-0.5,  1.1, 1],
-            [   0,    2, 1],
-        ], dtype=np.float32)
-        vertices[:, 0] *= 0.17
-        vertices[:, 1] *= 0.1
-        vertices[:, 2]  *= 0.5
-        vertices *= 0.3
-
-        faces = np.array([
-            [ 0, 1, 2],
-            [ 0, 2, 4],
-            [ 0, 4, 3],
-            [ 0, 3, 1],
-            [ 1, 3, 2],
-            [ 4, 2, 3],
-            [ 5, 6, 7],
-            [ 5, 7, 6],
-        ])
-
-        self.ACTIVE_CAMERA_COLOR = (0.6, 0.1, 0.1, 1)
-        self.INACTIVE_CAMERA_COLOR = (0.5, 0.5, 0.5, 1)
-
         # Compute position and orientation of each camera
         positions = []
         self.cameras = []
-        for i in range(len(camera_info['ids'])):
+        for i in range(len(camera_info['ids'])): 
+            intrinsics = camera_info['intrinsics'][i]
             extrinsics = camera_info['extrinsics'][i]
-            
-            rot = np.linalg.inv(extrinsics[:, 0:3])
-            pos = rot @ (-extrinsics[:, 3])
-            rot[:,:2] = -rot[:,:2]
 
-            pos -= rot[:, 2] * 0.15
+            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows)
+            self.add(camera, show_in_hierarchy=False)
+            self.cameras.append(camera)
 
-            camera_mesh = Meshes(vertices, faces, position=pos, rotation = rot, cast_shadow=False)
-            camera_mesh.color = self.INACTIVE_CAMERA_COLOR
-            self.add(camera_mesh, show_in_hierarchy=False)
-            self.cameras.append(camera_mesh)
-
-            positions.append(pos)
+            positions.append(camera.position)
 
         # Compute maximum distance from a camera to the center of all cameras and use it
         # to compute the distance at which to show the billboards
@@ -121,64 +99,25 @@ class MultiViewSystem(Node):
 
     def set_active_camera(self, index):
         if self.active_camera_index is not None:
-            self.cameras[self.active_camera_index].color = self.INACTIVE_CAMERA_COLOR
+            camera = self.get_active_camera()
+            camera.active = False
+            camera.hide_frustum()
         
         self.active_camera_index = index
-        self.cameras[index].color = self.ACTIVE_CAMERA_COLOR
-
+        self.cameras[index].active = True
 
     def get_active_camera(self):
-        idx = self.active_camera_index
-        K = self.camera_info['intrinsics'][idx]
-        Rt = self.camera_info['extrinsics'][idx]
-        return OpenCVCamera(K, Rt, self.cols, self.rows)
+        return self.cameras[self.active_camera_index]
 
     def change_view_to_active_camera(self):
         self.viewer.set_temp_camera(self.get_active_camera())
 
     def update_frustum(self):
-        if self.frustum:
-            self.remove(self.frustum)
-            self.frustum = None
-
+        camera = self.get_active_camera()
         if self.show_frustum:
-            camera = self.get_active_camera()
-            V, P = camera.compute_opengl_view_projection(self.cols, self.rows)
-            ndc_from_world = P @ V
-            world_from_ndc = np.linalg.inv(ndc_from_world)
-
-            def transform(x):
-                v = world_from_ndc @ np.append(x, 1.0)
-                return v[:3] / v[3]
-
-            # Comput z coordinate of a point at the given distance
-            world_p = camera.position + camera.forward * self.billboard_distance
-            ndc_p = (ndc_from_world @ np.concatenate([world_p, np.array([1])]))
-
-            # Compute z after perspective division
-            z = ndc_p[2] / ndc_p[3]
-
-            lines = np.array([
-                [-1, -1, -1], [-1,  1, -1],
-                [-1, -1,  z], [-1,  1,  z],
-                [ 1, -1, -1], [ 1,  1, -1],
-                [ 1, -1,  z], [ 1,  1,  z],
-                
-                [-1, -1, -1], [-1, -1, z],
-                [-1,  1, -1], [-1,  1, z],
-                [ 1, -1, -1], [ 1, -1, z],
-                [ 1,  1, -1], [ 1,  1, z],
-                
-                [-1, -1, -1], [ 1, -1, -1],
-                [-1, -1,  z], [ 1, -1,  z],
-                [-1,  1, -1], [ 1,  1, -1],
-                [-1,  1,  z], [ 1,  1,  z],
-            ])
-
-            lines = np.apply_along_axis(transform, 1, lines)
-
-            self.frustum = Lines(lines, position=self.position, r_base=0.005, mode='lines', cast_shadow=False)
-            self.add(self.frustum, show_in_hierarchy = False)
+            camera.show_frustum(self.cols, self.rows, self.billboard_distance)
+        else:
+            camera.hide_frustum()
 
     def update_billboard(self):
         # Release the old billboard
@@ -190,7 +129,7 @@ class MultiViewSystem(Node):
             # Look for images for the active camera
             camera_path = os.path.join(self.camera_images_path, str(self.camera_info['ids'][self.active_camera_index]))
             if not os.path.isdir(camera_path):
-                print(f"Camera images not found at {camera_path}")
+                print(f"Camera directory not found at {camera_path}")
                 return
 
             # Sort images by the frame number in the filename
@@ -202,11 +141,18 @@ class MultiViewSystem(Node):
                 return int(regex.search(name).group(0))
 
             paths = [os.path.join(camera_path, f) for f in sorted(files, key=sort_key)]
-            
+            if not paths:
+                print(f"Camera images not found at {camera_path}")
+                return
+
             #Create a new billboard for the currently active camera
-            self.billboard = Billboard.from_opencv_camera_and_distance(self.get_active_camera(), self.billboard_distance, self.cols, self.rows, paths)
-            self.billboard.current_frame_id = self.current_frame_id
-            self.add(self.billboard, show_in_hierarchy = False)
+            self.billboard = Billboard.from_camera_and_distance(self.get_active_camera(), self.billboard_distance, self.cols, self.rows, paths)
+
+            #Set the current frame index if we have an image for it
+            if self.current_frame_id < len(paths):
+                self.billboard.current_frame_id = self.current_frame_id
+            
+            self.add(self.billboard, show_in_hierarchy=False)
 
     def gui(self, imgui):
         u_selected, active_index = imgui.combo("ID", self.active_camera_index, [str(id) for id in self.camera_info['ids'].tolist()])

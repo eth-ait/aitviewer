@@ -333,7 +333,7 @@ class Viewer(moderngl_window.WindowConfig):
             pos = self.scene.camera.position
 
             self.scene.camera = PinholeCamera(45)
-            self.scene.camera.position = pos
+            self.scene.camera.position = np.copy(pos)
             self.scene.camera.target = pos + fwd * 3
             self.scene.camera.update_matrices(self.window_size[0], self.window_size[1])
             
