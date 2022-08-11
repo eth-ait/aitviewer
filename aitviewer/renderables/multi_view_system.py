@@ -69,8 +69,9 @@ class MultiViewSystem(Node):
         for i in range(len(camera_info['ids'])): 
             intrinsics = camera_info['intrinsics'][i]
             extrinsics = camera_info['extrinsics'][i]
+            dist_coeffs = camera_info['dist_coeffs'][i]
 
-            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows)
+            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs)
             self.add(camera, show_in_hierarchy=False)
             self.cameras.append(camera)
 

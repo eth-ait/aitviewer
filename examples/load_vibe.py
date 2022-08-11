@@ -29,8 +29,9 @@ import numpy as np
 
 # Set to True for rendering in headless mode, no window will be created and
 # a video will be exported to 'headless/test.mp4' in the export directory
-HEADLESS=False
-        
+HEADLESS = False
+
+
 if __name__ == '__main__':
     # Load camera and SMPL data from the output of the VIBE demo from https://github.com/mkocabas/VIBE
     data = joblib.load(open("resources/vibe/vibe_output.pkl", 'rb'))
@@ -46,7 +47,7 @@ if __name__ == '__main__':
 
     # Instantiate an SMPL sequence using the parameters from the data file.
     # We rotate the sequence by 180 degrees around the x axis to flip the y and z axis
-    # because VIBE outputs the pose in a different coordinate system
+    # because VIBE outputs the pose in a different coordinate system.
     smpl_layer = SMPLLayer(model_type='smpl', gender='neutral', device=C.device)
     smpl_sequence = SMPLSequence(poses_body=poses[:, 3:24 * 3],
                                  poses_root=poses[:, 0:3],
@@ -54,24 +55,25 @@ if __name__ == '__main__':
                                  smpl_layer=smpl_layer,
                                  rotation=aa2rot_numpy(np.array([1, 0, 0]) * np.pi))
 
-    # Size in pixels of the image data
+    # Size in pixels of the image data.
     cols, rows = 1920, 1080
 
-    # Create a sequence of weak perspective cameras,
-    cameras = WeakPerspectiveCamera(camera_info[:,:2], camera_info[:,2:], cols, rows, far=3, viewer=viewer)
+    # Create a sequence of weak perspective cameras.
+    cameras = WeakPerspectiveCamera(camera_info[:, :2], camera_info[:, 2:], cols, rows, far=3, viewer=viewer)
 
-    # Load the reference images and create a Billboard
+    # Load the reference images and create a Billboard.
     images_path = "resources/vibe/frames"
-    pc = Billboard.from_camera_and_distance(cameras, cameras.far - 1e-6, cols, rows, [os.path.join(images_path, f) for f in os.listdir(images_path)])
+    pc = Billboard.from_camera_and_distance(cameras, cameras.far - 1e-6, cols, rows,
+                                            [os.path.join(images_path, f) for f in os.listdir(images_path)])
 
-    # Add all the objects to the scene
+    # Add all the objects to the scene.
     viewer.scene.add(pc, smpl_sequence, cameras)
 
-    # Set the weak perspective cameras as the current camera for the used by the viewer.
-    # This is a temporary setting, moving the camera will result in switching back to the default camera.
+    # Set the weak perspective cameras as the current camera used by the viewer.
+    # This is a temporary setting, moving the camera will result in switching back to the default (pinhole) camera.
     viewer.set_temp_camera(cameras)
 
-    # Viewer settings
+    # Viewer settings.
     viewer.playback_fps = 25
     viewer.auto_set_floor = False
     viewer.scene.floor.position[1] = -1.15

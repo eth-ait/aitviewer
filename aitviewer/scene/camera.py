@@ -354,10 +354,11 @@ class WeakPerspectiveCamera(Camera):
 class OpenCVCamera(Camera):
     """ A camera described by extrinsics and intrinsics in the format used by OpenCV """
 
-    def __init__(self, K, Rt, cols, rows, near=C.znear, far=C.zfar, viewer=None, **kwargs):
+    def __init__(self, K, Rt, cols, rows, dist_coeffs=None, near=C.znear, far=C.zfar, viewer=None, **kwargs):
         """ Initializer.
         :param K:  A np array of camera intrinsics in the format used by OpenCV (3, 3)
         :param Rt: A np array of camera extrinsics in the format used by OpenCV (3, 4)
+        :param dist_coeffs: Lens distortion coefficients in the format used by OpenCV.
         :param cols: Width  of the image in pixels, matching the size of the image expected by the intrinsics matrix
         :param rows: Height of the image in pixels, matching the size of the image expected by the intrinsics matrix
         :param near: Distance of the near plane from the camera
@@ -373,6 +374,7 @@ class OpenCVCamera(Camera):
 
         self.K = K
         self.Rt = Rt
+        self.dist_coeffs = dist_coeffs
 
         self.cols = cols
         self.rows = rows

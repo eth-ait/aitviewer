@@ -14,17 +14,17 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
-from aitviewer.scene.camera import Camera
+from aitviewer.scene.camera import OpenCVCamera
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_screen_texture_program
 from aitviewer.utils.decorators import hooked
-
 from typing import List
-from PIL import Image
+
+import cv2
 import pickle
 import moderngl
 import numpy as np
+
 
 class Billboard(Node):
     """ A billboard for displaying a sequence of images as an object in the world"""
@@ -32,6 +32,7 @@ class Billboard(Node):
     def __init__(self,
                  vertices,
                  texture_paths,
+                 img_process_fn=None,
                  **kwargs):
         """ Initializer.
         :param vertices:
@@ -47,6 +48,7 @@ class Billboard(Node):
             assert vertices.shape[0] == 1 or vertices.shape[0] == len(texture_paths), "the length of the sequence of vertices must be 1 or match the number of textures"
 
         self.vertices = vertices
+        self.img_process_fn = (lambda img: img) if img_process_fn is None else img_process_fn
 
         # Tile the uv buffer to match the size of the vertices buffer,
         # we do this so that we can use the same vertex array for all draws
@@ -66,10 +68,13 @@ class Billboard(Node):
         self.backface_culling = False
 
     @classmethod
-    def from_camera_and_distance(cls, camera: Camera, distance: float, cols: int, rows:int, texture_paths: List[str]):
+    def from_camera_and_distance(cls, camera: OpenCVCamera, distance: float, cols: int, rows: int,
+                                 texture_paths: List[str]):
         """
-        Initialize a Billboard from an OpenCV camera object, a distance from the camera, the size of the image in pixels and the set of images.
+        Initialize a Billboard from an OpenCV camera object, a distance from the camera, the size of the image in
+        pixels and the set of images.
         """
+        assert isinstance(camera, OpenCVCamera), "Camera must be an OpenCVCamera."
         frames = camera.n_frames
         frame_id = camera.current_frame_id
 
@@ -107,7 +112,11 @@ class Billboard(Node):
             all_corners[i] = corners
 
         camera.current_frame_id = frame_id
-        return cls(all_corners, texture_paths)
+
+        def img_process_fn(img):
+            return cv2.undistort(img, camera.K, camera.dist_coeffs)
+
+        return cls(all_corners, texture_paths, img_process_fn)
 
     # noinspection PyAttributeOutsideInit
     @Node.once
@@ -128,10 +137,12 @@ class Billboard(Node):
             path = self.texture_paths[self.current_frame_id]
             if path.endswith((".pickle", "pkl")):
                 img = pickle.load(open(path, "rb"))
+                img = self.img_process_fn(img)
                 self.texture = self.ctx.texture(img.shape[:2], img.shape[2], img.tobytes())
             else:
-                img = Image.open(path).transpose(method=Image.FLIP_TOP_BOTTOM).convert("RGB")
-                self.texture = self.ctx.texture(img.size, 3, img.tobytes())
+                img = cv2.cvtColor(cv2.flip(cv2.imread(path), 0), cv2.COLOR_BGR2RGB)
+                img = self.img_process_fn(img)
+                self.texture = self.ctx.texture((img.shape[1], img.shape[0]), img.shape[2], img.tobytes())
             self._current_texture_id = self.current_frame_id
 
         self.prog['transparency'] = self.texture_alpha
