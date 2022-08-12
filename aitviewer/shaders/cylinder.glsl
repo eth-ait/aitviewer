@@ -138,7 +138,6 @@
 #elif defined FRAGMENT_SHADER
 
     #include directional_lights.glsl
-    #include utils.glsl
 
     in vec3 g_vert;
     in vec3 g_norm;

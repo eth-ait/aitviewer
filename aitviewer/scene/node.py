@@ -119,7 +119,7 @@ class Node(object):
 
         scale = np.diag([scale, scale, scale, 1])
         
-        return (rotation @ trans @ scale).astype('f4')
+        return (trans @ rotation @ scale).astype('f4')
 
     def model_matrix(self):
         """Construct model matrix from this node's orientation and position."""
@@ -218,6 +218,11 @@ class Node(object):
         for n in nodes:
             self._add_node(n, **kwargs)
 
+    def remove(self, *nodes):
+        for n in nodes:
+            n.release()
+            self.nodes.remove(n)
+
     @property
     def has_gui(self):
         return self._has_gui
@@ -233,8 +238,6 @@ class Node(object):
     @enabled.setter
     def enabled(self, enabled):
         self._enabled = enabled
-        for n in self.nodes:
-            n.enabled = enabled
 
     @property
     def expanded(self):
@@ -243,6 +246,13 @@ class Node(object):
     @expanded.setter
     def expanded(self, expanded):
         self._expanded = expanded
+
+    def is_transparent(self):
+        """ 
+        Returns true if the object is transparent and should thus be sorted when rendering.
+        Subclasses should implement this method to be rendered correctly when transparent.
+        """
+        return False
 
     def gui_animation(self, imgui):
         # Animation Control
@@ -401,7 +411,9 @@ class Node(object):
 
     def release(self):
         """
-        Release all OpenGL resources used by this node. 
+        Release all OpenGL resources used by this node and any of its children. 
         Subclasses that instantiate OpenGL objects should 
         implement this method with '@hooked' to avoid leaking resources.
         """
+        for n in self.nodes:
+            n.release()

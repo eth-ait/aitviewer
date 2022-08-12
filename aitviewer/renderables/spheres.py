@@ -14,15 +14,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import moderngl
 import numpy as np
-
+from aitviewer.renderables.meshes import Meshes
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
-from aitviewer.shaders import get_smooth_lit_with_edges_program
-from aitviewer.utils import set_lights_in_program
-from aitviewer.utils import set_material_properties
-
 
 def _create_spheres(radius=1.0, rings=16, sectors=32, n_spheres=1, create_faces=True):
     """
@@ -111,53 +106,35 @@ class Spheres(Node):
         self.sphere_faces = np.concatenate(sphere_faces)
         self.radius = radius
 
+        # A mesh representing the spheres for a single frame
+        self.mesh = Meshes(self.sphere_vertices, self.sphere_faces, self.sphere_normals, material=self.material, cast_shadow=False, pickable=False)
+            
+        self.add(self.mesh, show_in_hierarchy=False)
+
     @property
     def vertex_colors(self):
         return np.full((self.n_spheres * self.n_vertices, 4), self.color)
 
-    # noinspection PyAttributeOutsideInit
-    @Node.once
-    def make_renderable(self, ctx):
-        self.prog = get_smooth_lit_with_edges_program()
-        self.vbo_vertices = ctx.buffer(self.sphere_vertices.astype('f4').tobytes())
-        self.vbo_colors = ctx.buffer(self.vertex_colors.astype('f4').tobytes())
-        self.vbo_normals = ctx.buffer(self.sphere_normals.squeeze().astype('f4').tobytes())
-        self.vbo_indices = ctx.buffer(self.sphere_faces.tobytes())
-
-        self.mesh_vao = ctx.vertex_array(self.prog,
-                                         [(self.vbo_vertices, '3f4 /v', 'in_position'),
-                                          (self.vbo_colors, '4f4 /v', 'in_color'),
-                                          (self.vbo_normals, '3f4 /v', 'in_normal')],
-                                         self.vbo_indices)
-        self.is_renderable = True
+    def on_frame_update(self):  
         self.redraw()
-
-    def on_frame_update(self):
-        self.redraw()
-
-    def redraw(self, **kwargs):
-        """Upload the current frame data to the GPU for rendering."""
-        if not self.is_renderable:
-            return
-
+    
+    def redraw(self):
         current_pos = self.sphere_positions[self.current_frame_id]
         vertices = np.reshape(self.sphere_vertices, [-1, self.n_vertices, 3]) * self.radius + current_pos[:, np.newaxis]
-        self.vbo_vertices.write(np.reshape(vertices, [-1, 3]).astype('f4').tobytes())
-        self.vbo_colors.write(self.vertex_colors.astype('f4').tobytes())
+        self.mesh._vertices =np.reshape(vertices, [-1, 3])[np.newaxis]
+        self.mesh.redraw()
 
-    def render(self, camera, **kwargs):
-        self.set_camera_matrices(self.prog, camera, **kwargs)
-        set_lights_in_program(self.prog, kwargs['lights'], kwargs['shadows_enabled'])
-        set_material_properties(self.prog, self.material)
-        self.prog['draw_edges'].value = 1.0 if kwargs['draw_edges'] and self.material._show_edges else 0.0
-        self.prog['norm_coloring'].value = False
-        self.prog['win_size'].value = kwargs['window_size']
-        self.mesh_vao.render(moderngl.TRIANGLES)
-
-    @Node.color.setter
-    def color(self, color):
-        self.material.color = color
+    @Node.once
+    def make_renderable(self, ctx):
         self.redraw()
+    
+    @property
+    def color(self):
+        return self.mesh.color
+    
+    @color.setter
+    def color(self, color):
+        self.mesh.color = color
 
     def gui_scale(self, imgui):
         # Scale controls

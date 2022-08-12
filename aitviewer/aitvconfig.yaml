@@ -28,8 +28,6 @@ vsync: True
 export_dir: "../export"
 playback_fps: 60
 run_animations: False
-draw_edges: False
-flat_rendering: False
 dark_mode: False
 shadows_enabled: True
 show_shadow_map: False

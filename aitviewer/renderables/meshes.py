@@ -52,6 +52,9 @@ class Meshes(Node):
                  path_to_texture=None,
                  texture_alpha=1.0,
                  cast_shadow=True,
+                 pickable=True,
+                 flat_shading=False,
+                 draw_edges=False,
                  **kwargs):
         """
         Initializer.
@@ -100,11 +103,12 @@ class Meshes(Node):
 
         # Enable rendering passes
         self.cast_shadow = cast_shadow
-        self.fragmap = True
+        self.fragmap = pickable
         self.depth_prepass = True
 
         # Misc.
-        self.flat_shading = False
+        self._flat_shading = flat_shading
+        self.draw_edges = draw_edges
         self.show_texture = self.has_texture
         self.norm_coloring = False
         self.normals_r = None
@@ -227,6 +231,16 @@ class Meshes(Node):
         self.redraw()
 
     @property
+    def flat_shading(self):
+        return self._flat_shading
+    
+    @flat_shading.setter
+    def flat_shading(self, flat_shading):
+        if self._flat_shading != flat_shading:
+            self._flat_shading = flat_shading
+            self.redraw()
+
+    @property
     def current_vertices(self):
         return self.vertices[self.current_frame_id]
 
@@ -260,6 +274,12 @@ class Meshes(Node):
     @property
     def bounds(self):
         return self.get_bounds(self.vertices)
+
+    def is_transparent(self):
+        if self.has_texture and self.show_texture:
+            return self.texture_alpha < 1.0
+        else:
+            return self.color[3] < 1.0
 
     def on_frame_update(self):
         """Called whenever a new frame must be displayed."""
@@ -333,7 +353,9 @@ class Meshes(Node):
 
         self.positions_vao = VAO('{}:positions'.format(self.unique_name))
         self.positions_vao.buffer(self.vbo_vertices, '3f', ['in_position'])
-        self.positions_vao.index_buffer(self.vbo_indices)
+
+        if self.face_colors is None:
+            self.positions_vao.index_buffer(self.vbo_indices)
 
         if self.has_texture:
             img = self.texture_image
@@ -366,12 +388,7 @@ class Meshes(Node):
             self.texture.release()
 
     def render(self, camera, **kwargs):
-        # Check if flat shading changed, in which case we need to update the VBOs.
-        flat = kwargs.get('flat_rendering', False)
-        if flat != self.flat_shading:
-            self.flat_shading = flat
-            self.redraw()
-            
+        # Check if flat shading changed, in which case we need to update the VBOs.    
         if self.has_texture:
             self.texture_prog['texture_alpha'].value = self.texture_alpha
         vao = self._prepare_vao(camera, **kwargs)
@@ -394,7 +411,7 @@ class Meshes(Node):
             prog, vao = (self.flat_prog, self.flat_vao) if self.flat_shading else (self.smooth_prog, self.smooth_vao)
             prog['norm_coloring'].value = self.norm_coloring
 
-        prog['draw_edges'].value = 1.0 if kwargs['draw_edges'] and self.material._show_edges else 0.0
+        prog['draw_edges'].value = 1.0 if self.draw_edges else 0.0
         prog['win_size'].value = kwargs['window_size']
 
         self.set_camera_matrices(prog, camera, **kwargs)
@@ -406,14 +423,21 @@ class Meshes(Node):
     def _show_normals(self):
         """Create and add normals at runtime"""
         vn = self.vertex_normals
-        length = 0.01  # TODO make this either a parameter in the GUI or dependent on the bounding box.
+        
+        bounds = self.bounds
+        diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
+
+        length = 0.005 * max(diag, 1)
         vn = vn / np.linalg.norm(vn, axis=-1, keepdims=True) * length
 
         # Must import here because if we do it at the top we create a circular dependency.
         from aitviewer.renderables.arrows import Arrows
-        self.normals_r = Arrows(self.vertices, self.vertices + vn,
+
+        positions = self.vertices * self.scale
+        self.normals_r = Arrows(positions, positions + vn,
                                 r_base=length / 10, r_head=2 * length / 10, p=0.25, name='Normals')
         self.normals_r.position = self.position
+        self.normals_r.rotation = self.rotation
         self.normals_r.current_frame_id = self.current_frame_id
         self.add(self.normals_r, gui_elements=['material'])
 
@@ -426,7 +450,11 @@ class Meshes(Node):
         _, self.show_texture = imgui.checkbox('Render Texture##render_texture{}'.format(self.unique_name),
                                               self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
-                                               self.norm_coloring)
+                                               self.norm_coloring)                                       
+        _, self.flat_shading = imgui.checkbox('Flat shading##flat_shading{}'.format(self.unique_name),
+                                               self.flat_shading)
+        _, self.draw_edges = imgui.checkbox('Draw edges##draw_edges{}'.format(self.unique_name),
+                                               self.draw_edges)
 
         # TODO: Add  export workflow for all nodes
         if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
@@ -494,6 +522,8 @@ class VariableTopologyMeshes(Node):
 
         self.show_texture = True
         self.norm_coloring = False
+        self.flat_shading = False
+        self.draw_edges = False
         self.ctx = None
 
     def _construct_mesh_at_frame(self, frame_id):
@@ -646,6 +676,10 @@ class VariableTopologyMeshes(Node):
 
                 # Set mesh material
                 m.material = self.material
+                
+                # Set draw settings.
+                m.flat_shading = self.flat_shading
+                m.draw_edges = self.draw_edges
 
                 # Override the mesh color only if it has been changed by the user
                 if self._override_color:
@@ -673,6 +707,8 @@ class VariableTopologyMeshes(Node):
     def render(self, camera, **kwargs):
         self.current_mesh.show_texture = self.show_texture
         self.current_mesh.norm_coloring = self.norm_coloring
+        self.current_mesh.flat_shading = self.flat_shading
+        self.current_mesh.draw_edges = self.draw_edges
         self.current_mesh.render(camera, **kwargs)
 
     def render_depth_prepass(self, camera, **kwargs):
@@ -722,8 +758,10 @@ class VariableTopologyMeshes(Node):
                 self.current_mesh.color = color
                 self._override_color = True
 
-        _, self.show_texture = imgui.checkbox('Render Texture', self.show_texture)
+        _, self.show_texture  = imgui.checkbox('Render Texture', self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring', self.norm_coloring)
+        _, self.flat_shading = imgui.checkbox('Flat shading', self.flat_shading)
+        _, self.draw_edges = imgui.checkbox('Draw edges', self.draw_edges)
 
         if show_advanced:
             if imgui.tree_node("Advanced material##advanced_material{}'".format(self.unique_name)):

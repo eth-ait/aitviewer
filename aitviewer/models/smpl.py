@@ -144,11 +144,15 @@ class SMPLLayer(nn.Module, ABC):
         has_face = hasattr(self.bm, 'NUM_FACE_JOINTS')
         if has_hands:
             if self.bm.use_pca:
-                assert poses_left_hand is None or poses_left_hand.shape[1] == 6
-                assert poses_right_hand is None or poses_right_hand.shape[1] == 6
+                dof_per_hand = self.bm.num_pca_comps
+                assert poses_left_hand is None or poses_left_hand.shape[1] == dof_per_hand
+                assert poses_right_hand is None or poses_right_hand.shape[1] == dof_per_hand
             else:
-                assert poses_left_hand is None or poses_left_hand.shape[1] == self.bm.NUM_HAND_JOINTS*3
-                assert poses_right_hand is None or poses_right_hand.shape[1] == self.bm.NUM_HAND_JOINTS*3
+                dof_per_hand = self.bm.NUM_HAND_JOINTS*3
+                assert poses_left_hand is None or poses_left_hand.shape[1] == dof_per_hand
+                assert poses_right_hand is None or poses_right_hand.shape[1] == dof_per_hand
+        else:
+            dof_per_hand = 0  # Silencing the might not be initialized warning.
 
         batch_size = poses_body.shape[0]
         device = poses_body.device
@@ -159,11 +163,11 @@ class SMPLLayer(nn.Module, ABC):
             trans = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
 
         if has_hands and poses_left_hand is None:
-            poses_left_hand = torch.zeros([batch_size, self.bm.NUM_HAND_JOINTS*3]).to(dtype=poses_body.dtype,
-                                                                                      device=device)
+            poses_left_hand = torch.zeros([batch_size, dof_per_hand]).to(dtype=poses_body.dtype,
+                                                                         device=device)
         if has_hands and poses_right_hand is None:
-            poses_right_hand = torch.zeros([batch_size, self.bm.NUM_HAND_JOINTS * 3]).to(dtype=poses_body.dtype,
-                                                                                         device=device)
+            poses_right_hand = torch.zeros([batch_size, dof_per_hand]).to(dtype=poses_body.dtype,
+                                                                          device=device)
         if has_face and poses_jaw is None:
             poses_jaw = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
         if has_face and poses_leye is None:

@@ -87,8 +87,6 @@ class Plane(Node):
                                      (self.vbo_colors, '4f4 /v', 'in_color')])
 
     def render(self, camera, **kwargs):
-
-        self.prog['draw_edges'].value = 1.0 if kwargs['draw_edges'] else 0.0
         self.prog['norm_coloring'].value = False
         self.prog['win_size'].value = kwargs['window_size']
 

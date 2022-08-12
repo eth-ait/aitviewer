@@ -37,10 +37,6 @@ class HeadlessRenderer(Viewer):
         """
         super().__init__(**kwargs)
 
-        # Scene setup.
-        self.camera = PinholeCamera(45.0)
-        self.draw_edges = False
-
         # Book-keeping for the headless rendering.
         self.n_frames_rendered = 0
         self.frame_dir = None
@@ -104,7 +100,7 @@ class HeadlessRenderer(Viewer):
             print("Duration: {0:.2f}s @ {1:.2f} FPS".format(duration, self.max_frame / duration))
 
         if video_dir is not None:
-            images_to_video(frame_dir, video_dir)
+            images_to_video(frame_dir, video_dir, input_fps=self.playback_fps)
 
         # Only delete the frames if it was a temporary directory and we don't want to keep them.
         if temp_dir is not None and not keep_frames:

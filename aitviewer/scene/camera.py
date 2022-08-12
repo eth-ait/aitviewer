@@ -14,22 +14,467 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+from abc import ABC, abstractmethod
 import numpy as np
 import joblib
 import os
 
 from aitviewer.configuration import CONFIG as C
+from aitviewer.renderables.lines import Lines
+from aitviewer.renderables.meshes import Meshes
+from aitviewer.renderables.rigid_bodies import RigidBodies
 from aitviewer.scene.camera_utils import look_at
 from aitviewer.scene.camera_utils import orthographic_projection
 from aitviewer.scene.camera_utils import perspective_projection
+from aitviewer.scene.node import Node
 from trimesh.transformations import rotation_matrix
+
+from aitviewer.utils.decorators import hooked
+
 
 def _transform_vector(transform, vector):
     """Apply affine transformation (4-by-4 matrix) to a 3D vector."""
     return (transform @ np.concatenate([vector, np.array([1])]))[:3]
 
 
-class PinholeCamera(object):
+class CameraInterface(ABC):
+    """
+    An abstract class which describes the interface expected by the viewer for using this object as a camera
+    """
+
+    @abstractmethod
+    def update_matrices(self, width, height):
+        """
+        Update the matrices of this camera, should always be called before using any of the get_*_matrix() methods.
+        """
+        pass
+
+    @abstractmethod
+    def get_projection_matrix(self):
+        """
+        Returns the matrix that projects 3D coordinates in camera space to the image plane.
+        """
+        pass
+    
+    @abstractmethod
+    def get_view_matrix(self):
+        """
+        Returns the matrix that projects 3D coordinates in camera space to the image plane.
+        """
+        pass
+
+    @abstractmethod
+    def get_view_projection_matrix(self):
+        """
+        Returns the view-projection matrix, i.e. the 4x4 matrix that maps from homogenous world coordinates to image
+        space.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def position(self):
+        pass
+
+    @property
+    @abstractmethod
+    def forward(self):
+        pass
+
+    @property
+    @abstractmethod
+    def up(self):
+        pass
+    
+    @property
+    @abstractmethod
+    def right(self):
+        pass
+    
+    def gui(self):
+        pass
+
+
+class Camera(Node, CameraInterface):
+    """ 
+    A base camera object that provides rendering of a camera mesh and visualization of the camera frustum and coordinate system.
+    Subclasses of this class must implement the CameraInterface abstract methods.
+    """
+    def __init__(self, inactive_color=(0.5, 0.5, 0.5, 1), active_color=(0.6, 0.1, 0.1, 1), viewer=None, **kwargs):
+        """ Initializer
+        :param inactive_color: Color that will be used for rendering this object when inactive
+        :param active_color:   Color that will be used for rendering this object when active
+        :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
+        """
+
+        super(Camera, self).__init__(**kwargs)
+
+        # Camera object geometry
+        vertices = np.array([
+            # Body
+            [ 0,  0, 0],
+            [-1, -1, 1],
+            [-1,  1, 1],
+            [ 1, -1, 1],
+            [ 1,  1, 1],
+            
+            # Triangle
+            [ 0.5,  1.1, 1],
+            [-0.5,  1.1, 1],
+            [   0,    2, 1],
+        ], dtype=np.float32)
+
+        # Scale dimensions
+        vertices[:, 0] *= 0.05
+        vertices[:, 1] *= 0.03
+        vertices[:, 2] *= 0.15
+
+        # Slide such that the origin is in front of the object
+        vertices[:, 2] -= vertices[1, 2] * 1.1
+
+        # Reverse z since we use the opengl convention that camera forward is -z
+        vertices[:, 2] *= -1
+
+        # Reverse x too to maintain a consistent triangle winding
+        vertices[:, 0] *= -1
+
+        faces = np.array([
+            [ 0, 1, 2],
+            [ 0, 2, 4],
+            [ 0, 4, 3],
+            [ 0, 3, 1],
+            [ 1, 3, 2],
+            [ 4, 2, 3],
+            [ 5, 6, 7],
+            [ 5, 7, 6],
+        ])
+        
+        self._active = False
+        self.active_color = active_color
+        self.inactive_color = inactive_color
+
+        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True, position=kwargs.get('position'), rotation=kwargs.get('rotation'))
+        self.mesh.color = self.inactive_color
+        self.add(self.mesh, show_in_hierarchy=False)
+
+        self.frustum = None
+        self.origin = None
+
+        self.viewer = viewer
+    
+    @property
+    def active(self):
+        return self._active
+    
+    @active.setter
+    def active(self, active):
+        self._active = active
+
+        if active:
+            self.mesh.color = self.active_color
+        else:
+            self.mesh.color = self.inactive_color
+    
+    def hide_frustum(self):
+        if self.frustum:
+            self.remove(self.frustum)
+            self.frustum = None
+
+        if self.origin:
+            self.remove(self.origin)
+            self.origin = None
+
+    def show_frustum(self, width, height, distance):
+        # Remove previous frustum if it exists
+        self.hide_frustum()
+        
+        # Compute lines for each frame
+        all_lines = np.zeros((self.n_frames, 24, 3), dtype=np.float32)
+        frame_id = self.current_frame_id
+        for i in range(self.n_frames):
+            # Set the current frame id to use the camera matrices from the respective frame
+            self.current_frame_id = i
+
+            # Compute frustum coordinates
+            self.update_matrices(width, height)
+            V = self.get_view_matrix()
+            P = self.get_projection_matrix()
+            ndc_from_world = P @ V
+            world_from_ndc = np.linalg.inv(ndc_from_world)
+
+            def transform(x):
+                v = world_from_ndc @ np.append(x, 1.0)
+                return v[:3] / v[3]
+
+            # Comput z coordinate of a point at the given distance
+            world_p = self.position + self.forward *  distance
+            ndc_p = (ndc_from_world @ np.concatenate([world_p, np.array([1])]))
+
+            # Compute z after perspective division
+            z = ndc_p[2] / ndc_p[3]
+
+            lines = np.array([
+                [-1, -1, -1], [-1,  1, -1],
+                [-1, -1,  z], [-1,  1,  z],
+                [ 1, -1, -1], [ 1,  1, -1],
+                [ 1, -1,  z], [ 1,  1,  z],
+                
+                [-1, -1, -1], [-1, -1, z],
+                [-1,  1, -1], [-1,  1, z],
+                [ 1, -1, -1], [ 1, -1, z],
+                [ 1,  1, -1], [ 1,  1, z],
+                
+                [-1, -1, -1], [ 1, -1, -1],
+                [-1, -1,  z], [ 1, -1,  z],
+                [-1,  1, -1], [ 1,  1, -1],
+                [-1,  1,  z], [ 1,  1,  z],
+            ], dtype=np.float32)
+
+            lines = np.apply_along_axis(transform, 1, lines)
+            all_lines[i] = lines
+
+        self.frustum = Lines(all_lines, r_base=0.005, mode='lines', color=(0.1, 0.1, 0.1, 1), cast_shadow=False)
+        self.add(self.frustum, show_in_hierarchy=False)
+
+        orientation = np.array([ self.right,  self.up, self.forward ]).T
+        self.origin = RigidBodies(self.position[np.newaxis], orientation[np.newaxis])
+        self.add(self.origin, show_in_hierarchy=False)
+
+        self.current_frame_id = frame_id
+
+    def gui(self, imgui):
+        if self.viewer:
+            if imgui.button("View from camera"):
+                self.hide_frustum()
+                self.viewer.set_temp_camera(self)
+
+
+class WeakPerspectiveCamera(Camera):
+    """ 
+    A sequence of weak perspective cameras.
+    The camera is positioned at (0,0,1) axis aligned and looks towards the negative z direction following the OpenGL conventions.
+    """
+    def __init__(self, scale, translation, cols, rows, near=C.znear, far=C.zfar, viewer=None, **kwargs):
+        """ Initializer.
+        :param scale: A np array of scale parameters [sx, sy] of shape (2) or a sequence of parameters of shape (N, 2)
+        :param translation: A np array of translation parameters [tx, ty] of shape (2) or a sequence of parameters of shape (N, 2)
+        :param cols: Number of columns in an image captured by this camera, used for computing the aspect ratio of the camera
+        :param rows: Number of rows in an image captured by this camera, used for computing the aspect ratio of the camera
+        :param near: Distance of the near plane from the camera
+        :param far: Distance of the far plane from the camera
+        :param viewer: the current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
+         """
+        if len(scale.shape) == 1:
+            scale = scale[np.newaxis]
+            
+        if len(translation.shape) == 1:
+            translation = translation[np.newaxis]
+        
+        assert scale.shape[0] == translation.shape[0], "Number of frames in scale and translation must match"
+        
+        super(WeakPerspectiveCamera, self).__init__(n_frames=scale.shape[0], viewer=viewer, **kwargs)
+
+        self.scale = scale
+        self.translation = translation
+
+        self.cols = cols
+        self.rows = rows
+        self.near = near
+        self.far = far
+        self.viewer = viewer
+
+        self.position =  np.array([0, 0, 1], dtype=np.float32)
+        self._right   =  np.array([1, 0, 0], dtype=np.float32)
+        self._up      =  np.array([0, 1, 0], dtype=np.float32)
+        self._forward = -np.array([0, 0, 1], dtype=np.float32)
+    
+    @property
+    def forward(self):
+        return self._forward
+    
+    @property
+    def up(self):
+        return self._up
+    
+    @property
+    def right(self):
+        return self._right
+
+    def update_matrices(self, width, height):
+        sx, sy = self.scale[self.current_frame_id]
+        tx, ty = self.translation[self.current_frame_id]
+
+        window_ar = width / height
+        camera_ar = self.cols / self.rows
+        ar = camera_ar / window_ar
+
+        P = np.array([
+            [sx * ar,  0, 0,  tx * sx * ar],
+            [      0, sy, 0,      -ty * sy],
+            [      0, 0, -1,             0],
+            [      0, 0,  0,             1],
+        ])
+
+        znear, zfar = self.near, self.far
+        P[2][2] = 2.0 / (znear - zfar)
+        P[2][3] = (zfar + znear) / (znear - zfar)
+
+        V = look_at(self.position, self.forward, np.array([0, 1, 0]))
+
+        #Update camera matrices
+        self.projection_matrix = P.astype('f4')
+        self.view_matrix = V.astype('f4')
+        self.view_projection_matrix = np.matmul(P, V).astype('f4')
+    
+    def get_projection_matrix(self):
+        if self.projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the projection matrix")
+        return self.projection_matrix
+    
+    def get_view_matrix(self):
+        if self.view_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view matrix")
+        return self.view_matrix
+
+    def get_view_projection_matrix(self):
+        if self.view_projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
+        return self.view_projection_matrix
+    
+    @hooked
+    def gui(self, imgui):
+        u, show = imgui.checkbox("Show frustum", self.frustum is not None)
+        if u:
+            if show:
+                self.show_frustum(self.cols, self.rows, self.far)
+            else:
+                self.hide_frustum()
+        
+
+class OpenCVCamera(Camera):
+    """ A camera described by extrinsics and intrinsics in the format used by OpenCV """
+
+    def __init__(self, K, Rt, cols, rows, dist_coeffs=None, near=C.znear, far=C.zfar, viewer=None, **kwargs):
+        """ Initializer.
+        :param K:  A np array of camera intrinsics in the format used by OpenCV (3, 3)
+        :param Rt: A np array of camera extrinsics in the format used by OpenCV (3, 4)
+        :param dist_coeffs: Lens distortion coefficients in the format used by OpenCV.
+        :param cols: Width  of the image in pixels, matching the size of the image expected by the intrinsics matrix
+        :param rows: Height of the image in pixels, matching the size of the image expected by the intrinsics matrix
+        :param near: Distance of the near plane from the camera
+        :param far: Distance of the far plane from the camera
+        :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
+         """
+        rot = np.copy(Rt[:, 0:3].T)
+        pos = -rot @ Rt[:, 3]
+
+        rot[:, 1:] *= -1.0
+        
+        super(OpenCVCamera, self).__init__(position=pos, rotation=rot, viewer=viewer, **kwargs)
+
+        self.K = K
+        self.Rt = Rt
+        self.dist_coeffs = dist_coeffs
+
+        self.cols = cols
+        self.rows = rows
+
+        self.near = near
+        self.far = far
+
+    @property
+    def position(self):
+        return -self.Rt[:, 0:3].T @ self.Rt[:, 3]
+
+    @property
+    def forward(self):
+        return self.Rt[2, :3]
+    
+    @property
+    def up(self):
+        return -self.Rt[1, :3]
+    
+    @property
+    def right(self):
+        return self.Rt[0, :3]
+    
+    def compute_opengl_view_projection(self, width, height):
+        # Construct view and projection matrices which follow OpenGL conventions.
+        # Adapted from https://amytabb.com/tips/tutorials/2019/06/28/OpenCV-to-OpenGL-tutorial-essentials/
+
+        # Compute view matrix V
+        lookat = np.copy(self.Rt)
+        # Invert Y -> flip image bottom to top
+        # Invert Z -> OpenCV has positive Z forward, we use negative Z forward
+        lookat[1:3, :] *= -1.0
+        V = np.vstack((lookat, np.array([0, 0, 0, 1])))
+
+        # Compute projection matrix P
+        K = self.K
+        rows, cols = self.rows, self.cols
+        near, far = self.near, self.far
+
+        # Compute number of columns that we would need in the image to preserve the aspect ratio
+        window_cols =  width / height * rows
+
+        # Offset to center the image on the x direction
+        x_offset = (window_cols - cols) * 0.5
+        
+        # Calibration matrix with added Z information and adapted to OpenGL coordinate
+        # system which has (0,0) at center and Y pointing up
+        Kgl = np.array([
+            [-K[0,0],       0, -(cols - K[0, 2]) - x_offset,            0],
+            [      0, -K[1,1],             (rows - K[1, 2]),            0],
+            [      0,       0,                -(near + far),-(near * far)],
+            [      0,       0,                           -1,            0],
+        ])
+
+        # Transformation from pixel coordinates to normalized device coordinates used by OpenGL
+        NDC = np.array([
+            [-2 / window_cols,         0,                 0,                             1],
+            [               0, -2 / rows,                 0,                            -1],
+            [               0,         0,  2 / (far - near),  -(far + near) / (far - near)],
+            [               0,         0,                 0,                             1],
+        ])
+
+        P = NDC @ Kgl
+
+        return V, P
+
+    def update_matrices(self, width, height):
+        V, P = self.compute_opengl_view_projection(width, height)
+
+        #Update camera matrices
+        self.projection_matrix = P.astype('f4')
+        self.view_matrix = V.astype('f4')
+        self.view_projection_matrix = np.matmul(P, V).astype('f4')
+
+    def get_projection_matrix(self):
+        if self.projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the projection matrix")
+        return self.projection_matrix
+    
+    def get_view_matrix(self):
+        if self.view_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view matrix")
+        return self.view_matrix
+
+    def get_view_projection_matrix(self):
+        if self.view_projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
+        return self.view_projection_matrix
+
+    @hooked
+    def gui(self, imgui):
+        u, show = imgui.checkbox("Show frustum", self.frustum is not None)
+        if u:
+            if show:
+                self.show_frustum(self.cols, self.rows, self.far)
+            else:
+                self.hide_frustum()
+        
+
+class PinholeCamera(CameraInterface):
     """
     Your classic pinhole camera.
     """
@@ -40,9 +485,9 @@ class PinholeCamera(object):
         self.ortho_size = 1.0 if orthographic is None else orthographic
 
         # Default camera settings.
-        self.position = np.array([0.0, 0.0, 2.5])
+        self._position = np.array([0.0, 0.0, 2.5])
         self.target = np.array([0.0, 0.0, 0.0])
-        self.up = np.array([0.0, 1.0, 0.0])
+        self._up = np.array([0.0, 1.0, 0.0])
 
         self.ZOOM_FACTOR = 4
         self.ROT_FACTOR = 0.0025
@@ -52,9 +497,29 @@ class PinholeCamera(object):
         self.far = zfar
 
     @property
-    def dir(self):
-        dir = self.target - self.position
-        return dir / np.linalg.norm(dir)
+    def position(self):
+        return self._position
+
+    @position.setter
+    def position(self, position):
+        self._position = position
+
+    @property
+    def forward(self):
+        forward = self.target - self.position
+        return forward / np.linalg.norm(forward)
+
+    @property
+    def up(self):
+        return self._up
+
+    @up.setter
+    def up(self, up):
+        self._up = up
+
+    @property
+    def right(self):
+        return np.cross(self.up, self.forward)
 
     def save_cam(self):
         """Saves the current camera parameters"""
@@ -108,54 +573,58 @@ class PinholeCamera(object):
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
 
     def get_projection_matrix(self):
-        """
-        Returns the matrix that projects 3D coordinates in camera space to the image plane.
-        """
         if self.projection_matrix is None:
             raise ValueError("update_matrices() must be called before to update the projection matrix")
         return self.projection_matrix
     
     def get_view_matrix(self):
-        """
-        Returns the matrix that projects 3D coordinates in camera space to the image plane.
-        """
         if self.view_matrix is None:
             raise ValueError("update_matrices() must be called before to update the view matrix")
         return self.view_matrix
 
-
     def get_view_projection_matrix(self):
-        """
-        Returns the view-projection matrix, i.e. the 4x4 matrix that maps from homogenous world coordinates to image
-        space.
-        """
         if self.view_projection_matrix is None:
             raise ValueError("update_matrices() must be called before to update the view-projection matrix")
         return self.view_projection_matrix
 
-    def dolly_zoom(self, speed):
-        """Zoom by moving the camera along its view direction."""
+    def dolly_zoom(self, speed, move_target=False):
+        """
+        Zoom by moving the camera along its view direction.
+        If move_target is true the camera target will also move rigidly with the camera.
+        """
         # We update both the orthographic and perspective projection so that the transition is seamless when
         # transitioning between them.
         self.ortho_size -= 0.1 * np.sign(speed)
         self.ortho_size = max(0.0001, self.ortho_size)
 
         # Scale the speed in proportion to the norm (i.e. camera moves slower closer to the target)
-        norm = np.linalg.norm(self.position - self.target)
-        fwd = self.dir / np.linalg.norm(self.dir)
+        norm = max(np.linalg.norm(self.position - self.target), 2)
+        fwd = self.forward
 
         # Adjust speed according to config
         speed *= C.camera_zoom_speed
 
-        self.position += fwd * speed * norm
+        if move_target:
+            self.position += fwd * speed * norm
+            self.target += fwd * speed * norm
+        else:
+            # Clamp movement size to avoid surpassing the target
+            movement_length = speed * norm 
+            max_movement_length = max(np.linalg.norm(self.target - self.position) - 0.01, 0.0)
 
+            # Update position
+            self.position += fwd * min(movement_length, max_movement_length)
+        
     def pan(self, mouse_dx, mouse_dy):
         """Move the camera in the image plane."""
-        sideways = np.cross(self.dir, self.up)
-        up = np.cross(sideways, self.dir)
+        sideways = np.cross(self.forward, self.up)
+        up = np.cross(sideways, self.forward)
 
-        speed_x = mouse_dx * self.PAN_FACTOR
-        speed_y = mouse_dy * self.PAN_FACTOR
+        # scale speed according to distance from target
+        speed = max(np.linalg.norm(self.target - self.position) * 0.1, 0.1)
+        
+        speed_x = mouse_dx * self.PAN_FACTOR * speed
+        speed_y = mouse_dy * self.PAN_FACTOR * speed
 
         self.position -= sideways * speed_x
         self.target -= sideways * speed_x
@@ -212,7 +681,7 @@ class PinholeCamera(object):
         pixel_3d = _transform_vector(cam2world, pixel_2d)
         if self.is_ortho:
             ray_origin = pixel_3d
-            ray_dir = self.dir
+            ray_dir = self.forward
         else:
             eye_origin = np.zeros(3)
             ray_origin = _transform_vector(cam2world, eye_origin)

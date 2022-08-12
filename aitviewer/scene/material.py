@@ -14,11 +14,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import numpy as np
-
-from aitviewer.configuration import CONFIG as C
-from moderngl_window.opengl.vao import VAO
-
 
 class Material(object):
     """Per object material properties."""
@@ -28,21 +23,18 @@ class Material(object):
                  ambient=0.5,
                  specular=0.5,
                  color=(0.5, 0.5, 0.5, 1.0),
-                 show_edges=True,
                  ):
         """
         :param diffuse: diffuse coefficient in Phong shading model
         :param ambient: ambient coefficient in Phong shading model
         :param specular: specular coefficient in Phong shading model
         :param color: (R,G,B,A) 0-1 formatted color value
-        :param show_edges: Whether to show edges in edge view
         """
         assert len(color) == 4
 
         self.diffuse = diffuse
         self.ambient = ambient
         self.specular = specular
-        self._show_edges = show_edges
         self._color = color
 
     @property
