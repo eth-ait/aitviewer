@@ -53,6 +53,8 @@ class Meshes(Node):
                  texture_alpha=1.0,
                  cast_shadow=True,
                  pickable=True,
+                 flat_shading=False,
+                 draw_edges=False,
                  **kwargs):
         """
         Initializer.
@@ -105,8 +107,8 @@ class Meshes(Node):
         self.depth_prepass = True
 
         # Misc.
-        self._flat_shading = False
-        self.draw_edges = False
+        self._flat_shading = flat_shading
+        self.draw_edges = draw_edges
         self.show_texture = self.has_texture
         self.norm_coloring = False
         self.normals_r = None
