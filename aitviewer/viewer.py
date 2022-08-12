@@ -146,8 +146,6 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Settings
         self.run_animations = C.run_animations
-        self.draw_edges = C.draw_edges
-        self.flat_rendering = C.flat_rendering
         self.dark_mode = C.dark_mode
         self.playback_fps = C.playback_fps
         self.shadows_enabled = C.shadows_enabled
@@ -174,8 +172,6 @@ class Viewer(moderngl_window.WindowConfig):
         self._pause_key = self.wnd.keys.SPACE
         self._next_frame_key = self.wnd.keys.PERIOD
         self._previous_frame_key = self.wnd.keys.COMMA
-        self._draw_edges_key = self.wnd.keys.E
-        self._flat_rendering_key = self.wnd.keys.F
         self._shadow_key = self.wnd.keys.S
         self._orthographic_camera_key = self.wnd.keys.O
         self._mode_inspect = self.wnd.keys.I
@@ -190,9 +186,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._shortcut_names = {self.wnd.keys.SPACE: "Space",
                                 self.wnd.keys.C: "C",
                                 self.wnd.keys.D: "D",
-                                self.wnd.keys.E: "E",
                                 self.wnd.keys.I: "I",
-                                self.wnd.keys.F: "F",
                                 self.wnd.keys.L: "L",
                                 self.wnd.keys.O: "O",
                                 self.wnd.keys.P: "P",
@@ -298,8 +292,6 @@ class Viewer(moderngl_window.WindowConfig):
     def render_scene(self):
         """Render the current scene to the framebuffer without time accounting and GUI elements."""
         self.scene.render(window_size=self.window.size,
-                          draw_edges=self.draw_edges,
-                          flat_rendering=self.flat_rendering,
                           lights=self.scene.lights,
                           shadows_enabled=self.shadows_enabled,
                           show_camera_target=self.show_camera_target and not self._using_temp_camera,
@@ -392,10 +384,6 @@ class Viewer(moderngl_window.WindowConfig):
                 imgui.end_menu()
 
             if imgui.begin_menu("View", True):
-                _, self.flat_rendering = imgui.menu_item("Flat shading", self._shortcut_names[self._flat_rendering_key],
-                                                         self.flat_rendering, True)
-                _, self.draw_edges = imgui.menu_item("Draw edges", self._shortcut_names[self._draw_edges_key],
-                                                     self.draw_edges, True)
                 _, self.shadows_enabled = imgui.menu_item("Render Shadows", self._shortcut_names[self._shadow_key],
                                                           self.shadows_enabled, True)
                 # _, self.show_shadow_map = imgui.menu_item("Show Shadow Map", None, self.show_shadow_map, True)
@@ -612,9 +600,6 @@ class Viewer(moderngl_window.WindowConfig):
                 if not self.run_animations:
                     self.scene.previous_frame()
 
-            elif key == self._draw_edges_key:
-                self.draw_edges = not self.draw_edges
-
             elif key == self._shadow_key:
                 self.shadows_enabled = not self.shadows_enabled
 
@@ -625,9 +610,6 @@ class Viewer(moderngl_window.WindowConfig):
                 if self._using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
-
-            elif key == self._flat_rendering_key:
-                self.flat_rendering = not self.flat_rendering
 
             elif key == self._mode_view:
                 self.selected_mode = 'view'

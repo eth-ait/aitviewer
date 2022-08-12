@@ -105,7 +105,8 @@ class Meshes(Node):
         self.depth_prepass = True
 
         # Misc.
-        self.flat_shading = False
+        self._flat_shading = False
+        self.draw_edges = False
         self.show_texture = self.has_texture
         self.norm_coloring = False
         self.normals_r = None
@@ -226,6 +227,16 @@ class Meshes(Node):
 
         # Update color buffer
         self.redraw()
+
+    @property
+    def flat_shading(self):
+        return self._flat_shading
+    
+    @flat_shading.setter
+    def flat_shading(self, flat_shading):
+        if self._flat_shading != flat_shading:
+            self._flat_shading = flat_shading
+            self.redraw()
 
     @property
     def current_vertices(self):
@@ -375,12 +386,7 @@ class Meshes(Node):
             self.texture.release()
 
     def render(self, camera, **kwargs):
-        # Check if flat shading changed, in which case we need to update the VBOs.
-        flat = kwargs.get('flat_rendering', False)
-        if flat != self.flat_shading:
-            self.flat_shading = flat
-            self.redraw()
-            
+        # Check if flat shading changed, in which case we need to update the VBOs.    
         if self.has_texture:
             self.texture_prog['texture_alpha'].value = self.texture_alpha
         vao = self._prepare_vao(camera, **kwargs)
@@ -403,7 +409,7 @@ class Meshes(Node):
             prog, vao = (self.flat_prog, self.flat_vao) if self.flat_shading else (self.smooth_prog, self.smooth_vao)
             prog['norm_coloring'].value = self.norm_coloring
 
-        prog['draw_edges'].value = 1.0 if kwargs['draw_edges'] and self.material._show_edges else 0.0
+        prog['draw_edges'].value = 1.0 if self.draw_edges else 0.0
         prog['win_size'].value = kwargs['window_size']
 
         self.set_camera_matrices(prog, camera, **kwargs)
@@ -435,7 +441,11 @@ class Meshes(Node):
         _, self.show_texture = imgui.checkbox('Render Texture##render_texture{}'.format(self.unique_name),
                                               self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
-                                               self.norm_coloring)
+                                               self.norm_coloring)                                       
+        _, self.flat_shading = imgui.checkbox('Flat shading##flat_shading{}'.format(self.unique_name),
+                                               self.flat_shading)
+        _, self.draw_edges = imgui.checkbox('Draw edges##draw_edges{}'.format(self.unique_name),
+                                               self.draw_edges)
 
         # TODO: Add  export workflow for all nodes
         if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
@@ -503,6 +513,8 @@ class VariableTopologyMeshes(Node):
 
         self.show_texture = True
         self.norm_coloring = False
+        self.flat_shading = False
+        self.draw_edges = False
         self.ctx = None
 
     def _construct_mesh_at_frame(self, frame_id):
@@ -655,6 +667,10 @@ class VariableTopologyMeshes(Node):
 
                 # Set mesh material
                 m.material = self.material
+                
+                # Set draw settings.
+                m.flat_shading = self.flat_shading
+                m.draw_edges = self.draw_edges
 
                 # Override the mesh color only if it has been changed by the user
                 if self._override_color:
@@ -682,6 +698,8 @@ class VariableTopologyMeshes(Node):
     def render(self, camera, **kwargs):
         self.current_mesh.show_texture = self.show_texture
         self.current_mesh.norm_coloring = self.norm_coloring
+        self.current_mesh.flat_shading = self.flat_shading
+        self.current_mesh.draw_edges = self.draw_edges
         self.current_mesh.render(camera, **kwargs)
 
     def render_depth_prepass(self, camera, **kwargs):
@@ -731,8 +749,10 @@ class VariableTopologyMeshes(Node):
                 self.current_mesh.color = color
                 self._override_color = True
 
-        _, self.show_texture = imgui.checkbox('Render Texture', self.show_texture)
+        _, self.show_texture  = imgui.checkbox('Render Texture', self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring', self.norm_coloring)
+        _, self.flat_shading = imgui.checkbox('Flat shading', self.flat_shading)
+        _, self.draw_edges = imgui.checkbox('Draw edges', self.draw_edges)
 
         if show_advanced:
             if imgui.tree_node("Advanced material##advanced_material{}'".format(self.unique_name)):

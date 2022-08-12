@@ -23,6 +23,7 @@ if __name__ == '__main__':
     # Load a simple untextured cube.
     cube = trimesh.load('resources/cube.obj')
     cube_mesh = Meshes(cube.vertices, cube.faces, name='Cube', position=[-7.0, 0.0, 0.0])
+    cube_mesh.flat_shading = True
 
     # Load a sphere with a texture.
     planet = trimesh.load('resources/planet/planet.obj')
