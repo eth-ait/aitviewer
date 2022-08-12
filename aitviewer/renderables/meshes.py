@@ -52,6 +52,7 @@ class Meshes(Node):
                  path_to_texture=None,
                  texture_alpha=1.0,
                  cast_shadow=True,
+                 pickable=True,
                  **kwargs):
         """
         Initializer.
@@ -100,7 +101,7 @@ class Meshes(Node):
 
         # Enable rendering passes
         self.cast_shadow = cast_shadow
-        self.fragmap = True
+        self.fragmap = pickable
         self.depth_prepass = True
 
         # Misc.
