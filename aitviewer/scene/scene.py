@@ -62,7 +62,7 @@ class Scene(Node):
             [-1, 0, 0], [1, 0, 0],
             [0, -1, 0], [0, 1, 0],
             [0, 0, -1], [0, 0, 1],
-        ]) * 0.05, r_base = 0.002, color=(0.2, 0.2, 0.2, 1), mode='lines', cast_shadow=False)
+        ]) * 0.05, r_base=0.002, color=(0.2, 0.2, 0.2, 1), mode='lines', cast_shadow=False)
         self.add(self.camera_target, show_in_hierarchy=False)
 
         self.custom_font = None

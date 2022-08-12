@@ -321,7 +321,7 @@ class WeakPerspectiveCamera(Camera):
 
         V = look_at(self.position, self.forward, np.array([0, 1, 0]))
 
-        #Update camera matrices
+        # Update camera matrices
         self.projection_matrix = P.astype('f4')
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
