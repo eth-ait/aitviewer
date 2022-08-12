@@ -14,7 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from aitviewer.scene.camera import OpenCVCamera
+from aitviewer.scene.camera import Camera, OpenCVCamera
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_screen_texture_program
 from aitviewer.utils.decorators import hooked
@@ -68,13 +68,12 @@ class Billboard(Node):
         self.backface_culling = False
 
     @classmethod
-    def from_camera_and_distance(cls, camera: OpenCVCamera, distance: float, cols: int, rows: int,
+    def from_camera_and_distance(cls, camera: Camera, distance: float, cols: int, rows: int,
                                  texture_paths: List[str]):
         """
-        Initialize a Billboard from an OpenCV camera object, a distance from the camera, the size of the image in
+        Initialize a Billboard from a camera object, a distance from the camera, the size of the image in
         pixels and the set of images.
         """
-        assert isinstance(camera, OpenCVCamera), "Camera must be an OpenCVCamera."
         frames = camera.n_frames
         frame_id = camera.current_frame_id
 
@@ -113,8 +112,10 @@ class Billboard(Node):
 
         camera.current_frame_id = frame_id
 
-        def img_process_fn(img):
-            return cv2.undistort(img, camera.K, camera.dist_coeffs)
+        if isinstance(camera, OpenCVCamera) and (camera.dist_coeffs is not None):
+            img_process_fn = lambda img: cv2.undistort(img, camera.K, camera.dist_coeffs)
+        else:
+            img_process_fn = None
 
         return cls(all_corners, texture_paths, img_process_fn)
 
@@ -138,7 +139,7 @@ class Billboard(Node):
             if path.endswith((".pickle", "pkl")):
                 img = pickle.load(open(path, "rb"))
                 img = self.img_process_fn(img)
-                self.texture = self.ctx.texture(img.shape[:2], img.shape[2], img.tobytes())
+                self.texture = self.ctx.texture((img.shape[1], img.shape[0]), img.shape[2], img.tobytes())
             else:
                 img = cv2.cvtColor(cv2.flip(cv2.imread(path), 0), cv2.COLOR_BGR2RGB)
                 img = self.img_process_fn(img)
