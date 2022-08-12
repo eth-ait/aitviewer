@@ -58,10 +58,11 @@ class Arrows(Node):
         self.p = p
 
         # Nodes
+        self.material.color = color
         self.bases_r = Lines(lines=self.get_line_coords(self.origins, self.mid_points), mode='lines', r_base=r_base,
-                             color=color)
+                             color=color, cast_shadow=False)
         self.arrows_r = Lines(lines=self.get_line_coords(self.mid_points, self.tips), mode='lines', r_base=r_head,
-                              r_tip=0.0, color=color)
+                              r_tip=0.0, color=color, cast_shadow=False)
         self._add_nodes(self.bases_r, self.arrows_r, show_in_hierarchy=False)
 
     @property
@@ -79,3 +80,9 @@ class Arrows(Node):
         self.bases_r.redraw(**kwargs)
         self.arrows_r.lines = self.get_line_coords(self.mid_points, self.tips)
         self.arrows_r.redraw(**kwargs)
+    
+    @Node.color.setter
+    def color(self, color):
+        self.material.color = color
+        self.bases_r.color = color
+        self.arrows_r.color = color
