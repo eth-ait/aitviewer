@@ -159,6 +159,7 @@ class MultiViewSystem(Node):
         u_selected, active_index = imgui.combo("ID", self.active_camera_index, [str(id) for id in self.camera_info['ids'].tolist()])
         if u_selected:
             self.set_active_camera(active_index)
+            self.change_view_to_active_camera()
 
         if imgui.button("View from camera"):
             self.change_view_to_active_camera()
