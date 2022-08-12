@@ -154,6 +154,7 @@ class Camera(Node, CameraInterface):
         self.inactive_color = inactive_color
 
         self.mesh = Meshes(vertices, faces, cast_shadow=False, position=kwargs.get('position'), rotation=kwargs.get('rotation'))
+        self.mesh.flat_shading = True
         self.mesh.color = self.inactive_color
         self.add(self.mesh, show_in_hierarchy=False)
 
