@@ -113,7 +113,9 @@ class Billboard(Node):
         camera.current_frame_id = frame_id
 
         if isinstance(camera, OpenCVCamera) and (camera.dist_coeffs is not None):
-            img_process_fn = lambda img: cv2.undistort(img, camera.K, camera.dist_coeffs)
+            def undistort(img):
+                return cv2.undistort(img, camera.K, camera.dist_coeffs)
+            img_process_fn = undistort
         else:
             img_process_fn = None
 
@@ -138,12 +140,10 @@ class Billboard(Node):
             path = self.texture_paths[self.current_frame_id]
             if path.endswith((".pickle", "pkl")):
                 img = pickle.load(open(path, "rb"))
-                img = self.img_process_fn(img)
-                self.texture = self.ctx.texture((img.shape[1], img.shape[0]), img.shape[2], img.tobytes())
             else:
                 img = cv2.cvtColor(cv2.flip(cv2.imread(path), 0), cv2.COLOR_BGR2RGB)
-                img = self.img_process_fn(img)
-                self.texture = self.ctx.texture((img.shape[1], img.shape[0]), img.shape[2], img.tobytes())
+            img = self.img_process_fn(img)
+            self.texture = self.ctx.texture((img.shape[1], img.shape[0]), img.shape[2], img.tobytes())
             self._current_texture_id = self.current_frame_id
 
         self.prog['transparency'] = self.texture_alpha

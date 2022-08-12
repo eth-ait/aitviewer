@@ -80,10 +80,11 @@ class Viewer(moderngl_window.WindowConfig):
             samples=self.samples,
             cursor=True,
         )
+
         self.window_size = size
         self.window.print_context_info()
         activate_context(window=self.window)
-        # self.window.config = self
+
         self.timer = PerfTimer()
         self.ctx = self.window.ctx
         super().__init__(self.ctx, self.window, self.timer)
