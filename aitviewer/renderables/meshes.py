@@ -421,14 +421,21 @@ class Meshes(Node):
     def _show_normals(self):
         """Create and add normals at runtime"""
         vn = self.vertex_normals
-        length = 0.01  # TODO make this either a parameter in the GUI or dependent on the bounding box.
+        
+        bounds = self.bounds
+        diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
+
+        length = 0.005 * max(diag, 1)
         vn = vn / np.linalg.norm(vn, axis=-1, keepdims=True) * length
 
         # Must import here because if we do it at the top we create a circular dependency.
         from aitviewer.renderables.arrows import Arrows
-        self.normals_r = Arrows(self.vertices, self.vertices + vn,
+
+        positions = self.vertices * self.scale
+        self.normals_r = Arrows(positions, positions + vn,
                                 r_base=length / 10, r_head=2 * length / 10, p=0.25, name='Normals')
         self.normals_r.position = self.position
+        self.normals_r.rotation = self.rotation
         self.normals_r.current_frame_id = self.current_frame_id
         self.add(self.normals_r, gui_elements=['material'])
 
