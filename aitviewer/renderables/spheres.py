@@ -107,7 +107,9 @@ class Spheres(Node):
         self.radius = radius
 
         # A mesh representing the spheres for a single frame
-        self.mesh = Meshes(self.sphere_vertices, self.sphere_faces, self.sphere_normals, material=self.material, cast_shadow=False, pickable=False)
+        self.mesh = Meshes(self.sphere_vertices, self.sphere_faces, self.sphere_normals, material=self.material,
+                           cast_shadow=False, pickable=False)
+        self.mesh.position = self.position
             
         self.add(self.mesh, show_in_hierarchy=False)
 
