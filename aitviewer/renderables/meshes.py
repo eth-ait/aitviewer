@@ -704,6 +704,9 @@ class VariableTopologyMeshes(Node):
     def get_bc_coords_from_points(self, tri_id, points):
         return self.current_mesh.get_bc_coords_from_points(tri_id, points)
     
+    def is_transparent(self):
+        return self.current_mesh.is_transparent()
+
     # noinspection PyAttributeOutsideInit
     @Node.once
     def make_renderable(self, ctx):
