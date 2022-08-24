@@ -104,19 +104,6 @@ class Viewer(moderngl_window.WindowConfig):
         self.raw_depth_prog = self.load_program('shadow_mapping/raw_depth.glsl')
         self.depth_only_prog = self.load_program('shadow_mapping/depth_only.glsl')
 
-        # Mesh mouse intersection
-        self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
-        self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
-        self.offscreen_p_tri_id = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
-        self.offscreen_p = self.ctx.framebuffer(
-            color_attachments=[
-                self.offscreen_p_viewpos,
-                self.offscreen_p_tri_id
-            ],
-            depth_attachment=self.offscreen_p_depth
-        )
-        self.offscreen_p_tri_id.filter = (moderngl.NEAREST, moderngl.NEAREST)
-
         # Shaders for mesh mouse intersection
         self.frag_map_prog = self.load_program('fragment_picking/frag_map.glsl')
         self.frag_pick_prog = self.load_program('fragment_picking/frag_pick.glsl')
@@ -125,12 +112,13 @@ class Viewer(moderngl_window.WindowConfig):
         self.picker_output = self.ctx.buffer(reserve=5*4)  # 3 floats, 2 ints
         self.picker_vao = VAO(mode=moderngl.POINTS)
 
-        # Outline rendering
-        self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
-        self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
+        # Shaders for drawing outlines
         self.outline_prepare_prog = self.load_program('outline/outline_prepare.glsl')
         self.outline_draw_prog = self.load_program('outline/outline_draw.glsl')
         self.outline_quad = geometry.quad_2d(size=(2.0, 2.0), pos=(0.0, 0.0))
+
+        # Create framebuffers
+        self.create_framebuffers()
 
         # For debugging
         self.visualize = False
@@ -211,6 +199,28 @@ class Viewer(moderngl_window.WindowConfig):
         self.window.exit_key = None
         self._exit_popup_open = False
 
+    def create_framebuffers(self):
+        """
+        Create all framebuffers which depend on the window size.
+        This is called once at startup and every time the window is resized.
+        """
+        # Mesh mouse intersection
+        self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
+        self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
+        self.offscreen_p_tri_id = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
+        self.offscreen_p = self.ctx.framebuffer(
+            color_attachments=[
+                self.offscreen_p_viewpos,
+                self.offscreen_p_tri_id
+            ],
+            depth_attachment=self.offscreen_p_depth
+        )
+        self.offscreen_p_tri_id.filter = (moderngl.NEAREST, moderngl.NEAREST)
+
+        # Outline rendering
+        self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
+        self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
+        
     def run(self, *args, log=True):
         """
         Enter a blocking visualization loop. This is built following `moderngl_window.run_window_config`.
@@ -614,6 +624,7 @@ class Viewer(moderngl_window.WindowConfig):
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
         self.imgui.resize(width, height)
+        self.create_framebuffers()
 
     def key_event(self, key, action, modifiers):
         self.imgui.key_event(key, action, modifiers)
