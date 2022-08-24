@@ -68,6 +68,25 @@ class Billboard(Node):
         self.backface_culling = False
 
     @classmethod
+    def from_position_and_ar(cls, texture_paths, scale=1.0, **kwargs):
+        """
+        Initialize a Billboard at the given world position and with a given scale.
+        """
+        # Load a single image so we can determine the aspect ratio.
+        img = cv2.imread(texture_paths[0])
+        ar = img.shape[1] / img.shape[0]
+
+        corners = np.array([
+            [1 * ar, 1, 0],
+            [1 * ar, -1, 0],
+            [-1 * ar, 1, 0],
+            [-1 * ar, -1, 0],
+        ]) * scale
+
+        billboard = cls(corners, texture_paths, **kwargs)
+        return billboard
+
+    @classmethod
     def from_camera_and_distance(cls, camera: Camera, distance: float, cols: int, rows: int,
                                  texture_paths: List[str]):
         """

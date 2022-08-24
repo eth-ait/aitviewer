@@ -119,14 +119,11 @@ class PointClouds(Node):
         points = self.current_points.astype('f4').tobytes()
         colors = self.current_colors.astype('f4').tobytes()
 
-        # Resize the VBOs if necessary.
+        # Resize the VBOs if necessary. This can happen if new points are set after the `make_renderable` has been
+        # called.
         if self.max_n_points * 3 * 4 > self.vbo_points.size:
-            print("RESIZING VBOs")
             self.vbo_points.orphan(self.max_n_points * 3 * 4)
             self.vbo_colors.orphan(self.max_n_points * 4 * 4)
-        else:
-            # Clear the buffer because we write less data than before.
-            self._clear_buffer()
 
         self.vbo_points.write(points)
         self.vbo_colors.write(colors)
@@ -149,4 +146,5 @@ class PointClouds(Node):
 
     def render(self, camera, **kwargs):
         self.set_camera_matrices(self.prog, camera, **kwargs)
-        self.vao.render(self.prog)
+        # Draw only as many points as we have set in the buffer.
+        self.vao.render(self.prog, vertices=len(self.current_points))
