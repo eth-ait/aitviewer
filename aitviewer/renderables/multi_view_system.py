@@ -71,7 +71,7 @@ class MultiViewSystem(Node):
             extrinsics = camera_info['extrinsics'][i]
             dist_coeffs = camera_info['dist_coeffs'][i]
 
-            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs)
+            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs, viewer=viewer)
             self.add(camera, show_in_hierarchy=False)
             self.cameras.append(camera)
 
@@ -110,8 +110,8 @@ class MultiViewSystem(Node):
     def get_active_camera(self):
         return self.cameras[self.active_camera_index]
 
-    def change_view_to_active_camera(self):
-        self.viewer.set_temp_camera(self.get_active_camera())
+    def view_from_active_camera(self):
+        self.get_active_camera().view_from_camera()
 
     def update_frustum(self):
         camera = self.get_active_camera()
@@ -159,10 +159,10 @@ class MultiViewSystem(Node):
         u_selected, active_index = imgui.combo("ID", self.active_camera_index, [str(id) for id in self.camera_info['ids'].tolist()])
         if u_selected:
             self.set_active_camera(active_index)
-            self.change_view_to_active_camera()
+            self.view_from_active_camera()
 
         if imgui.button("View from camera"):
-            self.change_view_to_active_camera()
+            self.view_from_active_camera()
 
             # Also disable the frustum since it's going to block the view
             self.show_frustum = False
@@ -175,4 +175,10 @@ class MultiViewSystem(Node):
         u_frustum, self.show_frustum = imgui.checkbox("Show frustum", self.show_frustum)    
         if u_frustum or u_selected:
             self.update_frustum()
-        
+    
+    def capture_selection(self, node):
+        return False
+    
+    # Disable outline rendering for this node and its children
+    def render_outline(self, camera, prog):
+        pass

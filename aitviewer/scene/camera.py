@@ -242,11 +242,26 @@ class Camera(Node, CameraInterface):
 
         self.current_frame_id = frame_id
 
+    def render_outline(self, camera, prog):
+        # Only render the mesh outline, this avoids outlining 
+        # the frustum and coordinate system visualization.
+        self.mesh.render_outline(camera, prog)
+
+    def view_from_camera(self):
+        """If the viewer is specified for this camera, change the current view to view from this camera"""
+        if self.viewer:
+            self.hide_frustum()
+            self.viewer.set_temp_camera(self)
+
     def gui(self, imgui):
         if self.viewer:
             if imgui.button("View from camera"):
-                self.hide_frustum()
-                self.viewer.set_temp_camera(self)
+                self.view_from_camera()
+    
+    def gui_context_menu(self, imgui):
+        if self.viewer:
+            if imgui.menu_item("View from camera", shortcut=None, selected=False, enabled=True)[1]:
+                self.view_from_camera()
 
 
 class WeakPerspectiveCamera(Camera):
@@ -344,6 +359,15 @@ class WeakPerspectiveCamera(Camera):
     @hooked
     def gui(self, imgui):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
+        if u:
+            if show:
+                self.show_frustum(self.cols, self.rows, self.far)
+            else:
+                self.hide_frustum()
+
+    @hooked
+    def gui_context_menu(self, imgui):
+        u, show = imgui.menu_item("Show frustum", shortcut=None, selected=self.frustum is not None, enabled=True)
         if u:
             if show:
                 self.show_frustum(self.cols, self.rows, self.far)
@@ -472,7 +496,16 @@ class OpenCVCamera(Camera):
                 self.show_frustum(self.cols, self.rows, self.far)
             else:
                 self.hide_frustum()
-        
+    
+    @hooked
+    def gui_context_menu(self, imgui):
+        u, show = imgui.menu_item("Show frustum", shortcut=None, selected=self.frustum is not None, enabled=True)
+        if u:
+            if show:
+                self.show_frustum(self.cols, self.rows, self.far)
+            else:
+                self.hide_frustum()        
+
 
 class PinholeCamera(CameraInterface):
     """
