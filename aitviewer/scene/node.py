@@ -147,10 +147,18 @@ class Node(object):
         if len(points.shape) == 2 and points.shape[-1] == 3:
             points = points[np.newaxis]
         assert len(points.shape) == 3
-        return np.array([
-            [points[:, :, 0].min(), points[:, :, 0].max()],
-            [points[:, :, 1].min(), points[:, :, 1].max()],
-            [points[:, :, 2].min(), points[:, :, 2].max()]]) * self.scale
+
+        # Compute min and max coordinates of the bounding box ignoring NaNs.
+        val = np.array([
+            [np.nanmin(points[:, :, 0]), np.nanmax(points[:, :, 0])],
+            [np.nanmin(points[:, :, 1]), np.nanmax(points[:, :, 1])],
+            [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]]) * self.scale
+
+        # If any of the elements is NaN return an empty bounding box.
+        if np.isnan(val).any():
+            return np.array([[0, 0], [0, 0], [0, 0]])
+        else:
+            return val
 
     @property
     def n_frames(self):
