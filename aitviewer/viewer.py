@@ -26,8 +26,10 @@ import struct
 
 from array import array
 from aitviewer.configuration import CONFIG as C
+from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.scene.camera import PinholeCamera
 from aitviewer.scene.scene import Scene
+from aitviewer.scene.node import Node
 from aitviewer.streamables.streamable import Streamable
 from aitviewer.utils import images_to_video, PerfTimer
 from collections import namedtuple
@@ -102,17 +104,6 @@ class Viewer(moderngl_window.WindowConfig):
         self.raw_depth_prog = self.load_program('shadow_mapping/raw_depth.glsl')
         self.depth_only_prog = self.load_program('shadow_mapping/depth_only.glsl')
 
-        # Mesh mouse intersection
-        self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
-        self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
-        self.offscreen_p_tri_id = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
-        self.offscreen_p = self.ctx.framebuffer(
-            color_attachments=[
-                self.offscreen_p_viewpos,
-                self.offscreen_p_tri_id
-            ],
-            depth_attachment=self.offscreen_p_depth
-        )
         # Shaders for mesh mouse intersection
         self.frag_map_prog = self.load_program('fragment_picking/frag_map.glsl')
         self.frag_pick_prog = self.load_program('fragment_picking/frag_pick.glsl')
@@ -121,9 +112,19 @@ class Viewer(moderngl_window.WindowConfig):
         self.picker_output = self.ctx.buffer(reserve=5*4)  # 3 floats, 2 ints
         self.picker_vao = VAO(mode=moderngl.POINTS)
 
-        # For debugging
-        self.offscreen_quad = geometry.quad_2d(size=(0.5, 0.5), pos=(0.75, 0.75))
+        # Shaders for drawing outlines
+        self.outline_prepare_prog = self.load_program('outline/outline_prepare.glsl')
+        self.outline_draw_prog = self.load_program('outline/outline_draw.glsl')
+        self.outline_quad = geometry.quad_2d(size=(2.0, 2.0), pos=(0.0, 0.0))
 
+        # Create framebuffers
+        self.create_framebuffers()
+
+        # For debugging
+        self.visualize = False
+        self.vis_prog =  self.load_program('visualize.glsl')
+        self.vis_quad = geometry.quad_2d(size=(0.9, 0.9), pos=(0.5, 0.5))
+        
         # Custom UI Font
         self.font_dir = Path(__file__).parent / 'resources' / 'fonts'
         self.fonts = imgui.get_io().fonts
@@ -141,7 +142,6 @@ class Viewer(moderngl_window.WindowConfig):
             'menu': self.gui_menu,
             'scene': self.gui_scene,
             'playback': self.gui_playback,
-            'inspect': self.gui_inspect,
             'exit': self.gui_exit,
         }
 
@@ -150,7 +150,6 @@ class Viewer(moderngl_window.WindowConfig):
         self.dark_mode = C.dark_mode
         self.playback_fps = C.playback_fps
         self.shadows_enabled = C.shadows_enabled
-        self.show_shadow_map = C.show_shadow_map
         self.auto_set_floor = C.auto_set_floor
         self.auto_set_camera_target = C.auto_set_camera_target
         self.backface_culling = C.backface_culling
@@ -163,7 +162,6 @@ class Viewer(moderngl_window.WindowConfig):
         self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
 
-        self.mmi = None  # Mesh mouse intersection result
         self.animation_range = [0, -1]
         self.video_as_gif = False
         self.video_rotate = False
@@ -175,15 +173,17 @@ class Viewer(moderngl_window.WindowConfig):
         self._previous_frame_key = self.wnd.keys.COMMA
         self._shadow_key = self.wnd.keys.S
         self._orthographic_camera_key = self.wnd.keys.O
-        self._mode_inspect = self.wnd.keys.I
-        self._mode_view = self.wnd.keys.V
         self._dark_mode_key = self.wnd.keys.D
         self._screenshot_key = self.wnd.keys.P
+        self._middle_mouse_button = 3  # middle
         self._right_mouse_button = 2  # right
         self._left_mouse_button = 1  # left
         self._save_cam_key = self.wnd.keys.C
         self._load_cam_key = self.wnd.keys.L
         self._show_camera_target_key = self.wnd.keys.T
+        self._visualize_key = self.wnd.keys.Z
+        self._flat_shading_key = self.wnd.keys.F
+        self._draw_edges_key = self.wnd.keys.E
         self._shortcut_names = {self.wnd.keys.SPACE: "Space",
                                 self.wnd.keys.C: "C",
                                 self.wnd.keys.D: "D",
@@ -192,12 +192,35 @@ class Viewer(moderngl_window.WindowConfig):
                                 self.wnd.keys.O: "O",
                                 self.wnd.keys.P: "P",
                                 self.wnd.keys.S: "S",
-                                self.wnd.keys.T: "T"}
+                                self.wnd.keys.T: "T",
+                                self.wnd.keys.Z: "Z"}
 
         # Disable exit on escape key
         self.window.exit_key = None
         self._exit_popup_open = False
 
+    def create_framebuffers(self):
+        """
+        Create all framebuffers which depend on the window size.
+        This is called once at startup and every time the window is resized.
+        """
+        # Mesh mouse intersection
+        self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
+        self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
+        self.offscreen_p_tri_id = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
+        self.offscreen_p = self.ctx.framebuffer(
+            color_attachments=[
+                self.offscreen_p_viewpos,
+                self.offscreen_p_tri_id
+            ],
+            depth_attachment=self.offscreen_p_depth
+        )
+        self.offscreen_p_tri_id.filter = (moderngl.NEAREST, moderngl.NEAREST)
+
+        # Outline rendering
+        self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
+        self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
+        
     def run(self, *args, log=True):
         """
         Enter a blocking visualization loop. This is built following `moderngl_window.run_window_config`.
@@ -250,10 +273,14 @@ class Viewer(moderngl_window.WindowConfig):
         self.render_shadowmap()
         self.render_prepare()
         self.render_scene()
+        self.render_outline()
 
-        if self.show_shadow_map:
-            self.offscreen_p_depth.use(location=0)
-            self.offscreen_quad.render(self.frag_map_prog)
+        # If visualize is True draw a texture with the object id to the screen for debugging.
+        if self.visualize:
+            self.ctx.enable_only(moderngl.NOTHING)
+            self.offscreen_p_tri_id.use(location=0)
+            self.vis_prog['hash_color'] = True
+            self.vis_quad.render(self.vis_prog)
 
         # FPS accounting.
         self._past_frametimes[:-1] = self._past_frametimes[1:]
@@ -288,7 +315,29 @@ class Viewer(moderngl_window.WindowConfig):
         self.offscreen_p.use()
         rs = self.scene.collect_nodes()
         for r in rs:
-            r.render_fragmap(self.scene.camera, self.frag_map_prog, self.wnd.buffer_size)
+            r.render_fragmap(self.scene.camera, self.frag_map_prog)
+
+    def render_outline(self):
+        # If no object is selcted, skip rendering the outline.
+        if self.scene.selected_object is None:
+            return
+
+        # If the selected object is a Node render its outline.
+        if isinstance(self.scene.selected_object, Node):
+            # Prepare the outline buffer, all objects rendered to this buffer will be outlined.
+            self.outline_framebuffer.clear()
+            self.outline_framebuffer.use()
+            
+            # Render outline of the selected object, this potentially also renders its children.
+            self.scene.selected_object.render_outline(self.scene.camera, self.outline_prepare_prog)
+
+            # Render the outline effect to the window.
+            self.wnd.use()
+            self.ctx.enable_only(moderngl.NOTHING)
+            self.outline_texture.use(0)
+            self.outline_draw_prog['outline'] = 0
+            self.outline_draw_prog['outline_color'] = (1.0, 0.86, 0.35, 1.0)
+            self.outline_quad.render(self.outline_draw_prog)
 
     def render_scene(self):
         """Render the current scene to the framebuffer without time accounting and GUI elements."""
@@ -338,7 +387,20 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui(self):
         imgui.new_frame()
+        
+        # Create a context menu when right clicking on the background.
+        if (not any([imgui.is_window_hovered(), imgui.is_any_item_hovered()]) 
+            and imgui.is_mouse_clicked(button=1)
+            and self.scene.selected_object is not None) and hasattr(self.scene.selected_object, 'gui_context_menu'):
+            imgui.open_popup("Context Menu")
 
+        # Draw the context menu for the selected object
+        if imgui.begin_popup("Context Menu"):
+            if self.scene.selected_object is None or not hasattr(self.scene.selected_object, 'gui_context_menu'):
+                imgui.close_current_popup()
+            self.scene.selected_object.gui_context_menu(imgui)
+            imgui.end_popup()
+        
         # Reset user interacting state
         self.imgui_user_interacting = False
 
@@ -351,11 +413,12 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.render()
         self.imgui.render(imgui.get_draw_data())
 
+        self.prevent_background_interactions()
+
     def gui_scene(self):
         # Render scene GUI
         imgui.begin(self.scene.name, True)
         self.scene.gui(imgui)
-        self.prevent_background_interactions()
         imgui.end()
 
     def gui_menu(self):
@@ -387,7 +450,6 @@ class Viewer(moderngl_window.WindowConfig):
             if imgui.begin_menu("View", True):
                 _, self.shadows_enabled = imgui.menu_item("Render Shadows", self._shortcut_names[self._shadow_key],
                                                           self.shadows_enabled, True)
-                # _, self.show_shadow_map = imgui.menu_item("Show Shadow Map", None, self.show_shadow_map, True)
                 _, self.dark_mode = imgui.menu_item("Dark Mode", self._shortcut_names[self._dark_mode_key],
                                                     self.dark_mode, True)
                 _, self.show_camera_target = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
@@ -416,6 +478,9 @@ class Viewer(moderngl_window.WindowConfig):
                     self.reset_camera()
                     self.scene.camera.load_cam()
 
+                _, self.visualize = imgui.menu_item("Visualize debug texture", self._shortcut_names[self._visualize_key], 
+                                                    self.visualize, True)
+                
                 imgui.end_menu()
 
             if imgui.begin_menu("Mode", True):
@@ -500,18 +565,6 @@ class Viewer(moderngl_window.WindowConfig):
         self.prevent_background_interactions()
         imgui.end()
 
-    def gui_inspect(self):
-        """GUI to control playback settings."""
-        if self.selected_mode == 'inspect':
-            imgui.begin("Inspect", True)
-
-            if self.mmi is not None:
-                for k, v in zip(self.mmi._fields, self.mmi):
-                    imgui.text("{}: {}".format(k, v))
-
-            self.prevent_background_interactions()
-            imgui.end()
-
     def gui_exit(self):
         if self._exit_popup_open:    
             imgui.open_popup("Exit##exit-popup")
@@ -557,7 +610,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.picker_vao.transform(self.frag_pick_prog, self.picker_output, vertices=1)
         x, y, z, obj_id, tri_id = struct.unpack('3f2i', self.picker_output.read())
 
-        if obj_id > 0 and tri_id > 0:
+        if obj_id >= 0 and tri_id >= 0:
             node = self.scene.get_node_by_uid(obj_id)
             # Camera space to world space
             point_world = np.array(np.linalg.inv(self.scene.camera.get_view_matrix()) @ np.array((x, y, z, 1.0)))[:-1]
@@ -571,6 +624,7 @@ class Viewer(moderngl_window.WindowConfig):
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
         self.imgui.resize(width, height)
+        self.create_framebuffers()
 
     def key_event(self, key, action, modifiers):
         self.imgui.key_event(key, action, modifiers)
@@ -612,12 +666,6 @@ class Viewer(moderngl_window.WindowConfig):
                     self.reset_camera()
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
 
-            elif key == self._mode_view:
-                self.selected_mode = 'view'
-
-            elif key == self._mode_inspect:
-                self.selected_mode = 'inspect'
-
             elif key == self._dark_mode_key:
                 self.dark_mode = not self.dark_mode
                 self.scene.set_lights(self.dark_mode)
@@ -632,6 +680,19 @@ class Viewer(moderngl_window.WindowConfig):
                 if self._using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.load_cam()
+            
+            elif key == self._visualize_key:
+                self.visualize = not self.visualize
+            
+            elif key == self._flat_shading_key:
+                selected = self.scene.selected_object
+                if isinstance(selected, Meshes) or isinstance(selected, VariableTopologyMeshes):
+                    selected.flat_shading = not selected.flat_shading
+
+            elif key == self._draw_edges_key:
+                selected = self.scene.selected_object
+                if isinstance(selected, Meshes) or isinstance(selected, VariableTopologyMeshes):
+                    selected.draw_edges = not selected.draw_edges
 
         if action == self.wnd.keys.ACTION_RELEASE:
             pass
@@ -639,22 +700,41 @@ class Viewer(moderngl_window.WindowConfig):
     def mouse_position_event(self, x, y, dx, dy):
         self.imgui.mouse_position_event(x, y, dx, dy)
 
-        if self.selected_mode == 'inspect':
-            self.mmi = self.mesh_mouse_intersection(x, y)
-
     def mouse_press_event(self, x: int, y: int, button: int):
         self.imgui.mouse_press_event(x, y, button)
 
         if not self.imgui_user_interacting:
-            self._pan_camera = button == self._right_mouse_button
-            self._rotate_camera = button == self._left_mouse_button
+            # Pan or rotate camera on middle click.
+            if button == self._middle_mouse_button:
+                self._pan_camera = self.wnd.modifiers.shift
+                self._rotate_camera = not self.wnd.modifiers.shift
+            
+            # Select the mesh under the cursor on left click.
+            if button == self._left_mouse_button:            
+                mmi = self.mesh_mouse_intersection(x, y)
+                if mmi is not None:
+                    node = mmi.node
+
+                    # Collect all ancestors of the clicked node.
+                    nodes = [node]
+                    while node.parent is not None:
+                        nodes.append(node)
+                        node = node.parent
+                    
+                    # Traverse ancestors top down until one captures the selection.
+                    for n in reversed(nodes):
+                        if n.capture_selection(mmi.node):
+                            self.scene.select(n)
+                            break
+                else:
+                    # If nothing was click remove the current selection.
+                    self.scene.select(None)
 
     def mouse_release_event(self, x: int, y: int, button: int):
         self.imgui.mouse_release_event(x, y, button)
 
-        if button == self._right_mouse_button:
+        if button == self._middle_mouse_button:
             self._pan_camera = False
-        if button == self._left_mouse_button:
             self._rotate_camera = False
 
     def mouse_drag_event(self, x: int, y: int, dx: int, dy: int):

@@ -105,6 +105,7 @@ class Meshes(Node):
         self.cast_shadow = cast_shadow
         self.fragmap = pickable
         self.depth_prepass = True
+        self.outline = True
 
         # Misc.
         self._flat_shading = flat_shading
@@ -465,6 +466,10 @@ class Meshes(Node):
             if imgui.button('Show Normals ##show_normals{}'.format(self.unique_name)):
                 self._show_normals()
 
+    def gui_context_menu(self, imgui):
+        _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
+        _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
+
 
 class VariableTopologyMeshes(Node):
     """
@@ -693,6 +698,12 @@ class VariableTopologyMeshes(Node):
     def bounds(self):
         return self.current_mesh.get_bounds(self.current_mesh.vertices)
 
+    def closest_vertex_in_triangle(self, tri_id, point):
+        return self.current_mesh.closest_vertex_in_triangle(tri_id, point)
+
+    def get_bc_coords_from_points(self, tri_id, points):
+        return self.current_mesh.get_bc_coords_from_points(tri_id, points)
+    
     # noinspection PyAttributeOutsideInit
     @Node.once
     def make_renderable(self, ctx):
@@ -716,6 +727,18 @@ class VariableTopologyMeshes(Node):
 
     def render_shadowmap(self, light_mvp, program):
         self.current_mesh.render_shadowmap(light_mvp, program)
+    
+    def render_fragmap(self, camera, prog, uid=None):
+        # Since the current mesh is not a child node we cannot capture its selection.
+        # Therefore we draw to the fragmap using our own id instead of the mesh id.
+        self.current_mesh.render_fragmap(camera, prog, self.uid)
+    
+    def render_outline(self, camera, prog):
+        self.current_mesh.render_outline(camera, prog)
+
+    def gui_context_menu(self, imgui):
+        _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
+        _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
 
     def gui_position(self, imgui):
         # Position controls

@@ -67,6 +67,9 @@ class Scene(Node):
 
         self.custom_font = None
 
+        # Currently selected object, None if no object is selected
+        self.selected_object = None
+        
     def render(self, **kwargs):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
 
@@ -198,33 +201,64 @@ class Scene(Node):
             if n.uid == uid:
                 return n
         return None
+    
+    def select(self, obj):
+        """Set 'obj' as the selected object"""
+        self.selected_object = obj
+
+    def is_selected(self, obj):
+        """Returns true if obj is currently selected"""
+        return obj == self.selected_object
+    
+    def gui_selected(self, imgui):
+        """GUI to edit the selected node"""
+        if self.selected_object:
+            self.selected_object.gui(imgui)
 
     def gui(self, imgui):
         """GUI to control scene settings."""
         self.gui_camera(imgui)
         self.gui_lights(imgui)
         self.gui_renderables(imgui, self.nodes)
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        self.gui_selected(imgui)
         
     def gui_camera(self, imgui):
         # Camera GUI
         imgui.push_font(self.custom_font)
-        camera_expanded = imgui.tree_node("\u0084 Camera##tree_node_r_camera")
+        imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
+
+        flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
+        if self.is_selected(self.camera):
+            flags |= imgui.TREE_NODE_SELECTED
+        camera_expanded = imgui.tree_node("\u0084 Camera##tree_node_r_camera", flags)
+        if imgui.is_item_clicked():
+            self.select(self.camera)
+            
+        imgui.pop_style_var()
         imgui.pop_font()
         if camera_expanded:
-            self.camera.gui(imgui)
             imgui.tree_pop()
-        imgui.spacing()
 
     def gui_lights(self, imgui):
         # Lights GUI
         for _, light in enumerate(self.lights):
             imgui.push_font(self.custom_font)
-            light_expanded = imgui.tree_node("\u0085 {}##tree_node_r".format(light.name))
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
+
+            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
+            if self.is_selected(light):
+                flags |= imgui.TREE_NODE_SELECTED
+            light_expanded = imgui.tree_node("\u0085 {}##tree_node_r".format(light.name), flags)
+            if imgui.is_item_clicked():
+                self.select(light)
+
+            imgui.pop_style_var()
             imgui.pop_font()
             if light_expanded:
-                light.gui(imgui)
                 imgui.tree_pop()
-                imgui.spacing()
 
     def gui_renderables(self, imgui, rs):
         # Nodes GUI
@@ -237,13 +271,20 @@ class Scene(Node):
 
                 # Title
                 imgui.push_font(self.custom_font)
-                if r.has_gui:
-                    r.expanded = imgui.tree_node("{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name),
-                                                 r.expanded and imgui.TREE_NODE_DEFAULT_OPEN)
-                else:
-                    imgui.spacing()
-                    imgui.same_line(spacing=24)
-                    imgui.text("{} {}".format(r.icon, r.name))
+                imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))               
+
+                flags = imgui.TREE_NODE_OPEN_ON_ARROW | imgui.TREE_NODE_FRAME_PADDING 
+                if r.expanded:
+                    flags |= imgui.TREE_NODE_DEFAULT_OPEN 
+                if self.is_selected(r):
+                    flags |= imgui.TREE_NODE_SELECTED
+                if not any(c.show_in_hierarchy for c in r.nodes) or not r.has_gui:
+                    flags |= imgui.TREE_NODE_LEAF
+                r.expanded = imgui.tree_node("{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name), flags)
+                if imgui.is_item_clicked():
+                    self.select(r)
+
+                imgui.pop_style_var()
                 imgui.pop_font()
 
                 # Aligns checkbox to the right side of the window
@@ -253,13 +294,10 @@ class Scene(Node):
                 if eu:
                     r.enabled = enabled
 
-                if r.has_gui and r.expanded:
-                    # Render this elements GUI
-                    r.gui(imgui)
-                    # Recursively render the GUI of this elements children renderables
-                    self.gui_renderables(imgui, r.nodes)
-
-                    imgui.spacing()
+                if r.expanded:
+                    if r.has_gui:
+                        # Recursively render children nodes
+                        self.gui_renderables(imgui, r.nodes)
                     imgui.tree_pop()
 
                 if not curr_enabled:
@@ -279,3 +317,8 @@ class Scene(Node):
         for n in ns:
             n_frames = max(n_frames, n.n_frames)
         return n_frames
+
+    def capture_selection(self, node):
+        # The scene is the common ancestors of all nodes, therefore it should 
+        # never be selected when a descendant is clicked.
+        return False

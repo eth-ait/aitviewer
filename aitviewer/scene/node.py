@@ -65,6 +65,7 @@ class Node(object):
         self.cast_shadow = False
         self.fragmap = False
         self.depth_prepass = False
+        self.outline = False
 
         # GUI
         self.name = name if name is not None else type(self).__name__
@@ -76,8 +77,9 @@ class Node(object):
         self._has_gui = True
         self._gui_elements = []
         self._show_in_hierarchy = True
-
+        
         self.nodes = []
+        self.parent = None
 
     # Transform
     @property
@@ -145,10 +147,18 @@ class Node(object):
         if len(points.shape) == 2 and points.shape[-1] == 3:
             points = points[np.newaxis]
         assert len(points.shape) == 3
-        return np.array([
-            [points[:, :, 0].min(), points[:, :, 0].max()],
-            [points[:, :, 1].min(), points[:, :, 1].max()],
-            [points[:, :, 2].min(), points[:, :, 2].max()]]) * self.scale
+
+        # Compute min and max coordinates of the bounding box ignoring NaNs.
+        val = np.array([
+            [np.nanmin(points[:, :, 0]), np.nanmax(points[:, :, 0])],
+            [np.nanmin(points[:, :, 1]), np.nanmax(points[:, :, 1])],
+            [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]]) * self.scale
+
+        # If any of the elements is NaN return an empty bounding box.
+        if np.isnan(val).any():
+            return np.array([[0, 0], [0, 0], [0, 0]])
+        else:
+            return val
 
     @property
     def n_frames(self):
@@ -212,6 +222,7 @@ class Node(object):
         n._expanded = expanded
         n._enabled = enabled
         self.nodes.append(n)
+        n.parent = self
 
     def _add_nodes(self, *nodes, **kwargs):
         """Add multiple nodes"""
@@ -253,6 +264,14 @@ class Node(object):
         Subclasses should implement this method to be rendered correctly when transparent.
         """
         return False
+
+    def capture_selection(self, node):
+        """
+        Returns true if the object should be selected when it or one of its children nodes is clicked.
+        Subclasses can return False to allow selection of children nodes indipendently of the parent.
+        :param node: node that was clicked, this is guaranteed to be a descendant of this node.
+        """
+        return True
 
     def gui_animation(self, imgui):
         # Animation Control
@@ -385,7 +404,7 @@ class Node(object):
 
         self.render_positions(prog)
 
-    def render_fragmap(self, camera, prog, window_size):
+    def render_fragmap(self, camera, prog, uid=None):
         if not self.fragmap:
             return
 
@@ -395,7 +414,9 @@ class Node(object):
         # Transpose because np is row-major but OpenGL expects column-major.
         prog['projection'].write(p.T.astype('f4').tobytes())
         prog['modelview'].write(mv.T.astype('f4').tobytes())
-        prog['obj_id'] = self.uid
+
+        # Render with the specified object uid, if None use the node uid instead.
+        prog['obj_id'] = uid or self.uid
 
         self.render_positions(prog)    
 
@@ -408,6 +429,17 @@ class Node(object):
         prog['mvp'].write(mvp.T.tobytes())
 
         self.render_positions(prog)  
+    
+    def render_outline(self, camera, prog):
+        if self.outline:
+            mvp = camera.get_view_projection_matrix() @ self.model_matrix()
+            prog['mvp'].write(mvp.T.tobytes())
+
+            self.render_positions(prog)
+        
+        # Render children node recursively.
+        for n in self.nodes:
+            n.render_outline(camera, prog)
 
     def release(self):
         """

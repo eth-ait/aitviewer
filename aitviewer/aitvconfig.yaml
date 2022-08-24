@@ -30,7 +30,6 @@ playback_fps: 60
 run_animations: False
 dark_mode: False
 shadows_enabled: True
-show_shadow_map: False
 auto_set_floor: True
 auto_set_camera_target: True
 backface_culling: True
