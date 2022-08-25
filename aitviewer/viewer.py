@@ -153,6 +153,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.auto_set_floor = C.auto_set_floor
         self.auto_set_camera_target = C.auto_set_camera_target
         self.backface_culling = C.backface_culling
+        self.lock_selection = False
 
         self.show_camera_target = False
 
@@ -184,11 +185,13 @@ class Viewer(moderngl_window.WindowConfig):
         self._visualize_key = self.wnd.keys.Z
         self._flat_shading_key = self.wnd.keys.F
         self._draw_edges_key = self.wnd.keys.E
+        self._lock_selection_key = self.wnd.keys.K
         self._shortcut_names = {self.wnd.keys.SPACE: "Space",
                                 self.wnd.keys.C: "C",
                                 self.wnd.keys.D: "D",
                                 self.wnd.keys.I: "I",
                                 self.wnd.keys.L: "L",
+                                self.wnd.keys.K: "K",
                                 self.wnd.keys.O: "O",
                                 self.wnd.keys.P: "P",
                                 self.wnd.keys.S: "S",
@@ -399,7 +402,8 @@ class Viewer(moderngl_window.WindowConfig):
         if imgui.begin_popup("Context Menu"):
             if self.scene.selected_object is None or not hasattr(self.scene.selected_object, 'gui_context_menu'):
                 imgui.close_current_popup()
-            self.scene.selected_object.gui_context_menu(imgui)
+            else:
+                self.scene.selected_object.gui_context_menu(imgui)
             imgui.end_popup()
         
         # Reset user interacting state
@@ -479,6 +483,9 @@ class Viewer(moderngl_window.WindowConfig):
                     self.reset_camera()
                     self.scene.camera.load_cam()
 
+                _, self.lock_selection = imgui.menu_item("Lock selection", self._shortcut_names[self._lock_selection_key], 
+                                                         self.lock_selection, True)
+                
                 _, self.visualize = imgui.menu_item("Visualize debug texture", self._shortcut_names[self._visualize_key], 
                                                     self.visualize, True)
                 
@@ -624,6 +631,10 @@ class Viewer(moderngl_window.WindowConfig):
 
     def select_object(self, x: int, y: int):
         """Selects the object at pixel coordinates x, y, returns True if an object is selected"""
+        # If the selection is locked, do nothing
+        if self.lock_selection:
+            return False
+
         mmi = self.mesh_mouse_intersection(x, y)
         if mmi is not None:
             node = mmi.node
@@ -714,6 +725,9 @@ class Viewer(moderngl_window.WindowConfig):
                 selected = self.scene.selected_object
                 if isinstance(selected, Meshes) or isinstance(selected, VariableTopologyMeshes):
                     selected.draw_edges = not selected.draw_edges
+            
+            elif key == self._lock_selection_key:
+                self.lock_selection = not self.lock_selection
 
         if action == self.wnd.keys.ACTION_RELEASE:
             pass
@@ -727,19 +741,28 @@ class Viewer(moderngl_window.WindowConfig):
         if not self.imgui_user_interacting:
             # Pan or rotate camera on middle click.
             if button == self._middle_mouse_button:
-                self._pan_camera = self.wnd.modifiers.shift
-                self._rotate_camera = not self.wnd.modifiers.shift
+                self._pan_camera = True
+
+            if button == self._left_mouse_button:
+                if self.wnd.modifiers.ctrl:
+                    self._pan_camera = True
+                else:
+                    self._rotate_camera = True
             
             # Select the mesh under the cursor on left click.
             if button == self._left_mouse_button:
                 if not self.select_object(x, y):
-                    # If nothing was selected clear the previous selection
-                    self.scene.selected_object = None
+                    # If selection is enabled and nothing was selected clear the previous selection
+                    if not self.lock_selection:
+                        self.scene.selected_object = None
 
     def mouse_release_event(self, x: int, y: int, button: int):
         self.imgui.mouse_release_event(x, y, button)
 
         if button == self._middle_mouse_button:
+            self._pan_camera = False
+
+        if button == self._left_mouse_button:
             self._pan_camera = False
             self._rotate_camera = False
 
@@ -763,7 +786,7 @@ class Viewer(moderngl_window.WindowConfig):
         if not self.imgui_user_interacting:
             if self._using_temp_camera:
                 self.reset_camera()
-            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift)
+            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.ctrl)
 
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
