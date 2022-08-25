@@ -27,7 +27,7 @@ class Light(Node):
     """Simple point light."""
 
     def __init__(self, intensity_diffuse=1.0, intensity_ambient=1.0, shadow_enabled=True, **kwargs):
-        super(Light, self).__init__(**kwargs)
+        super(Light, self).__init__(icon='\u0085',**kwargs)
 
         self.intensity_ambient = intensity_ambient
         self.intensity_diffuse = intensity_diffuse

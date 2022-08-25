@@ -213,7 +213,15 @@ class Scene(Node):
     def gui_selected(self, imgui):
         """GUI to edit the selected node"""
         if self.selected_object:
-            self.selected_object.gui(imgui)
+            s = self.selected_object
+
+            # Draw object icon and name
+            imgui.push_font(self.custom_font)
+            imgui.text(f"{s.icon} {s.name}")
+            imgui.pop_font()
+
+            # Draw gui
+            s.gui(imgui)
 
     def gui(self, imgui):
         """GUI to control scene settings."""
@@ -233,7 +241,7 @@ class Scene(Node):
         flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
         if self.is_selected(self.camera):
             flags |= imgui.TREE_NODE_SELECTED
-        camera_expanded = imgui.tree_node("\u0084 Camera##tree_node_r_camera", flags)
+        camera_expanded = imgui.tree_node(f"{self.camera.icon} {self.camera.name}##tree_node_r_camera", flags)
         if imgui.is_item_clicked():
             self.select(self.camera)
             
@@ -251,7 +259,7 @@ class Scene(Node):
             flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
             if self.is_selected(light):
                 flags |= imgui.TREE_NODE_SELECTED
-            light_expanded = imgui.tree_node("\u0085 {}##tree_node_r".format(light.name), flags)
+            light_expanded = imgui.tree_node(f"{light.icon} {light.name}##tree_node_r", flags)
             if imgui.is_item_clicked():
                 self.select(light)
 
@@ -262,46 +270,49 @@ class Scene(Node):
 
     def gui_renderables(self, imgui, rs):
         # Nodes GUI
-        for i, r in enumerate(rs):
-            if r.show_in_hierarchy:
-                # Visibility
-                curr_enabled = r.enabled
-                if not curr_enabled:
-                    imgui.push_style_color(imgui.COLOR_TEXT, 1.0, 1.0, 1.0, 0.4)
+        for r in rs:
+            # Skip nodes that shouldn't appear in the hierarchy.
+            if not r.show_in_hierarchy:
+                continue
 
-                # Title
-                imgui.push_font(self.custom_font)
-                imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))               
+            # Visibility
+            curr_enabled = r.enabled
+            if not curr_enabled:
+                imgui.push_style_color(imgui.COLOR_TEXT, 1.0, 1.0, 1.0, 0.4)
 
-                flags = imgui.TREE_NODE_OPEN_ON_ARROW | imgui.TREE_NODE_FRAME_PADDING 
-                if r.expanded:
-                    flags |= imgui.TREE_NODE_DEFAULT_OPEN 
-                if self.is_selected(r):
-                    flags |= imgui.TREE_NODE_SELECTED
-                if not any(c.show_in_hierarchy for c in r.nodes) or not r.has_gui:
-                    flags |= imgui.TREE_NODE_LEAF
-                r.expanded = imgui.tree_node("{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name), flags)
-                if imgui.is_item_clicked():
-                    self.select(r)
+            # Title
+            imgui.push_font(self.custom_font)
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))               
 
-                imgui.pop_style_var()
-                imgui.pop_font()
+            flags = imgui.TREE_NODE_OPEN_ON_ARROW | imgui.TREE_NODE_FRAME_PADDING 
+            if r.expanded:
+                flags |= imgui.TREE_NODE_DEFAULT_OPEN 
+            if self.is_selected(r):
+                flags |= imgui.TREE_NODE_SELECTED
+            if not any(c.show_in_hierarchy for c in r.nodes) or not r.has_gui:
+                flags |= imgui.TREE_NODE_LEAF
+            r.expanded = imgui.tree_node("{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name), flags)
+            if imgui.is_item_clicked():
+                self.select(r)
 
-                # Aligns checkbox to the right side of the window
-                # https://github.com/ocornut/imgui/issues/196
-                imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
-                eu, enabled = imgui.checkbox('##enabled_r_{}'.format(r.unique_name), r.enabled)
-                if eu:
-                    r.enabled = enabled
+            imgui.pop_style_var()
+            imgui.pop_font()
 
-                if r.expanded:
-                    if r.has_gui:
-                        # Recursively render children nodes
-                        self.gui_renderables(imgui, r.nodes)
-                    imgui.tree_pop()
+            # Aligns checkbox to the right side of the window
+            # https://github.com/ocornut/imgui/issues/196
+            imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
+            eu, enabled = imgui.checkbox('##enabled_r_{}'.format(r.unique_name), r.enabled)
+            if eu:
+                r.enabled = enabled
 
-                if not curr_enabled:
-                    imgui.pop_style_color(1)
+            if r.expanded:
+                if r.has_gui:
+                    # Recursively render children nodes
+                    self.gui_renderables(imgui, r.nodes)
+                imgui.tree_pop()
+
+            if not curr_enabled:
+                imgui.pop_style_color(1)
 
     def add_light(self, light):
         self.lights.append(light)

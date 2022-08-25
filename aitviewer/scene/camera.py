@@ -107,7 +107,7 @@ class Camera(Node, CameraInterface):
         :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
         """
 
-        super(Camera, self).__init__(**kwargs)
+        super(Camera, self).__init__(icon='\u0084', **kwargs)
 
         # Camera object geometry
         vertices = np.array([
@@ -528,6 +528,10 @@ class PinholeCamera(CameraInterface):
 
         self.near = znear
         self.far = zfar
+
+        # GUI options
+        self.name = 'Camera'
+        self.icon = '\u0084'
 
     @property
     def position(self):
