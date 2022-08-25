@@ -732,10 +732,10 @@ class VariableTopologyMeshes(Node):
     def render_shadowmap(self, light_mvp, program):
         self.current_mesh.render_shadowmap(light_mvp, program)
     
-    def render_fragmap(self, camera, prog, uid=None):
+    def render_fragmap(self, ctx, camera, prog, uid=None):
         # Since the current mesh is not a child node we cannot capture its selection.
         # Therefore we draw to the fragmap using our own id instead of the mesh id.
-        self.current_mesh.render_fragmap(camera, prog, self.uid)
+        self.current_mesh.render_fragmap(ctx, camera, prog, self.uid)
     
     def render_outline(self, ctx, camera, prog):
         self.current_mesh.render_outline(ctx, camera, prog)

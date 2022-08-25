@@ -304,6 +304,15 @@ class Lines(Node):
 
         return vs, fs, ns
 
+    def get_index_from_node_and_triangle(self, node, tri_id):
+        if node == self.mesh:
+            if self.mode == 'lines':
+                n_lines = self.lines.shape[1] // 2
+            else:
+                n_lines = self.lines.shape[1] - 1
+            return tri_id // (self.mesh.faces.shape[0] // n_lines)
+        return None
+
 
 class LinesWithGeometryShader(Node):
     """

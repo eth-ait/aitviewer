@@ -70,6 +70,24 @@ def aa2rot_numpy(rotation_vectors):
     return rotation_matrices
 
 
+def aa2euler_numpy(rotation_vectors, degrees=False):
+    assert isinstance(rotation_vectors, np.ndarray)
+    ori_shape = rotation_vectors.shape[:-1]
+    aas = np.reshape(rotation_vectors, (-1, 3))
+    rots = R.as_euler(R.from_rotvec(aas), 'XYZ', degrees=degrees)
+    euler_angles = np.reshape(rots, ori_shape + (3, ))
+    return euler_angles
+
+
+def euler2aa_numpy(euler_angles, degrees=False):
+    assert isinstance(euler_angles, np.ndarray)
+    ori_shape = euler_angles.shape[:-1]
+    rots = np.reshape(euler_angles, (-1, 3))
+    aas = R.as_rotvec(R.from_euler('XYZ', rots, degrees=degrees))
+    rotation_vectors = np.reshape(aas, ori_shape + (3, ))
+    return rotation_vectors
+
+
 def interpolate_rotations(rotations, ts_in, ts_out):
     """
     Interpolate rotations given at timestamps `ts_in` to timestamps given at `ts_out`. This performs the equivalent

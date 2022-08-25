@@ -329,7 +329,7 @@ class Scene(Node):
             n_frames = max(n_frames, n.n_frames)
         return n_frames
 
-    def capture_selection(self, node):
+    def capture_selection(self, node, tri_id):
         # The scene is the common ancestors of all nodes, therefore it should 
         # never be selected when a descendant is clicked.
         return False

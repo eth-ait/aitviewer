@@ -315,7 +315,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.offscreen_p.use()
         rs = self.scene.collect_nodes()
         for r in rs:
-            r.render_fragmap(self.scene.camera, self.frag_map_prog)
+            r.render_fragmap(self.ctx, self.scene.camera, self.frag_map_prog)
 
     def render_outline(self):
         # If no object is selcted, skip rendering the outline.
@@ -636,7 +636,7 @@ class Viewer(moderngl_window.WindowConfig):
             
             # Traverse ancestors top down until one captures the selection.
             for n in reversed(nodes):
-                if n.capture_selection(mmi.node):
+                if n.capture_selection(mmi.node, mmi.tri_id):
                     self.scene.select(n)
                     return True
         

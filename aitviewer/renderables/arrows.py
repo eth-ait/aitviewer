@@ -75,7 +75,14 @@ class Arrows(Node):
         c[:, 0::2] = starts
         c[:, 1::2] = ends
         return c
-
+    
+    def get_index_from_node_and_triangle(self, node, tri_id):
+        idx = self.bases_r.get_index_from_node_and_triangle(node, tri_id)
+        if idx is not None:
+            return idx
+        
+        return self.arrows_r.get_index_from_node_and_triangle(node, tri_id)
+    
     def redraw(self, **kwargs):
         self.bases_r.lines = self.get_line_coords(self.origins, self.mid_points)
         self.bases_r.redraw(**kwargs)

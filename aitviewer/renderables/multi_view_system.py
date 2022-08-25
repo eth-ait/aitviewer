@@ -185,7 +185,7 @@ class MultiViewSystem(Node):
         if u_cameras:
             self.update_cameras()
 
-    def capture_selection(self, node):
+    def capture_selection(self, node, tri_id):
         return False
     
     # Disable outline rendering for this node and its children

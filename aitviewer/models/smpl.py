@@ -57,6 +57,7 @@ class SMPLLayer(nn.Module, ABC):
                                num_betas=self.num_betas, gender=gender, **smpl_model_params)
         self.bm.to(device=device, dtype=dtype)
 
+        self.model_type = model_type
         self._parents = None
         self._children = None
         self._closest_joints = None

@@ -59,6 +59,7 @@ class Node(object):
         self.render_priority = render_priority
         self.is_renderable = False
         self.backface_culling = True
+        self.backface_fragmap = False
 
         # Flags to enable rendering passes
         self.cast_shadow = False
@@ -264,7 +265,7 @@ class Node(object):
         """
         return False
 
-    def capture_selection(self, node):
+    def capture_selection(self, node, tri_id):
         """
         Returns true if the object should be selected when it or one of its children nodes is clicked.
         Subclasses can return False to allow selection of children nodes indipendently of the parent.
@@ -403,7 +404,7 @@ class Node(object):
 
         self.render_positions(prog)
 
-    def render_fragmap(self, camera, prog, uid=None):
+    def render_fragmap(self, ctx, camera, prog, uid=None):
         if not self.fragmap:
             return
 
@@ -417,7 +418,20 @@ class Node(object):
         # Render with the specified object uid, if None use the node uid instead.
         prog['obj_id'] = uid or self.uid
 
-        self.render_positions(prog)    
+        if self.backface_culling or self.backface_fragmap:
+            ctx.enable(moderngl.CULL_FACE)
+        else:
+            ctx.disable(moderngl.CULL_FACE)
+
+        # If backface_fragmap is enabled for this node only render backfaces
+        if self.backface_fragmap:
+            ctx.cull_face = 'front'
+            
+        self.render_positions(prog)
+
+        # Restore cull face to back
+        if self.backface_fragmap:
+            ctx.cull_face = 'back'
 
     def render_depth_prepass(self, camera, **kwargs):
         if not self.depth_prepass:

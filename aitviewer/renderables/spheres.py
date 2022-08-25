@@ -116,6 +116,10 @@ class Spheres(Node):
     @property
     def vertex_colors(self):
         return np.full((self.n_spheres * self.n_vertices, 4), self.color)
+        
+    @vertex_colors.setter
+    def vertex_colors(self, vertex_colors):
+        self.mesh.vertex_colors = vertex_colors
 
     def on_frame_update(self):  
         self.redraw()
@@ -137,6 +141,12 @@ class Spheres(Node):
     @color.setter
     def color(self, color):
         self.mesh.color = color
+
+    def get_index_from_node_and_triangle(self, node, tri_id):
+        if node == self.mesh:
+            return tri_id // (self.spheres_data['faces'].shape[1])
+        
+        return None
 
     def gui_scale(self, imgui):
         # Scale controls
