@@ -705,7 +705,7 @@ class VariableTopologyMeshes(Node):
         return self.current_mesh.get_bc_coords_from_points(tri_id, points)
     
     def is_transparent(self):
-        return self.current_mesh.is_transparent()
+        return self.color[3] < 1.0
 
     # noinspection PyAttributeOutsideInit
     @Node.once
