@@ -95,6 +95,7 @@ class MultiViewSystem(Node):
         self.billboard = None
         self.show_frustum = False
         self.frustum = None
+        self.show_cameras = True
 
         self.set_active_camera(0)
 
@@ -154,6 +155,10 @@ class MultiViewSystem(Node):
                 self.billboard.current_frame_id = self.current_frame_id
             
             self.add(self.billboard, show_in_hierarchy=False)
+    
+    def update_cameras(self):
+        for c in self.cameras:
+            c.enabled = self.show_cameras
 
     def gui(self, imgui):
         u_selected, active_index = imgui.combo("ID", self.active_camera_index, [str(id) for id in self.camera_info['ids'].tolist()])
@@ -175,7 +180,11 @@ class MultiViewSystem(Node):
         u_frustum, self.show_frustum = imgui.checkbox("Show frustum", self.show_frustum)    
         if u_frustum or u_selected:
             self.update_frustum()
-    
+        
+        u_cameras, self.show_cameras = imgui.checkbox("Show cameras", self.show_cameras)
+        if u_cameras:
+            self.update_cameras()
+
     def capture_selection(self, node):
         return False
     

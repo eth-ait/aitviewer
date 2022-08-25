@@ -374,19 +374,20 @@ class Meshes(Node):
 
     @hooked
     def release(self):
-        self.smooth_vao.release()
-        self.flat_vao.release()
-        self.positions_vao.release(buffer=False)
+        if self.is_renderable:
+            self.smooth_vao.release()
+            self.flat_vao.release()
+            self.positions_vao.release(buffer=False)
 
-        self.vbo_vertices.release()
-        self.vbo_indices.release()
-        self.vbo_normals.release()
-        self.vbo_colors.release()
+            self.vbo_vertices.release()
+            self.vbo_indices.release()
+            self.vbo_normals.release()
+            self.vbo_colors.release()
 
-        if self.has_texture:
-            self.texture_vao.release()
-            self.vbo_uvs.release()
-            self.texture.release()
+            if self.has_texture:
+                self.texture_vao.release()
+                self.vbo_uvs.release()
+                self.texture.release()
 
     def render(self, camera, **kwargs):
         # Check if flat shading changed, in which case we need to update the VBOs.    
