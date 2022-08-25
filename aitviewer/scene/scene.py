@@ -217,11 +217,16 @@ class Scene(Node):
 
             # Draw object icon and name
             imgui.push_font(self.custom_font)
-            imgui.text(f"{s.icon} {s.name}")
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
+            e = imgui.tree_node(f"{s.icon} {s.name}##gui_selected", imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING)
+            imgui.pop_style_var()
             imgui.pop_font()
 
             # Draw gui
             s.gui(imgui)
+
+            if e:
+                imgui.tree_pop()
 
     def gui(self, imgui):
         """GUI to control scene settings."""
