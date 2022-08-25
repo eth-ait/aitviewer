@@ -390,9 +390,10 @@ class Viewer(moderngl_window.WindowConfig):
         
         # Create a context menu when right clicking on the background.
         if (not any([imgui.is_window_hovered(), imgui.is_any_item_hovered()]) 
-            and imgui.is_mouse_clicked(button=1)
-            and self.scene.selected_object is not None) and hasattr(self.scene.selected_object, 'gui_context_menu'):
-            imgui.open_popup("Context Menu")
+            and imgui.is_mouse_clicked(button=1)):
+            # Select the object under the cursor
+            if self.select_object(*imgui.get_io().mouse_pos) and hasattr(self.scene.selected_object, 'gui_context_menu'):
+                imgui.open_popup("Context Menu")
 
         # Draw the context menu for the selected object
         if imgui.begin_popup("Context Menu"):
@@ -621,6 +622,26 @@ class Viewer(moderngl_window.WindowConfig):
 
         return None
 
+    def select_object(self, x: int, y: int):
+        """Selects the object at pixel coordinates x, y, returns True if an object is selected"""
+        mmi = self.mesh_mouse_intersection(x, y)
+        if mmi is not None:
+            node = mmi.node
+
+            # Collect all ancestors of the clicked node.
+            nodes = [node]
+            while node.parent is not None:
+                nodes.append(node)
+                node = node.parent
+            
+            # Traverse ancestors top down until one captures the selection.
+            for n in reversed(nodes):
+                if n.capture_selection(mmi.node):
+                    self.scene.select(n)
+                    return True
+        
+        return False
+
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
         self.imgui.resize(width, height)
@@ -710,25 +731,10 @@ class Viewer(moderngl_window.WindowConfig):
                 self._rotate_camera = not self.wnd.modifiers.shift
             
             # Select the mesh under the cursor on left click.
-            if button == self._left_mouse_button:            
-                mmi = self.mesh_mouse_intersection(x, y)
-                if mmi is not None:
-                    node = mmi.node
-
-                    # Collect all ancestors of the clicked node.
-                    nodes = [node]
-                    while node.parent is not None:
-                        nodes.append(node)
-                        node = node.parent
-                    
-                    # Traverse ancestors top down until one captures the selection.
-                    for n in reversed(nodes):
-                        if n.capture_selection(mmi.node):
-                            self.scene.select(n)
-                            break
-                else:
-                    # If nothing was click remove the current selection.
-                    self.scene.select(None)
+            if button == self._left_mouse_button:
+                if not self.select_object(x, y):
+                    # If nothing was selected clear the previous selection
+                    self.scene.selected_object = None
 
     def mouse_release_event(self, x: int, y: int, button: int):
         self.imgui.mouse_release_event(x, y, button)
