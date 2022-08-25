@@ -180,5 +180,5 @@ class MultiViewSystem(Node):
         return False
     
     # Disable outline rendering for this node and its children
-    def render_outline(self, camera, prog):
+    def render_outline(self, ctx, camera, prog):
         pass

@@ -329,7 +329,7 @@ class Viewer(moderngl_window.WindowConfig):
             self.outline_framebuffer.use()
             
             # Render outline of the selected object, this potentially also renders its children.
-            self.scene.selected_object.render_outline(self.scene.camera, self.outline_prepare_prog)
+            self.scene.selected_object.render_outline(self.ctx, self.scene.camera, self.outline_prepare_prog)
 
             # Render the outline effect to the window.
             self.wnd.use()

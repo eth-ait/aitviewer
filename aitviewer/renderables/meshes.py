@@ -736,8 +736,8 @@ class VariableTopologyMeshes(Node):
         # Therefore we draw to the fragmap using our own id instead of the mesh id.
         self.current_mesh.render_fragmap(camera, prog, self.uid)
     
-    def render_outline(self, camera, prog):
-        self.current_mesh.render_outline(camera, prog)
+    def render_outline(self, ctx, camera, prog):
+        self.current_mesh.render_outline(ctx, camera, prog)
 
     def gui_context_menu(self, imgui):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)

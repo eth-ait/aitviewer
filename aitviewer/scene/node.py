@@ -19,8 +19,7 @@ import numpy as np
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.scene.material import Material
-from moderngl_window.opengl.vao import VAO
-
+import moderngl
 
 class Node(object):
     """Interface for nodes."""
@@ -430,16 +429,20 @@ class Node(object):
 
         self.render_positions(prog)  
     
-    def render_outline(self, camera, prog):
+    def render_outline(self, ctx, camera, prog):
         if self.outline:
             mvp = camera.get_view_projection_matrix() @ self.model_matrix()
             prog['mvp'].write(mvp.T.tobytes())
 
+            if self.backface_culling:
+                ctx.enable(moderngl.CULL_FACE)
+            else:
+                ctx.disable(moderngl.CULL_FACE)
             self.render_positions(prog)
         
         # Render children node recursively.
         for n in self.nodes:
-            n.render_outline(camera, prog)
+            n.render_outline(ctx, camera, prog)
 
     def release(self):
         """

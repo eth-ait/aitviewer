@@ -242,10 +242,10 @@ class Camera(Node, CameraInterface):
 
         self.current_frame_id = frame_id
 
-    def render_outline(self, camera, prog):
+    def render_outline(self, ctx, camera, prog):
         # Only render the mesh outline, this avoids outlining 
         # the frustum and coordinate system visualization.
-        self.mesh.render_outline(camera, prog)
+        self.mesh.render_outline(ctx, camera, prog)
 
     def view_from_camera(self):
         """If the viewer is specified for this camera, change the current view to view from this camera"""

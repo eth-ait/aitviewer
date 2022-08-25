@@ -23,7 +23,9 @@ from typing import List
 import cv2
 import pickle
 import moderngl
+from moderngl_window.opengl.vao import VAO
 import numpy as np
+from trimesh.triangles import points_to_barycentric
 
 
 class Billboard(Node):
@@ -47,7 +49,9 @@ class Billboard(Node):
         else:
             assert vertices.shape[0] == 1 or vertices.shape[0] == len(texture_paths), "the length of the sequence of vertices must be 1 or match the number of textures"
 
-        self.vertices = vertices
+        center = np.mean(vertices, axis=(0, 1))
+        self.vertices = vertices - center
+        self.position = center
         self.img_process_fn = (lambda img: img) if img_process_fn is None else img_process_fn
 
         # Tile the uv buffer to match the size of the vertices buffer,
@@ -66,6 +70,10 @@ class Billboard(Node):
         self._current_texture_id = None
 
         self.backface_culling = False
+
+        # Render passes
+        self.fragmap = True
+        self.outline = True
 
     @classmethod
     def from_position_and_ar(cls, texture_paths, scale=1.0, **kwargs):
@@ -149,6 +157,10 @@ class Billboard(Node):
         self.vao = ctx.vertex_array(self.prog,
                                     [(self.vbo_vertices, '3f4 /v', 'in_position'),
                                      (self.vbo_uvs, '2f4 /v', 'in_texcoord_0')])
+
+        self.positions_vao = VAO('{}:positions'.format(self.unique_name))
+        self.positions_vao.buffer(self.vbo_vertices, '3f', ['in_position'])
+
         self.ctx = ctx
 
     def render(self, camera, **kwargs):
@@ -175,17 +187,34 @@ class Billboard(Node):
         first = 4 * self.current_frame_id if self.vertices.shape[0] > 1 else 0
         self.vao.render(moderngl.TRIANGLE_STRIP, vertices=4, first=first)
 
+    def render_positions(self, prog):
+        if self.is_renderable:
+            first = 4 * self.current_frame_id if self.vertices.shape[0] > 1 else 0
+            self.positions_vao.render(prog, mode=moderngl.TRIANGLE_STRIP, vertices=4, first=first)
+
     @hooked
     def release(self):
         if self.is_renderable:
+            self.vao.release()
+            self.positions_vao.release(buffer=False)
+
             self.vbo_vertices.release()
             self.vbo_uvs.release()
-            self.vao.release()
+            
             if self.texture:
                 self.texture.release()
     
     def is_transparent(self):
         return self.texture_alpha < 1.0
+    
+    def closest_vertex_in_triangle(self, tri_id, point):
+        vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
+        return np.linalg.norm((vertices - point), axis=-1).argmin()
+        
+    def get_bc_coords_from_points(self, tri_id, points):
+        vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
+        indices = np.array([ [0, 1, 2], [1, 2, 3] ])
+        return points_to_barycentric(vertices[indices[[tri_id]]], points)[0]
 
     def gui_material(self, imgui, show_advanced=True):
         _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name),
