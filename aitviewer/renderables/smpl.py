@@ -152,7 +152,7 @@ class SMPLSequence(Node):
         kwargs = self._render_kwargs.copy()
         kwargs['name'] = 'Mesh'
         kwargs['color'] = kwargs.get('color', (160 / 255, 160 / 255, 160 / 255, 1.0))
-        self.mesh_seq = Meshes(self.vertices, self.faces, **kwargs)
+        self.mesh_seq = Meshes(self.vertices, self.faces, is_selectable=False, **kwargs)
         self.mesh_seq.position = self.position
         self.mesh_seq.rotation = self.rotation
         self._add_node(self.mesh_seq, gui_elements=['material'])
@@ -354,6 +354,9 @@ class SMPLSequence(Node):
         super().redraw()
 
     def set_edit_mode(self, enabled):
+        if enabled == self.edit_mode:
+            return
+            
         if not enabled:
             self.edit_mode = False
 
@@ -363,9 +366,11 @@ class SMPLSequence(Node):
             self.rbs.color = (0, 1, 0.5, 1.0)
             self.rbs.redraw()
             self.rbs.enabled = self._view_mode_joint_angles
+            self.rbs.is_selectable = True
         else:
             self.edit_mode = True
             self.rbs.enabled = True
+            self.rbs.is_selectable = False
             self.edit_pose = self.poses[self.current_frame_id]
             
             # Disable picking for the mesh
@@ -453,7 +458,7 @@ class SMPLSequence(Node):
                 imgui.close_current_popup()
         
     
-    def capture_selection(self, node, tri_id):
+    def on_selection(self, node, tri_id):
         if self.edit_mode:
             self.edit_joint = self.rbs.get_index_from_node_and_triangle(node, tri_id)
             if self.edit_joint is not None:
@@ -461,7 +466,6 @@ class SMPLSequence(Node):
             else:
                 # Reset color of all spheres to the default color
                 self.rbs.color = self.rbs.color
-        return True
     
     def render_outline(self, ctx, camera, prog):
         # Only render outline of the mesh, skipping skeleton and rigid bodies.

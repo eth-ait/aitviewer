@@ -153,7 +153,7 @@ class Camera(Node, CameraInterface):
         self.active_color = active_color
         self.inactive_color = inactive_color
 
-        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True, position=kwargs.get('position'), rotation=kwargs.get('rotation'))
+        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True, position=kwargs.get('position'), rotation=kwargs.get('rotation'), is_selectable=False)
         self.mesh.color = self.inactive_color
         self.add(self.mesh, show_in_hierarchy=False)
 

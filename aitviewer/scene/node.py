@@ -33,6 +33,7 @@ class Node(object):
                  color=(0.5, 0.5, 0.5, 1.0),
                  material=None,
                  render_priority=1,
+                 is_selectable=True,
                  n_frames=1):
         """
         :param name: Name of the node
@@ -77,6 +78,7 @@ class Node(object):
         self._has_gui = True
         self._gui_elements = []
         self._show_in_hierarchy = True
+        self.is_selectable = is_selectable
         
         self.nodes = []
         self.parent = None
@@ -264,14 +266,6 @@ class Node(object):
         Subclasses should implement this method to be rendered correctly when transparent.
         """
         return False
-
-    def capture_selection(self, node, tri_id):
-        """
-        Returns true if the object should be selected when it or one of its children nodes is clicked.
-        Subclasses can return False to allow selection of children nodes indipendently of the parent.
-        :param node: node that was clicked, this is guaranteed to be a descendant of this node.
-        """
-        return True
 
     def gui_animation(self, imgui):
         # Animation Control
@@ -466,3 +460,13 @@ class Node(object):
         """
         for n in self.nodes:
             n.release()
+    
+    def on_selection(self, node, tri_id):
+        """
+        Called when the node is selcted
+
+        :param node:  the node which was clicked (can be None if the selection wasn't a mouse event)
+        :param tri_id: the id of the triangle that was clicked from the 'node' mesh 
+                       (can be None if the selection wasn't a mouse event)
+        """
+        pass
