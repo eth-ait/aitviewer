@@ -163,10 +163,15 @@ class Viewer(moderngl_window.WindowConfig):
         self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
 
-        self.animation_range = [0, -1]
-        self.video_as_gif = False
-        self.video_rotate = False
-
+        # Export settings
+        self.export_animation = True
+        self.export_animation_range = [0, -1]
+        self.export_duration = 10
+        self.export_as_gif = False
+        self.export_rotate_camera = False
+        self.export_seconds_per_rotation = 10
+        self.export_fps = 30
+        
         # Key Shortcuts
         self._exit_key = self.wnd.keys.ESCAPE
         self._pause_key = self.wnd.keys.SPACE
@@ -223,13 +228,8 @@ class Viewer(moderngl_window.WindowConfig):
         # Outline rendering
         self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
         self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
-        
-    def run(self, *args, log=True):
-        """
-        Enter a blocking visualization loop. This is built following `moderngl_window.run_window_config`.
-        :param args: The arguments passed to `config_cls` constructor.
-        :param log: Whether to log to the console.
-        """
+    
+    def _init_scene(self):
         self.scene.make_renderable(self.ctx)
         if self.auto_set_floor:
             self.scene.auto_set_floor()
@@ -237,8 +237,16 @@ class Viewer(moderngl_window.WindowConfig):
         if self.auto_set_camera_target:
             self.scene.auto_set_camera_target()
         self.scene.set_lights(self.dark_mode)
+        
+    def run(self, *args, log=True):
+        """
+        Enter a blocking visualization loop. This is built following `moderngl_window.run_window_config`.
+        :param args: The arguments passed to `config_cls` constructor.
+        :param log: Whether to log to the console.
+        """
+        self._init_scene()
 
-        self.animation_range[-1] = self.scene.n_frames - 1
+        self.export_animation_range[-1] = self.scene.n_frames - 1
 
         self.timer.start()
         self._last_frame_rendered_at = self.timer.time
@@ -255,9 +263,8 @@ class Viewer(moderngl_window.WindowConfig):
         if duration > 0 and log:
             print("Duration: {0:.2f}s @ {1:.2f} FPS".format(duration, self.window.frames / duration))
 
-    def render(self, time, frame_time):
+    def render(self, time, frame_time, export=False):
         """The main drawing function."""
-
         # Advance up to 100 frames to avoid looping for too long if the playback speed is too high
         for _ in range(100):
             # Check if we need to advance the sequences. 
@@ -271,26 +278,30 @@ class Viewer(moderngl_window.WindowConfig):
         #Update camera matrices that will be used for rendering
         self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
 
-        self.streamable_capture()
-        self.render_fragmap()
+        if not export:
+            self.streamable_capture()
+            self.render_fragmap()
+
         self.render_shadowmap()
         self.render_prepare()
         self.render_scene()
-        self.render_outline()
 
-        # If visualize is True draw a texture with the object id to the screen for debugging.
-        if self.visualize:
-            self.ctx.enable_only(moderngl.NOTHING)
-            self.offscreen_p_tri_id.use(location=0)
-            self.vis_prog['hash_color'] = True
-            self.vis_quad.render(self.vis_prog)
+        if not export:
+            self.render_outline()
 
-        # FPS accounting.
-        self._past_frametimes[:-1] = self._past_frametimes[1:]
-        self._past_frametimes[-1] = frame_time
+            # If visualize is True draw a texture with the object id to the screen for debugging.
+            if self.visualize:
+                self.ctx.enable_only(moderngl.NOTHING)
+                self.offscreen_p_tri_id.use(location=0)
+                self.vis_prog['hash_color'] = True
+                self.vis_quad.render(self.vis_prog)
 
-        # Render the UI components.
-        self.gui()
+            # FPS accounting.
+            self._past_frametimes[:-1] = self._past_frametimes[1:]
+            self._past_frametimes[-1] = frame_time
+
+            # Render the UI components.
+            self.gui()
 
     def streamable_capture(self):
         # Collect all streamable nodes
@@ -440,11 +451,6 @@ class Viewer(moderngl_window.WindowConfig):
                 clicked_export, selected_export = imgui.menu_item(
                     "Save as video..", None, False, True)
 
-                clicked_export360, _ = imgui.menu_item(
-                    "Save as 360 video..", None, False, enabled=isinstance(self.scene.camera, PinholeCamera))
-                if clicked_export360:
-                    self.to_360_deg_video()
-
                 clicked_screenshot, selected_screenshot = imgui.menu_item(
                     "Screenshot", self._shortcut_names[self._screenshot_key], False, True)
                 if clicked_screenshot:
@@ -502,22 +508,63 @@ class Viewer(moderngl_window.WindowConfig):
 
         if clicked_export:
             imgui.open_popup("Export Video")
+            self.toggle_animation(False)
+
+        imgui.set_next_window_size(530,0)
         if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
-            imgui.text("Enter Range for Video Export.")
-            rcu, animation_range = imgui.drag_int2('Range##range_control', *self.animation_range,
-                                                   min_value=0,  max_value=self.scene.n_frames-1)
-            if rcu:
-                self.animation_range[0] = max(animation_range[0], 0)
-                self.animation_range[1] = min(animation_range[-1], self.scene.n_frames-1)
-            _, self.video_as_gif = imgui.checkbox("GIF instead of MP4", self.video_as_gif)
+            if imgui.radio_button("Animation", self.export_animation):
+                self.export_animation = True
+            if imgui.radio_button("Single frame", not self.export_animation):
+                self.export_animation = False
             
+            if self.export_animation:
+                _, animation_range = imgui.drag_int2('Animation range', *self.export_animation_range, min_value=0,  max_value=self.scene.n_frames - 1)
+                if animation_range[0] != self.export_animation_range[0]:
+                    self.export_animation_range[0] = animation_range[0]
+                    self.export_animation_range[1] = max(animation_range[0], animation_range[1])
+                elif animation_range[-1] != self.export_animation_range[1]:
+                    self.export_animation_range[1] = animation_range[1]
+                    self.export_animation_range[0] = min(animation_range[0], animation_range[1])
+                
+                _, self.playback_fps = imgui.drag_float('Playback fps', self.playback_fps, 0.1,
+                                                         min_value=1.0, max_value=120.0, format='%.1f')
+            else:
+                _, self.scene.current_frame_id = imgui.slider_int('Frame', self.scene.current_frame_id,
+                                                                   min_value=0, max_value=self.scene.n_frames - 1)
+                _, self.export_duration = imgui.drag_float('Duration (s)', self.export_duration, min_value=0, change_speed=0.1, format='%.1f')
+
             if isinstance(self.scene.camera, PinholeCamera):
-                _, self.video_rotate = imgui.checkbox("Animate and rotate", self.video_rotate)
+                _, self.export_rotate_camera = imgui.checkbox("Rotate camera", self.export_rotate_camera)
             else:
                 imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
-                imgui.checkbox("Animate and rotate", False)
+                imgui.checkbox("Rotate camera (only available for PinholeCamera)", False)
                 imgui.pop_style_var(1)
 
+            if self.export_rotate_camera:
+                _, self.export_seconds_per_rotation = imgui.drag_float('Rotation time (s)', self.export_seconds_per_rotation, min_value=0, change_speed=0.1, format='%.1f')
+                imgui.same_line()
+                if imgui.button("Once"):
+                    if self.export_animation:
+                        self.export_seconds_per_rotation = (self.export_animation_range[1] - self.export_animation_range[0] + 1) / self.playback_fps
+                    else:
+                        self.export_seconds_per_rotation = self.export_duration
+            imgui.spacing()
+            imgui.separator()
+            imgui.spacing()
+            imgui.text("Output")
+            imgui.spacing()
+            if imgui.radio_button("MP4", not self.export_as_gif):
+                self.export_as_gif = False
+            if imgui.radio_button("GIF", self.export_as_gif):
+                self.export_as_gif = True
+
+            if self.export_as_gif:
+                max_output_fps = 30.0
+            else:
+                max_output_fps = 60.0
+            self.export_fps = min(self.export_fps, max_output_fps)
+            _, self.export_fps = imgui.drag_float('fps', self.export_fps, 0.1,
+                                                   min_value=1.0, max_value=max_output_fps, format='%.1f')
             
             imgui.spacing()
 
@@ -529,7 +576,7 @@ class Viewer(moderngl_window.WindowConfig):
             imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
             imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
 
-            if imgui.button("cancel", width=button_width):
+            if imgui.button("Cancel", width=button_width):
                 imgui.close_current_popup()
 
             imgui.pop_style_color()
@@ -537,11 +584,19 @@ class Viewer(moderngl_window.WindowConfig):
             imgui.pop_style_color()
 
             imgui.same_line()
-            if imgui.button("export", button_width):
+            if imgui.button("Export", button_width):
                 imgui.close_current_popup()
-                self.to_video(self.video_rotate)
+                self.export_video(
+                    os.path.join(C.export_dir, 'videos', self.window.title + ('.gif' if self.export_as_gif else '.mp4')),
+                    animation=self.export_animation,
+                    animation_range=self.export_animation_range,
+                    duration=self.export_duration,
+                    frame=self.scene.current_frame_id,
+                    output_fps=self.export_fps,
+                    rotate_camera=self.export_rotate_camera,
+                    seconds_per_rotation=self.export_seconds_per_rotation
+                )
 
-            self.prevent_background_interactions()
             imgui.end_popup()
 
     def gui_playback(self):
@@ -820,101 +875,93 @@ class Viewer(moderngl_window.WindowConfig):
         self.render_scene()
         self.save_current_frame_as_image(frame_dir, self.scene.current_frame_id)
 
-    def to_video(self, rotate=False):
-        """Render the loaded animations to video."""
-
-        if self.animation_range[-1] < self.animation_range[0]:
-            print("No frames rendered.")
-            return
-
-        if rotate and not isinstance(self.scene.camera, PinholeCamera):
+    def export_video(
+        self, 
+        output_path,
+        frame_dir=None,
+        animation=True,
+        animation_range=None,
+        duration=10.0,
+        frame=None,
+        output_fps=60.0,
+        rotate_camera=False,
+        seconds_per_rotation=10.0,
+        ):
+        if rotate_camera and not isinstance(self.scene.camera, PinholeCamera):
             print("Cannot export an animated video while using a camera that is not a PinholeCamera")
             return 
 
-        # Start all sequences from 0 but remember where we left off.
-        saved_curr_frame = self.scene.current_frame_id
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # If frame_dir is None use the temporary directory.
+            if frame_dir is None:
+                frame_dir = temp_dir
+            else:
+                # We want to avoid overriding anything in an existing directory, so add suffixes.
+                format_str = "{:0>4}"
+                counter = 0
+                candidate_dir = os.path.join(frame_dir, format_str.format(counter))
+                while os.path.exists(candidate_dir):
+                    counter += 1
+                    candidate_dir = os.path.join(frame_dir, format_str.format(counter))
+                frame_dir = os.path.abspath(candidate_dir)
 
-        # Create a temporary directory to render frames to.
-        frame_dir = tempfile.TemporaryDirectory().name
-        os.makedirs(frame_dir)
+                # The frame dir does not yet exist (we've made sure of it).
+                os.makedirs(frame_dir)
 
-        # Store the current camera and create a copy of if required
-        saved_camera = self.scene.camera
-        if rotate:
-            self.scene.camera = copy.deepcopy(self.scene.camera)
+            # Render each frame to an image file.
+            print("Saving frames to {}".format(frame_dir))
+        
+            # Store the current camera and create a copy of it if required.
+            saved_camera = self.scene.camera
+            if rotate_camera:
+                self.scene.camera = copy.deepcopy(self.scene.camera)
+            
+            # Remember viewer data.
+            saved_curr_frame = self.scene.current_frame_id
+            saved_run_animations = self.run_animations
+            
+            if animation:
+                if animation_range is None:
+                    animation_range = [0, self.scene.n_frames - 1]
 
-        az_delta = 2 * np.pi / (self.animation_range[-1]+1)
+                if animation_range[-1] < animation_range[0]:
+                    print("No frames rendered.")
+                    return
 
-        # Render each frame to an image file.
-        print("Saving frames to {}".format(frame_dir))
-        progress_bar = tqdm(total=self.animation_range[-1]-self.animation_range[0], desc='Rendering frames')
+                # Compute duration of the animation at given playback speed
+                animation_frames = (animation_range[-1] - animation_range[0]) + 1
+                duration = animation_frames / self.playback_fps
 
-        for i, f in enumerate(range(self.animation_range[0], self.animation_range[-1]+1)):
-            if rotate:
-                self.scene.camera.rotate_azimuth(az_delta)
+                # Setup viewer for rendering the animation
+                self.run_animations = True
+                self.scene.current_frame_id = animation_range[0]
+                self._last_frame_rendered_at = 0
+            else:
+                self.run_animations = False
+                self.scene.current_frame_id = frame
 
-            self.scene.current_frame_id = f
-            self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
-            self.render_shadowmap()
-            self.render_prepare()
-            self.render_scene()
-            self.save_current_frame_as_image(frame_dir, i)
-            progress_bar.update()
-        progress_bar.close()
+            frames = int(np.ceil(duration * output_fps))
+            dt = 1 / output_fps
+            time = 0
 
-        # Export to video.
-        suffix = '.gif' if self.video_as_gif else '.mp4'
-        images_to_video(frame_dir, C.export_dir + '/videos/' + self.window.title + suffix, input_fps=self.playback_fps,
-                        output_fps=60)
+            # Compute camera speed.
+            az_delta = 2 * np.pi / seconds_per_rotation * (duration / frames)
+            for i in tqdm(range(frames), desc='Rendering frames'):
+                if rotate_camera:
+                    self.scene.camera.rotate_azimuth(az_delta)
 
-        # Remove temp frames.
-        shutil.rmtree(frame_dir)
+                self.render(time, time + dt, export=True)
+                self.save_current_frame_as_image(frame_dir, i)
 
-        # Reset frame IDs.
-        self.scene.current_frame_id = saved_curr_frame
-        self.scene.camera = saved_camera
+                time += dt
+                
+            # Export to video.
+            images_to_video(frame_dir, output_path, input_fps=output_fps, output_fps=output_fps)
+            
+            # Reset viewer data.
+            self.scene.camera = saved_camera
+            self.scene.current_frame_id = saved_curr_frame
+            self.run_animations = saved_run_animations
+            self._last_frame_rendered_at = self.timer.time
 
-        print("Done.")
-
-    def to_360_deg_video(self):
-        """Matrix shot. Keeps the look-at point fixed and rotates the camera around it."""
-        if not isinstance(self.scene.camera, PinholeCamera):
-            print("Cannot export a 360 video while using a camera that is not a PinholeCamera")
-            return
-
-        n_frames = 360
-        saved_camera = copy.deepcopy(self.scene.camera)
-
-        angles = -np.arange(0, 2*np.pi, 2*np.pi/n_frames)
-        cam_centered = self.scene.camera.position - self.scene.camera.target
-        new_x = cam_centered[0] * np.cos(angles) - cam_centered[2] * np.sin(angles) + self.scene.camera.target[0]
-        new_z = cam_centered[0] * np.sin(angles) + cam_centered[2] * np.cos(angles) + self.scene.camera.target[2]
-        circle = np.stack([new_x, np.zeros_like(new_x) + self.scene.camera.position[1], new_z]).T
-
-        # Create a temporary directory to render frames to.
-        frame_dir = tempfile.TemporaryDirectory().name
-        os.makedirs(frame_dir)
-
-        # Render each frame to an image file.
-        print("Saving frames to {}".format(frame_dir))
-        progress_bar = tqdm(total=n_frames, desc='Rendering frames')
-        for f in range(circle.shape[0]):
-            self.scene.camera.position = circle[f]
-            self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
-            self.render_shadowmap()
-            self.render_prepare()
-            self.render_scene()
-            self.save_current_frame_as_image(frame_dir, f)
-            progress_bar.update()
-        progress_bar.close()
-
-        # Export to video.
-        images_to_video(frame_dir, C.export_dir + '/videos/' + self.window.title + '_360deg.mp4')
-
-        # Remove temp frames.
-        shutil.rmtree(frame_dir)
-
-        # Reset Camera.
-        self.scene.camera = saved_camera
-
-        print("Done.")
+            print("Done.")

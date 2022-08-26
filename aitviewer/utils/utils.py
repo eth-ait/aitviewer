@@ -87,8 +87,7 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
                    '-loglevel', 'panic',
                    '-i', os.path.join(frame_dir, frame_format),
                    '-y',
-                   '-filter_complex', "[0:v] fps=15,scale=w=1080:h=-1,split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1",
-                   '-r', str(output_fps),
+                   '-filter_complex', f"[0:v] fps={output_fps},split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
                    video_path_candidate]
     else:
         print("Unknown video format, only '.mp4' or '.gif' is supported.")
