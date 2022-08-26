@@ -96,7 +96,7 @@ class Billboard(Node):
 
     @classmethod
     def from_camera_and_distance(cls, camera: Camera, distance: float, cols: int, rows: int,
-                                 texture_paths: List[str]):
+                                 texture_paths: List[str], image_process_fn=None):
         """
         Initialize a Billboard from a camera object, a distance from the camera, the size of the image in
         pixels and the set of images.
@@ -139,14 +139,13 @@ class Billboard(Node):
 
         camera.current_frame_id = frame_id
 
-        if isinstance(camera, OpenCVCamera) and (camera.dist_coeffs is not None):
-            def undistort(img):
-                return cv2.undistort(img, camera.K, camera.dist_coeffs)
-            img_process_fn = undistort
-        else:
-            img_process_fn = None
+        if image_process_fn is None:
+            if isinstance(camera, OpenCVCamera) and (camera.dist_coeffs is not None):
+                def undistort(img):
+                    return cv2.undistort(img, camera.K, camera.dist_coeffs)
+                image_process_fn = undistort
 
-        return cls(all_corners, texture_paths, img_process_fn)
+        return cls(all_corners, texture_paths, image_process_fn)
 
     # noinspection PyAttributeOutsideInit
     @Node.once
