@@ -184,9 +184,6 @@ class MultiViewSystem(Node):
         u_cameras, self.show_cameras = imgui.checkbox("Show cameras", self.show_cameras)
         if u_cameras:
             self.update_cameras()
-
-    def capture_selection(self, node, tri_id):
-        return False
     
     # Disable outline rendering for this node and its children
     def render_outline(self, ctx, camera, prog):

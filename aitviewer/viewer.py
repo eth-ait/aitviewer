@@ -639,17 +639,12 @@ class Viewer(moderngl_window.WindowConfig):
         if mmi is not None:
             node = mmi.node
 
-            # Collect all ancestors of the clicked node.
-            nodes = [node]
+            # Traverse all parents until one is found that is selectable
             while node.parent is not None:
-                nodes.append(node)
-                node = node.parent
-            
-            # Traverse ancestors top down until one captures the selection.
-            for n in reversed(nodes):
-                if n.capture_selection(mmi.node, mmi.tri_id):
-                    self.scene.select(n)
+                if node.is_selectable:
+                    self.scene.select(node, mmi.node, mmi.tri_id)
                     return True
+                node = node.parent
         
         return False
 
@@ -754,7 +749,7 @@ class Viewer(moderngl_window.WindowConfig):
                 if not self.select_object(x, y):
                     # If selection is enabled and nothing was selected clear the previous selection
                     if not self.lock_selection:
-                        self.scene.selected_object = None
+                        self.scene.select(None)
 
     def mouse_release_event(self, x: int, y: int, button: int):
         self.imgui.mouse_release_event(x, y, button)

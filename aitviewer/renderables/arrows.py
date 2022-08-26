@@ -60,9 +60,9 @@ class Arrows(Node):
         # Nodes
         self.material.color = color
         self.bases_r = Lines(lines=self.get_line_coords(self.origins, self.mid_points), mode='lines', r_base=r_base,
-                             color=color, cast_shadow=False)
+                             color=color, cast_shadow=False, is_selectable=False)
         self.arrows_r = Lines(lines=self.get_line_coords(self.mid_points, self.tips), mode='lines', r_base=r_head,
-                              r_tip=0.0, color=color, cast_shadow=False)
+                              r_tip=0.0, color=color, cast_shadow=False, is_selectable=False)
 
         self._add_nodes(self.bases_r, self.arrows_r, show_in_hierarchy=False)
 

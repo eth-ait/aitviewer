@@ -202,9 +202,11 @@ class Scene(Node):
                 return n
         return None
     
-    def select(self, obj):
+    def select(self, obj, selected_node=None, selected_tri_id=None):
         """Set 'obj' as the selected object"""
         self.selected_object = obj
+        if isinstance(obj, Node):
+            self.selected_object.on_selection(selected_node, selected_tri_id)
 
     def is_selected(self, obj):
         """Returns true if obj is currently selected"""
@@ -333,8 +335,3 @@ class Scene(Node):
         for n in ns:
             n_frames = max(n_frames, n.n_frames)
         return n_frames
-
-    def capture_selection(self, node, tri_id):
-        # The scene is the common ancestors of all nodes, therefore it should 
-        # never be selected when a descendant is clicked.
-        return False
