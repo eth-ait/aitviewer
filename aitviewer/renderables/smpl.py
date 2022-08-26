@@ -354,6 +354,9 @@ class SMPLSequence(Node):
         super().redraw()
 
     def set_edit_mode(self, enabled):
+        if enabled == self.edit_mode:
+            return
+            
         if not enabled:
             self.edit_mode = False
 
