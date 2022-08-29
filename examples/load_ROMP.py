@@ -56,7 +56,7 @@ if __name__ == '__main__':
                              betas=results['smpl_betas'],
                              color=(0.0, 106 / 255, 139 / 255, 1.0),
                              name='ROMP Estimate',
-                             rotation=aa2rot_numpy(np.array([1, 0, 0]) * np.pi) if USE_WEAK_PERSPECTIVE_CAMERA else None)
+                             rotation=aa2rot_numpy(np.array([1, 0, 0]) * np.pi))
 
     # Instantiate the viewer.
     viewer = Viewer(size=(cols, cols if USE_WEAK_PERSPECTIVE_CAMERA else rows))
@@ -89,6 +89,8 @@ if __name__ == '__main__':
         input_img = cv2.imread(img_path)
         cam_intrinsics = np.array([[focal_length, 0., cols / 2], [0., focal_length, rows / 2], [0., 0., 1.]])
         cam_extrinsics = np.eye(4)
+        # The OpenCVCamera class expects extrinsics with Y pointing down, so we flip both Y and Z axis to keep a positive determinant.
+        cam_extrinsics[:, 1:3] *= -1.0
 
         # Tranform to perspective projection as suggested in the Github issue.
         tra_pred = estimate_translation_cv2(results['joints'][0], results['pj2d_org'][0], proj_mat=cam_intrinsics)
