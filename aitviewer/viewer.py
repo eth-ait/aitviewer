@@ -142,6 +142,7 @@ class Viewer(moderngl_window.WindowConfig):
             'menu': self.gui_menu,
             'scene': self.gui_scene,
             'playback': self.gui_playback,
+            'inspect': self.gui_inspect,
             'exit': self.gui_exit,
         }
 
@@ -162,6 +163,9 @@ class Viewer(moderngl_window.WindowConfig):
         self._using_temp_camera = False
         self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
+
+        # Mouse mesh intersection in inspect mode.
+        self.mmi = None
 
         # Mouse selection
         self._selection_move_threshold = 3
@@ -195,6 +199,8 @@ class Viewer(moderngl_window.WindowConfig):
         self._flat_shading_key = self.wnd.keys.F
         self._draw_edges_key = self.wnd.keys.E
         self._lock_selection_key = self.wnd.keys.K
+        self._mode_inspect_key = self.wnd.keys.I
+        self._mode_view_key = self.wnd.keys.V
         self._shortcut_names = {self.wnd.keys.SPACE: "Space",
                                 self.wnd.keys.C: "C",
                                 self.wnd.keys.D: "D",
@@ -632,6 +638,18 @@ class Viewer(moderngl_window.WindowConfig):
         self.prevent_background_interactions()
         imgui.end()
 
+    def gui_inspect(self):
+        """GUI to control playback settings."""
+        if self.selected_mode == 'inspect':
+            imgui.begin("Inspect", True)
+
+            if self.mmi is not None:
+                for k, v in zip(self.mmi._fields, self.mmi):
+                    imgui.text("{}: {}".format(k, v))
+
+            self.prevent_background_interactions()
+            imgui.end()
+
     def gui_exit(self):
         if self._exit_popup_open:    
             imgui.open_popup("Exit##exit-popup")
@@ -752,6 +770,12 @@ class Viewer(moderngl_window.WindowConfig):
                     self.reset_camera()
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
 
+            elif key == self._mode_view_key:
+                self.selected_mode = 'view'
+
+            elif key == self._mode_inspect_key:
+                self.selected_mode = 'inspect'
+
             elif key == self._dark_mode_key:
                 self.dark_mode = not self.dark_mode
                 self.scene.set_lights(self.dark_mode)
@@ -788,6 +812,9 @@ class Viewer(moderngl_window.WindowConfig):
 
     def mouse_position_event(self, x, y, dx, dy):
         self.imgui.mouse_position_event(x, y, dx, dy)
+
+        if self.selected_mode == 'inspect':
+            self.mmi = self.mesh_mouse_intersection(x, y)
 
     def mouse_press_event(self, x: int, y: int, button: int):
         self.imgui.mouse_press_event(x, y, button)

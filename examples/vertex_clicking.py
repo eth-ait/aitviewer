@@ -45,7 +45,7 @@ class ClickingViewer(Viewer):
         self.scene.add(ms)
 
     def mouse_press_event(self, x: int, y: int, button: int):
-        if not self.imgui_user_interacting and self.wnd.modifiers.ctrl:
+        if not self.imgui_user_interacting and self.selected_mode == 'inspect':
             result = self.mesh_mouse_intersection(x, y)
             if result is not None:
                 self.interact_with_sequence(result, button)
