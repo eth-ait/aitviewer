@@ -71,7 +71,7 @@ class MultiViewSystem(Node):
             extrinsics = camera_info['extrinsics'][i]
             dist_coeffs = camera_info['dist_coeffs'][i]
 
-            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs, viewer=viewer)
+            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs, viewer=viewer, is_selectable=False)
             self.add(camera, show_in_hierarchy=False)
             self.cameras.append(camera)
 
@@ -184,6 +184,47 @@ class MultiViewSystem(Node):
         u_cameras, self.show_cameras = imgui.checkbox("Show cameras", self.show_cameras)
         if u_cameras:
             self.update_cameras()
+    
+    def gui_context_menu(self, imgui):
+        imgui.text(f"Camera {self.camera_info['ids'][self.selected_camera_index]}")
+
+        imgui.separator()
+        _, s = imgui.menu_item(f"Activate camera", selected=self.active_camera_index == self.selected_camera_index)
+        if s and self.active_camera_index != self.selected_camera_index:
+            self.set_active_camera(self.selected_camera_index)
+            self.update_billboard()
+            self.update_frustum()
+                
+        _, v = imgui.menu_item(f"View from camera")
+        if v:
+            self.set_active_camera(self.selected_camera_index)
+            self.update_billboard()
+            self.update_frustum()
+            self.view_from_active_camera()
+        
+        imgui.spacing()
+        imgui.spacing()
+        imgui.text(f"{self.name}")
+        imgui.separator()
+        
+        u_billboard, self.show_billboard = imgui.checkbox("Show billboard", self.show_billboard)    
+        if u_billboard:
+            self.update_billboard()
+
+        u_frustum, self.show_frustum = imgui.checkbox("Show frustum", self.show_frustum)    
+        if u_frustum:
+            self.update_frustum()
+        
+        u_cameras, self.show_cameras = imgui.checkbox("Show cameras", self.show_cameras)
+        if u_cameras:
+            self.update_cameras()
+            
+        
+    def on_selection(self, node, tri_id):
+        for idx, c in enumerate(self.cameras):
+            if node in c.nodes:
+                self.selected_camera_index = idx
+                break
     
     # Disable outline rendering for this node and its children
     def render_outline(self, ctx, camera, prog):
