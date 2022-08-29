@@ -509,12 +509,6 @@ class Viewer(moderngl_window.WindowConfig):
 
                 imgui.end_menu()
                 
-            if imgui.begin_menu("Debug", True):
-                _, self.visualize = imgui.menu_item("Visualize debug texture", self._shortcut_names[self._visualize_key], 
-                                                    self.visualize, True)
-
-                imgui.end_menu()
-
             if imgui.begin_menu("Mode", True):
                 for id, mode in self.modes.items():
                     mode_clicked, _ = imgui.menu_item(mode['title'], mode['shortcut'], id == self.selected_mode, True)
@@ -522,6 +516,13 @@ class Viewer(moderngl_window.WindowConfig):
                         self.selected_mode = id
 
                 imgui.end_menu()
+
+            if imgui.begin_menu("Debug", True):
+                _, self.visualize = imgui.menu_item("Visualize debug texture", self._shortcut_names[self._visualize_key], 
+                                                    self.visualize, True)
+
+                imgui.end_menu()
+
             imgui.end_main_menu_bar()
 
         if clicked_export:
@@ -836,9 +837,11 @@ class Viewer(moderngl_window.WindowConfig):
             # Rotate camera on left click.
             if button == self._left_mouse_button:
                 self._rotate_camera = True
+                self._pan_camera = False
             
             if button == self._right_mouse_button:
                 self._pan_camera = True
+                self._rotate_camera = False
 
             self._mouse_down_position = np.array([x, y])
             self._mouse_moved = False
@@ -846,13 +849,8 @@ class Viewer(moderngl_window.WindowConfig):
     def mouse_release_event(self, x: int, y: int, button: int):
         self.imgui.mouse_release_event(x, y, button)
 
-        if button == self._middle_mouse_button:
-            self._pan_camera = False
-            self._rotate_camera = False
-
-        if button == self._left_mouse_button:
-            self._pan_camera = False
-            self._rotate_camera = False
+        self._pan_camera = False
+        self._rotate_camera = False
 
         if not self.imgui_user_interacting:
             # Select the mesh under the cursor on left click.
