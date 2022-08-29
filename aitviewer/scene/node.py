@@ -463,7 +463,7 @@ class Node(object):
     
     def on_selection(self, node, tri_id):
         """
-        Called when the node is selcted
+        Called when the node is selected
 
         :param node:  the node which was clicked (can be None if the selection wasn't a mouse event)
         :param tri_id: the id of the triangle that was clicked from the 'node' mesh 

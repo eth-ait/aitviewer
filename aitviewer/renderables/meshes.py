@@ -453,9 +453,9 @@ class Meshes(Node):
                                               self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
                                                self.norm_coloring)                                       
-        _, self.flat_shading = imgui.checkbox('Flat shading##flat_shading{}'.format(self.unique_name),
+        _, self.flat_shading = imgui.checkbox('Flat shading [F]##flat_shading{}'.format(self.unique_name),
                                                self.flat_shading)
-        _, self.draw_edges = imgui.checkbox('Draw edges##draw_edges{}'.format(self.unique_name),
+        _, self.draw_edges = imgui.checkbox('Draw edges [E]##draw_edges{}'.format(self.unique_name),
                                                self.draw_edges)
 
         # TODO: Add  export workflow for all nodes
@@ -787,8 +787,8 @@ class VariableTopologyMeshes(Node):
 
         _, self.show_texture  = imgui.checkbox('Render Texture', self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring', self.norm_coloring)
-        _, self.flat_shading = imgui.checkbox('Flat shading', self.flat_shading)
-        _, self.draw_edges = imgui.checkbox('Draw edges', self.draw_edges)
+        _, self.flat_shading = imgui.checkbox('Flat shading [F]', self.flat_shading)
+        _, self.draw_edges = imgui.checkbox('Draw edges [E]', self.draw_edges)
 
         if show_advanced:
             if imgui.tree_node("Advanced material##advanced_material{}'".format(self.unique_name)):

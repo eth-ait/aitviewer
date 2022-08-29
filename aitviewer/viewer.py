@@ -168,7 +168,8 @@ class Viewer(moderngl_window.WindowConfig):
         self.mmi = None
 
         # Mouse selection
-        self._selection_move_threshold = 3
+        self._move_threshold = 3
+        self._mouse_moved = False
         self._mouse_down_position = np.array([0, 0])
 
         # Export settings
@@ -414,7 +415,8 @@ class Viewer(moderngl_window.WindowConfig):
         
         # Create a context menu when right clicking on the background.
         if (not any([imgui.is_window_hovered(), imgui.is_any_item_hovered()]) 
-            and imgui.is_mouse_clicked(button=1)):
+            and imgui.is_mouse_released(button=1)
+            and not self._mouse_moved):
             # Select the object under the cursor
             if self.select_object(*imgui.get_io().mouse_pos) and hasattr(self.scene.selected_object, 'gui_context_menu'):
                 imgui.open_popup("Context Menu")
@@ -473,6 +475,13 @@ class Viewer(moderngl_window.WindowConfig):
                                                           self.shadows_enabled, True)
                 _, self.dark_mode = imgui.menu_item("Dark Mode", self._shortcut_names[self._dark_mode_key],
                                                     self.dark_mode, True)
+
+                _, self.lock_selection = imgui.menu_item("Lock selection", self._shortcut_names[self._lock_selection_key], 
+                                                         self.lock_selection, True)
+                
+                imgui.end_menu()
+            
+            if imgui.begin_menu("Camera", True):
                 _, self.show_camera_target = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
                                                     self.show_camera_target, True)
 
@@ -494,17 +503,16 @@ class Viewer(moderngl_window.WindowConfig):
                 clicked_load_cam, selected_load_cam = imgui.menu_item("Load Camera",
                                                                 self._shortcut_names[self._load_cam_key],
                                                                 False, True)
-
                 if clicked_load_cam:
                     self.reset_camera()
                     self.scene.camera.load_cam()
 
-                _, self.lock_selection = imgui.menu_item("Lock selection", self._shortcut_names[self._lock_selection_key], 
-                                                         self.lock_selection, True)
+                imgui.end_menu()
                 
+            if imgui.begin_menu("Debug", True):
                 _, self.visualize = imgui.menu_item("Visualize debug texture", self._shortcut_names[self._visualize_key], 
                                                     self.visualize, True)
-                
+
                 imgui.end_menu()
 
             if imgui.begin_menu("Mode", True):
@@ -822,21 +830,25 @@ class Viewer(moderngl_window.WindowConfig):
         if not self.imgui_user_interacting:
             # Pan or rotate camera on middle click.
             if button == self._middle_mouse_button:
+                self._pan_camera = self.wnd.modifiers.shift
+                self._rotate_camera = not self.wnd.modifiers.shift
+
+            # Rotate camera on left click.
+            if button == self._left_mouse_button:
+                self._rotate_camera = True
+            
+            if button == self._right_mouse_button:
                 self._pan_camera = True
 
-            if button == self._left_mouse_button:
-                if self.wnd.modifiers.ctrl:
-                    self._pan_camera = True
-                else:
-                    self._rotate_camera = True
-            
-            self._mouse_down_position = np.array([x, y])    
+            self._mouse_down_position = np.array([x, y])
+            self._mouse_moved = False
 
     def mouse_release_event(self, x: int, y: int, button: int):
         self.imgui.mouse_release_event(x, y, button)
 
         if button == self._middle_mouse_button:
             self._pan_camera = False
+            self._rotate_camera = False
 
         if button == self._left_mouse_button:
             self._pan_camera = False
@@ -844,7 +856,7 @@ class Viewer(moderngl_window.WindowConfig):
 
         if not self.imgui_user_interacting:
             # Select the mesh under the cursor on left click.
-            if button == self._left_mouse_button and np.linalg.norm(np.array([x, y]) - self._mouse_down_position) <= self._selection_move_threshold:
+            if button == self._left_mouse_button and not self._mouse_moved:
                 if not self.select_object(x, y):
                     # If selection is enabled and nothing was selected clear the previous selection
                     if not self.lock_selection:
@@ -863,6 +875,9 @@ class Viewer(moderngl_window.WindowConfig):
                 if self._using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.rotate_azimuth_elevation(dx, dy)
+            
+            if not self._mouse_moved and np.linalg.norm(np.array([x, y]) - self._mouse_down_position) > self._move_threshold:
+                self._mouse_moved = True
 
     def mouse_scroll_event(self, x_offset: float, y_offset: float):
         self.imgui.mouse_scroll_event(x_offset, y_offset)
@@ -870,7 +885,7 @@ class Viewer(moderngl_window.WindowConfig):
         if not self.imgui_user_interacting:
             if self._using_temp_camera:
                 self.reset_camera()
-            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.ctrl)
+            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift)
 
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
