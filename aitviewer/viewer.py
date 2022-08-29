@@ -163,6 +163,10 @@ class Viewer(moderngl_window.WindowConfig):
         self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
 
+        # Mouse selection
+        self._selection_move_threshold = 3
+        self._mouse_down_position = np.array([0, 0])
+
         # Export settings
         self.export_animation = True
         self.export_animation_range = [0, -1]
@@ -799,12 +803,7 @@ class Viewer(moderngl_window.WindowConfig):
                 else:
                     self._rotate_camera = True
             
-            # Select the mesh under the cursor on left click.
-            if button == self._left_mouse_button:
-                if not self.select_object(x, y):
-                    # If selection is enabled and nothing was selected clear the previous selection
-                    if not self.lock_selection:
-                        self.scene.select(None)
+            self._mouse_down_position = np.array([x, y])    
 
     def mouse_release_event(self, x: int, y: int, button: int):
         self.imgui.mouse_release_event(x, y, button)
@@ -815,6 +814,14 @@ class Viewer(moderngl_window.WindowConfig):
         if button == self._left_mouse_button:
             self._pan_camera = False
             self._rotate_camera = False
+
+        if not self.imgui_user_interacting:
+            # Select the mesh under the cursor on left click.
+            if button == self._left_mouse_button and np.linalg.norm(np.array([x, y]) - self._mouse_down_position) <= self._selection_move_threshold:
+                if not self.select_object(x, y):
+                    # If selection is enabled and nothing was selected clear the previous selection
+                    if not self.lock_selection:
+                        self.scene.select(None)
 
     def mouse_drag_event(self, x: int, y: int, dx: int, dy: int):
         self.imgui.mouse_drag_event(x, y, dx, dy)
