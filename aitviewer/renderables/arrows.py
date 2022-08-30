@@ -67,6 +67,22 @@ class Arrows(Node):
         self._add_nodes(self.bases_r, self.arrows_r, show_in_hierarchy=False)
 
     @property
+    def current_origins(self):
+        return self.origins[self.current_frame_id]
+    
+    @current_origins.setter
+    def current_origins(self, origins):
+        self.origins[self.current_frame_id] = origins
+
+    @property
+    def current_tips(self):
+        return self.tips[self.current_frame_id]
+    
+    @current_origins.setter
+    def current_tips(self, tips):
+        self.tips[self.current_frame_id] = tips
+    
+    @property
     def mid_points(self):
         return self.origins + (self.tips - self.origins) * (1 - self.p)
 

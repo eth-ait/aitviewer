@@ -121,14 +121,23 @@ class Spheres(Node):
     def vertex_colors(self, vertex_colors):
         self.mesh.vertex_colors = vertex_colors
 
+    @property
+    def current_sphere_positions(self):
+        return self.sphere_positions[self.current_frame_id]
+    
+    @current_sphere_positions.setter
+    def current_sphere_positions(self, positions):
+        assert len(positions.shape) == 2
+        self.sphere_positions[self.current_frame_id] = positions
+
     def on_frame_update(self):  
         self.redraw()
     
-    def redraw(self):
+    def redraw(self, **kwargs):
         current_pos = self.sphere_positions[self.current_frame_id]
         vertices = np.reshape(self.sphere_vertices, [-1, self.n_vertices, 3]) * self.radius + current_pos[:, np.newaxis]
         self.mesh._vertices =np.reshape(vertices, [-1, 3])[np.newaxis]
-        self.mesh.redraw()
+        super().redraw(**kwargs)
 
     @Node.once
     def make_renderable(self, ctx):

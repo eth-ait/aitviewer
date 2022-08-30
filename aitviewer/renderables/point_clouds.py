@@ -111,7 +111,7 @@ class PointClouds(Node):
         super().on_frame_update()
         self.redraw()
 
-    def redraw(self):
+    def redraw(self, **kwargs):
         """Upload the current frame data to the GPU for rendering."""
         if not self.is_renderable:
             return

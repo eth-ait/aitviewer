@@ -181,6 +181,7 @@ class Node(object):
     def current_frame_id(self, frame_id):
         if self.n_frames == 1 or frame_id == self._current_frame_id:
             return
+        self.on_before_frame_update()
         if frame_id < 0:
             self._current_frame_id = 0
         elif frame_id >= len(self):
@@ -194,6 +195,9 @@ class Node(object):
 
     def previous_frame(self):
         self.current_frame_id = self.current_frame_id - 1 if self.current_frame_id > 0 else len(self) - 1
+
+    def on_before_frame_update(self):
+        pass
 
     def on_frame_update(self):
         for n in self.nodes:
@@ -359,7 +363,7 @@ class Node(object):
     def redraw(self, **kwargs):
         """ Perform update and redraw operations. Push to the GPU when finished. Recursively redraw child nodes"""
         for n in self.nodes:
-            n.redraw()
+            n.redraw(**kwargs)
 
     def set_camera_matrices(self, prog, camera, **kwargs):
         """Set the model view projection matrix in the given program."""
