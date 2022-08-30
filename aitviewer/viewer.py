@@ -180,6 +180,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_rotate_camera = False
         self.export_seconds_per_rotation = 10
         self.export_fps = 30
+        self.export_downscale_factor = 1.0
         
         # Key Shortcuts
         self._exit_key = self.wnd.keys.ESCAPE
@@ -531,13 +532,22 @@ class Viewer(moderngl_window.WindowConfig):
 
         imgui.set_next_window_size(530,0)
         if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
+            if self.scene.n_frames == 1:
+                imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
+                self.export_animation = False
+
             if imgui.radio_button("Animation", self.export_animation):
                 self.export_animation = True
-            if imgui.radio_button("Single frame", not self.export_animation):
+
+            if self.scene.n_frames == 1:
+                imgui.pop_style_var()
+                self.export_animation = False
+
+            if imgui.radio_button("360 shot", not self.export_animation):
                 self.export_animation = False
             
             if self.export_animation:
-                _, animation_range = imgui.drag_int2('Animation range', *self.export_animation_range, min_value=0,  max_value=self.scene.n_frames - 1)
+                _, animation_range = imgui.drag_int2('Animation range', *self.export_animation_range, min_value=0, max_value=self.scene.n_frames - 1)
                 if animation_range[0] != self.export_animation_range[0]:
                     self.export_animation_range[0] = animation_range[0]
                     self.export_animation_range[1] = max(animation_range[0], animation_range[1])
@@ -550,26 +560,30 @@ class Viewer(moderngl_window.WindowConfig):
             else:
                 _, self.scene.current_frame_id = imgui.slider_int('Frame', self.scene.current_frame_id,
                                                                    min_value=0, max_value=self.scene.n_frames - 1)
-                _, self.export_duration = imgui.drag_float('Duration (s)', self.export_duration, min_value=0, change_speed=0.1, format='%.1f')
+                _, self.export_duration = imgui.drag_float('Duration (s)', self.export_duration, min_value=0.1, max_value=10000.0, change_speed=0.05, format='%.1f')
 
-            if isinstance(self.scene.camera, PinholeCamera):
-                _, self.export_rotate_camera = imgui.checkbox("Rotate camera", self.export_rotate_camera)
-            else:
-                imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
-                imgui.checkbox("Rotate camera (only available for PinholeCamera)", False)
-                imgui.pop_style_var(1)
+            if self.export_animation:
+                if isinstance(self.scene.camera, PinholeCamera):
+                    _, self.export_rotate_camera = imgui.checkbox("Rotate camera", self.export_rotate_camera)
+                else:
+                    imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
+                    imgui.checkbox("Rotate camera (only available for PinholeCamera)", False)
+                    imgui.pop_style_var(1)
 
-            if self.export_rotate_camera:
-                _, self.export_seconds_per_rotation = imgui.drag_float('Rotation time (s)', self.export_seconds_per_rotation, min_value=0, change_speed=0.1, format='%.1f')
+            if not self.export_animation or self.export_rotate_camera:
+                _, self.export_seconds_per_rotation = imgui.drag_float('Rotation time (s)', self.export_seconds_per_rotation, min_value=0.1, max_value=10000.0, change_speed=0.05, format='%.1f')
                 imgui.same_line()
                 if imgui.button("Once"):
                     if self.export_animation:
                         self.export_seconds_per_rotation = (self.export_animation_range[1] - self.export_animation_range[0] + 1) / self.playback_fps
                     else:
                         self.export_seconds_per_rotation = self.export_duration
+            
             imgui.spacing()
             imgui.separator()
             imgui.spacing()
+
+            # Output settings.
             imgui.text("Output")
             imgui.spacing()
             if imgui.radio_button("MP4", not self.export_as_gif):
@@ -583,13 +597,32 @@ class Viewer(moderngl_window.WindowConfig):
                 max_output_fps = 60.0
             self.export_fps = min(self.export_fps, max_output_fps)
             _, self.export_fps = imgui.drag_float('fps', self.export_fps, 0.1,
-                                                   min_value=1.0, max_value=max_output_fps, format='%.1f')
+                                                min_value=1.0, max_value=max_output_fps, format='%.1f')
+            
+            if self.export_animation:
+                imgui.same_line(spacing=23)
+                if imgui.button("Use playback fps"):
+                    self.export_fps = self.playback_fps
+            
+            imgui.spacing()
+            imgui.text(f"Output resolution: [{int(self.window_size[0] / self.export_downscale_factor)}]x[{int(self.window_size[1] / self.export_downscale_factor)}]")
+            _, self.export_downscale_factor = imgui.drag_float('Downscale', self.export_downscale_factor, min_value=1.0, max_value=100.0, change_speed=0.05, format='%.1f')
+            
+            imgui.same_line(spacing=20)
+            if imgui.button("1x"):
+                self.export_downscale_factor = 1.0
+            imgui.same_line()
+            if imgui.button("2x"):
+                self.export_downscale_factor = 2.0
+            imgui.same_line()
+            if imgui.button("4x"):
+                self.export_downscale_factor = 4.0
             
             imgui.spacing()
 
             # Draw a cancel and exit button on the same line using the available space
             button_width = (imgui.get_content_region_available()[0] - imgui.get_style().item_spacing[0]) * 0.5
-            
+
             # Style the cancel with a grey color
             imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
             imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
@@ -612,8 +645,9 @@ class Viewer(moderngl_window.WindowConfig):
                     duration=self.export_duration,
                     frame=self.scene.current_frame_id,
                     output_fps=self.export_fps,
-                    rotate_camera=self.export_rotate_camera,
-                    seconds_per_rotation=self.export_seconds_per_rotation
+                    rotate_camera=not self.export_animation or self.export_rotate_camera,
+                    seconds_per_rotation=self.export_seconds_per_rotation,
+                    downscale_factor=self.export_downscale_factor
                 )
 
             imgui.end_popup()
@@ -888,10 +922,14 @@ class Viewer(moderngl_window.WindowConfig):
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
 
-    def save_current_frame_as_image(self, frame_dir, frame_id):
+    def save_current_frame_as_image(self, frame_dir, frame_id, downscale_factor=None):
         """Saves the current frame as an image to disk."""
         image = self.get_current_frame_as_image()
         image_name = os.path.join(frame_dir, 'frame_{:0>6}.png'.format(frame_id))
+        if downscale_factor is not None and downscale_factor != 1.0:
+            w = int(image.width / downscale_factor)
+            h = int(image.height / downscale_factor)
+            image = image.resize((w, h), Image.LANCZOS)
         image.save(image_name)
 
     def get_current_frame_as_image(self):
@@ -933,10 +971,12 @@ class Viewer(moderngl_window.WindowConfig):
         output_fps=60.0,
         rotate_camera=False,
         seconds_per_rotation=10.0,
+        downscale_factor=None,
         ):
         if rotate_camera and not isinstance(self.scene.camera, PinholeCamera):
             print("Cannot export an animated video while using a camera that is not a PinholeCamera")
             return 
+        
 
         with tempfile.TemporaryDirectory() as temp_dir:
             # If frame_dir is None use the temporary directory.
@@ -971,12 +1011,12 @@ class Viewer(moderngl_window.WindowConfig):
                 if animation_range is None:
                     animation_range = [0, self.scene.n_frames - 1]
 
-                if animation_range[-1] < animation_range[0]:
+                if animation_range[1] < animation_range[0]:
                     print("No frames rendered.")
                     return
 
                 # Compute duration of the animation at given playback speed
-                animation_frames = (animation_range[-1] - animation_range[0]) + 1
+                animation_frames = (animation_range[1] - animation_range[0]) + 1
                 duration = animation_frames / self.playback_fps
 
                 # Setup viewer for rendering the animation
@@ -987,7 +1027,15 @@ class Viewer(moderngl_window.WindowConfig):
                 self.run_animations = False
                 self.scene.current_frame_id = frame
 
-            frames = int(np.ceil(duration * output_fps))
+            # Compute exact number of frames if we have the same playback and output fps
+            if animation and abs(self.playback_fps - output_fps) < 0.1:
+                frames = (animation_range[1] - animation_range[0]) + 1
+                self.run_animations = False
+                exact_playback = True
+            else:
+                frames = int(np.ceil(duration * output_fps))
+                exact_playback = False
+
             dt = 1 / output_fps
             time = 0
 
@@ -998,7 +1046,10 @@ class Viewer(moderngl_window.WindowConfig):
                     self.scene.camera.rotate_azimuth(az_delta)
 
                 self.render(time, time + dt, export=True)
-                self.save_current_frame_as_image(frame_dir, i)
+                self.save_current_frame_as_image(frame_dir, i, downscale_factor=downscale_factor)
+
+                if exact_playback:
+                    self.scene.next_frame()
 
                 time += dt
                 
