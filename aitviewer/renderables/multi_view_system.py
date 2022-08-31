@@ -186,6 +186,9 @@ class MultiViewSystem(Node):
             self.update_cameras()
     
     def gui_context_menu(self, imgui):
+        if self.selected_camera_index is None:
+            return
+        
         imgui.text(f"Camera {self.camera_info['ids'][self.selected_camera_index]}")
 
         imgui.separator()
@@ -228,4 +231,5 @@ class MultiViewSystem(Node):
     
     # Disable outline rendering for this node and its children
     def render_outline(self, ctx, camera, prog):
-        pass
+        if self.selected_camera_index is not None:
+            self.cameras[self.selected_camera_index].render_outline(ctx, camera, prog)

@@ -134,6 +134,16 @@ class Meshes(Node):
         self.redraw()
 
     @property
+    def current_vertices(self):
+        return self.vertices[self.current_frame_id]
+    
+    @current_vertices.setter
+    def current_vertices(self, vertices):
+        self._vertices[self.current_frame_id] = vertices
+        self.compute_vertex_and_face_normals.cache_clear()
+        self.redraw()
+
+    @property
     def n_faces(self):
         return self.faces.shape[0]
 
@@ -202,6 +212,10 @@ class Meshes(Node):
         else:
             self._vertex_colors = vertex_colors
         self.redraw()
+    
+    @property
+    def current_vertex_colors(self):
+        return self.vertex_colors[self.current_frame_id]
 
     @property
     def face_colors(self):
@@ -240,14 +254,6 @@ class Meshes(Node):
         if self._flat_shading != flat_shading:
             self._flat_shading = flat_shading
             self.redraw()
-
-    @property
-    def current_vertices(self):
-        return self.vertices[self.current_frame_id]
-
-    @property
-    def current_vertex_colors(self):
-        return self.vertex_colors[self.current_frame_id]
 
     def closest_vertex_in_triangle(self, tri_id, point):
         face_vertex_id = np.linalg.norm((self.current_vertices[self.faces[tri_id]] - point), axis=-1).argmin()
@@ -315,7 +321,7 @@ class Meshes(Node):
         if self.has_texture:
             self.vbo_uvs.write(self.uv_coords.astype('f4').tobytes())
 
-    def redraw(self):
+    def redraw(self, **kwargs):
         self._need_upload = True
 
     # noinspection PyAttributeOutsideInit
@@ -453,9 +459,9 @@ class Meshes(Node):
                                               self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
                                                self.norm_coloring)                                       
-        _, self.flat_shading = imgui.checkbox('Flat shading##flat_shading{}'.format(self.unique_name),
+        _, self.flat_shading = imgui.checkbox('Flat shading [F]##flat_shading{}'.format(self.unique_name),
                                                self.flat_shading)
-        _, self.draw_edges = imgui.checkbox('Draw edges##draw_edges{}'.format(self.unique_name),
+        _, self.draw_edges = imgui.checkbox('Draw edges [E]##draw_edges{}'.format(self.unique_name),
                                                self.draw_edges)
 
         # TODO: Add  export workflow for all nodes
@@ -787,8 +793,8 @@ class VariableTopologyMeshes(Node):
 
         _, self.show_texture  = imgui.checkbox('Render Texture', self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring', self.norm_coloring)
-        _, self.flat_shading = imgui.checkbox('Flat shading', self.flat_shading)
-        _, self.draw_edges = imgui.checkbox('Draw edges', self.draw_edges)
+        _, self.flat_shading = imgui.checkbox('Flat shading [F]', self.flat_shading)
+        _, self.draw_edges = imgui.checkbox('Draw edges [E]', self.draw_edges)
 
         if show_advanced:
             if imgui.tree_node("Advanced material##advanced_material{}'".format(self.unique_name)):

@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import pickle as pkl
 import torch
+from scipy.spatial.transform import Rotation
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
@@ -24,6 +25,7 @@ from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.skeletons import Skeletons
 from aitviewer.renderables.rigid_bodies import RigidBodies
 from aitviewer.scene.node import Node
+from aitviewer.utils.decorators import hooked
 from aitviewer.utils.so3 import aa2euler_numpy, aa2rot_torch as aa2rot, euler2aa_numpy
 from aitviewer.utils.so3 import rot2aa_torch as rot2aa
 from aitviewer.utils.so3 import interpolate_rotations
@@ -120,6 +122,7 @@ class SMPLSequence(Node):
         self.edit_mode = False
         self.edit_joint = None
         self.edit_pose = None
+        self.edit_pose_dirty = False
 
         # Nodes
         self.vertices, self.joints, self.faces, self.skeleton = self.fk()
@@ -262,25 +265,48 @@ class SMPLSequence(Node):
         return torch.cat((self.poses_root, self.poses_body), dim=-1)
     
 
-    def fk(self):
+    def fk(self, current_frame_only=False):
         """Get joints and/or vertices from the poses."""
-        # Use the edited pose if in edit mode.
-        if self.edit_mode:
-            poses_root = self.poses_root.clone()
-            poses_body = self.poses_body.clone()
+        if current_frame_only:
+            # Use current frame data.
+            if self.edit_mode:
+                poses_root = self.edit_pose[:3][None,:]
+                poses_body = self.edit_pose[3:][None,:]
+            else:
+                poses_body = self.poses_body[self.current_frame_id][None,:]
+                poses_root = self.poses_root[self.current_frame_id][None,:]
+            
+            poses_left_hand = None if self.poses_left_hand is None else self.poses_left_hand[self.current_frame_id][None,:]
+            poses_right_hand = None if self.poses_right_hand is None else self.poses_right_hand[self.current_frame_id][None,:]
+            trans = self.trans[self.current_frame_id][None,:]
 
-            poses_root[self.current_frame_id] = self.edit_pose[:3]
-            poses_body[self.current_frame_id] = self.edit_pose[3:]
+            if self.betas.shape[0] == self.n_frames:
+                betas = self.betas[self.current_frame_id][None,:]
+            else:
+                betas = self.betas
         else:
-            poses_body = self.poses_body
-            poses_root = self.poses_root
+            # Use the whole sequence.
+            if self.edit_mode:
+                poses_root = self.poses_root.clone()
+                poses_body = self.poses_body.clone()
 
+                poses_root[self.current_frame_id] = self.edit_pose[:3]
+                poses_body[self.current_frame_id] = self.edit_pose[3:]
+            else:
+                poses_body = self.poses_body
+                poses_root = self.poses_root
+                
+            poses_left_hand = self.poses_left_hand
+            poses_right_hand = self.poses_right_hand
+            trans=self.trans
+            betas=self.betas
+        
         verts, joints = self.smpl_layer(poses_root=poses_root,
                                         poses_body=poses_body,
-                                        poses_left_hand=self.poses_left_hand,
-                                        poses_right_hand=self.poses_right_hand,
-                                        betas=self.betas,
-                                        trans=self.trans)
+                                        poses_left_hand=poses_left_hand,
+                                        poses_right_hand=poses_right_hand,
+                                        betas=betas,
+                                        trans=trans)
                                         
         # Transform output vertices and joints into our viewer's coordinate system (where Y is up).
         # We do this on the joints and not on the root pose of SMPL because the SMPL root does not correspond
@@ -293,7 +319,11 @@ class SMPLSequence(Node):
         skeleton = self.smpl_layer.skeletons()['body'].T
         faces = self.smpl_layer.bm.faces.astype(np.int64)
         joints = joints[:, :skeleton.shape[0]]
-        return c2c(verts), c2c(joints), c2c(faces), c2c(skeleton)
+
+        if current_frame_only:
+            return c2c(verts)[0], c2c(joints)[0], c2c(faces), c2c(skeleton)
+        else:
+            return c2c(verts), c2c(joints), c2c(faces), c2c(skeleton)
 
     def interpolate(self, frame_ids):
         """
@@ -322,36 +352,77 @@ class SMPLSequence(Node):
 
         self.redraw()
 
-    def redraw(self):
+    @hooked
+    def on_before_frame_update(self):
+        if self.edit_pose_dirty:
+            self.edit_pose = self.poses[self.current_frame_id].clone()
+            self.redraw(current_frame_only=True)
+            self.edit_pose_dirty = False
+
+    @hooked
+    def on_frame_update(self):
+        self.edit_pose = self.poses[self.current_frame_id].clone()
+        self.edit_pose_dirty = False
+
+    def redraw(self, **kwargs):
+        current_frame_only = kwargs.get('current_frame_only', False)
+
         # Use the edited pose if in edit mode.
-        if self.edit_mode:
-            poses_root = self.poses_root.clone()
-            poses_body = self.poses_body.clone()
+        vertices, joints, self.faces, self.skeleton = self.fk(current_frame_only)
 
-            poses_root[self.current_frame_id] = self.edit_pose[:3]
-            poses_body[self.current_frame_id] = self.edit_pose[3:]
+        if current_frame_only:
+            self.vertices[self.current_frame_id] = vertices
+            self.joints[self.current_frame_id] = joints
+
+            if self._is_rigged:
+                self.skeleton_seq.current_joint_positions = joints
+            
+            # Use current frame data.
+            if self.edit_mode:
+                pose = self.edit_pose
+            else:
+                pose = torch.cat([self.poses_root[self.current_frame_id], self.poses_body[self.current_frame_id]], dim=-1)
+
+            # Update rigid bodies.
+            if self.smpl_layer.model_type != 'flame':
+                global_oris = local_to_global(pose, self.skeleton[:, 0], output_format='rotmat')
+                global_oris = global_oris.reshape((-1, 3, 3))
+                self.rbs.current_rb_ori = c2c(global_oris)
+            self.rbs.current_rb_pos = self.joints[self.current_frame_id]
+            
+            # Update mesh.
+            self.mesh_seq.current_vertices = vertices
         else:
-            poses_body = self.poses_body
-            poses_root = self.poses_root
+            self.vertices = vertices
+            self.joints = joints
 
-        self.vertices, self.joints, self.faces, self.skeleton = self.fk()
-        if self._is_rigged:
-            self.skeleton_seq.joint_positions = self.joints
-        
-        if self.smpl_layer.model_type != 'flame':
-            global_oris = local_to_global(torch.cat([poses_root, poses_body], dim=-1),
-                                            self.skeleton[:, 0], output_format='rotmat')
-            global_oris = global_oris.reshape((self.n_frames, -1, 3, 3))
-            self.rbs.rb_ori = c2c(global_oris)
+            # Update skeleton.
+            if self._is_rigged:
+                self.skeleton_seq.joint_positions = self.joints
 
-        self.rbs.rb_pos = self.joints
-        self.rbs.redraw()
+            # Extract poses including the edited pose.
+            if self.edit_mode:
+                poses_root = self.poses_root.clone()
+                poses_body = self.poses_body.clone()
 
-        # Update vertices of underlying mesh without redrawing,
-        # 'redraw' will be called by super().redraw() since it propagates 
-        # to all children nodes
-        self.mesh_seq.vertices = self.vertices
-        super().redraw()
+                poses_root[self.current_frame_id] = self.edit_pose[:3]
+                poses_body[self.current_frame_id] = self.edit_pose[3:]
+            else:
+                poses_body = self.poses_body
+                poses_root = self.poses_root
+
+            # Update rigid bodies.
+            if self.smpl_layer.model_type != 'flame':
+                global_oris = local_to_global(torch.cat([poses_root, poses_body], dim=-1),
+                                                self.skeleton[:, 0], output_format='rotmat')
+                global_oris = global_oris.reshape((self.n_frames, -1, 3, 3))
+                self.rbs.rb_ori = c2c(global_oris)
+            self.rbs.rb_pos = self.joints
+
+            # Update mesh
+            self.mesh_seq.vertices = vertices
+
+        super().redraw(**kwargs)
 
     def set_edit_mode(self, enabled):
         if enabled == self.edit_mode:
@@ -364,21 +435,21 @@ class SMPLSequence(Node):
             self.mesh_seq.color = self._view_mode_color
             
             self.rbs.color = (0, 1, 0.5, 1.0)
-            self.rbs.redraw()
             self.rbs.enabled = self._view_mode_joint_angles
             self.rbs.is_selectable = True
         else:
             self.edit_mode = True
             self.rbs.enabled = True
             self.rbs.is_selectable = False
-            self.edit_pose = self.poses[self.current_frame_id]
+            self.edit_pose = self.poses[self.current_frame_id].clone()
             
             # Disable picking for the mesh
             self.mesh_seq.backface_fragmap = True
             self.rbs.color = (1, 0, 0.5, 1.0)
-            self.rbs.redraw()
             self._view_mode_color = self.mesh_seq.color
             self.mesh_seq.color = (*self._view_mode_color[:3], min(self._view_mode_color[3], 0.5))
+
+        self.redraw(current_frame_only=True)
 
     def gui_joint(self, imgui, j, tree=None):
         name = "unknown"
@@ -402,8 +473,8 @@ class SMPLSequence(Node):
             if u:
                 aa = euler2aa_numpy(np.array(euler), degrees=True)
                 self.edit_pose[j * 3: (j + 1) * 3] = torch.from_numpy(aa)
-                self.redraw()
-
+                self.edit_pose_dirty = True
+                self.redraw(current_frame_only=True)
             if tree:
                 for c in tree.get(j, []):
                     self.gui_joint(imgui, c, tree)
@@ -439,11 +510,26 @@ class SMPLSequence(Node):
             if imgui.button("Apply"):
                 self.poses_root[self.current_frame_id] = self.edit_pose[:3]
                 self.poses_body[self.current_frame_id] = self.edit_pose[3:]
+                self.edit_pose_dirty = False
+                self.redraw(current_frame_only=True)
+            imgui.same_line()
+            if imgui.button("Apply to all"):
+                edit_rots = Rotation.from_rotvec(np.reshape(self.edit_pose, (-1, 3)))
+                base_rots = Rotation.from_rotvec(np.reshape(self.poses[self.current_frame_id], (-1, 3)))
+                relative = edit_rots * base_rots.inv()
+                for i in range(self.n_frames):
+                    root = Rotation.from_rotvec(np.reshape(self.poses_root[i], (-1, 3)))
+                    self.poses_root[i] = torch.from_numpy((relative[0] * root).as_rotvec().flatten())
+
+                    body = Rotation.from_rotvec(np.reshape(self.poses_body[i], (-1, 3)))
+                    self.poses_body[i] = torch.from_numpy((relative[1:] * body).as_rotvec().flatten())
+                self.edit_pose_dirty = False
                 self.redraw()
             imgui.same_line()
             if imgui.button("Reset"):
                 self.edit_pose = self.poses[self.current_frame_id]
-                self.redraw()
+                self.edit_pose_dirty = False
+                self.redraw(current_frame_only=True)
 
 
     def gui_context_menu(self, imgui):

@@ -76,10 +76,23 @@ class Skeletons(Node):
         self._joint_positions = joint_positions
         self.n_frames = len(joint_positions)
 
-    def redraw(self):
-        self.spheres.sphere_positions = self.joint_positions
-        self.lines.lines = self.joint_positions[:, self.skeleton].reshape(len(self), -1, 3)
-        super().redraw()
+    @property
+    def current_joint_positions(self):
+        return self._joint_positions[self.current_frame_id]
+
+    @current_joint_positions.setter
+    def current_joint_positions(self, positions):
+        assert len(positions.shape) == 2
+        self._joint_positions[self.current_frame_id] = positions
+
+    def redraw(self, **kwargs):
+        if kwargs.get('current_frame_only', False):
+            self.spheres.current_sphere_positions = self.current_joint_positions
+            self.lines.current_lines = self.current_joint_positions[self.skeleton].reshape(-1, 3)
+        else:
+            self.spheres.sphere_positions = self.joint_positions
+            self.lines.lines = self.joint_positions[:, self.skeleton].reshape(len(self), -1, 3)
+        super().redraw(**kwargs)
 
     @property
     def bounds(self):

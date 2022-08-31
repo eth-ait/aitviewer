@@ -72,18 +72,45 @@ class RigidBodies(Node):
         self.material.color = color
         self.spheres.color = color
 
+    @property
+    def current_rb_pos(self):
+        return self.rb_pos[self.current_frame_id]
+    
+    @current_rb_pos.setter
+    def current_rb_pos(self, pos):
+        self.rb_pos[self.current_frame_id] = pos
+    
+    @property
+    def current_rb_ori(self):
+        return self.rb_ori[self.current_frame_id]
+    
+    @current_rb_ori.setter
+    def current_rb_ori(self, ori):
+        self.rb_ori[self.current_frame_id] = ori
+    
     def redraw(self, **kwargs):
-        self.spheres.sphere_positions = self.rb_pos
-        self.spheres.redraw(**kwargs)
+        if kwargs.get('current_frame_only', False):
+            self.spheres.current_sphere_positions = self.current_rb_pos
+            
+            for i in range(3):
+                line = self.rb_ori[..., :, i][self.current_frame_id]
+                line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
+                axs = self.coords[i]
+                axs.position = self.position
+                axs.current_origins = self.current_rb_pos
+                axs.current_tips = self.current_rb_pos + line
+        else:
+            self.spheres.sphere_positions = self.rb_pos
 
-        for i in range(3):
-            line = self.rb_ori[..., :, i]
-            line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
-            axs = self.coords[i]
-            axs.position = self.position
-            axs.origins = self.rb_pos
-            axs.tips = self.rb_pos + line
-            axs.redraw(**kwargs)
+            for i in range(3):
+                line = self.rb_ori[..., :, i]
+                line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
+                axs = self.coords[i]
+                axs.position = self.position
+                axs.origins = self.rb_pos
+                axs.tips = self.rb_pos + line
+        
+        super().redraw(**kwargs)
 
     def get_index_from_node_and_triangle(self, node, tri_id):
         idx = self.spheres.get_index_from_node_and_triangle(node, tri_id)

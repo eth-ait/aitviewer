@@ -69,6 +69,8 @@ class Scene(Node):
 
         # Currently selected object, None if no object is selected
         self.selected_object = None
+        # Object shown in the property panel
+        self._gui_selected_object = None
         
     def render(self, **kwargs):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
@@ -207,6 +209,9 @@ class Scene(Node):
         self.selected_object = obj
         if isinstance(obj, Node):
             self.selected_object.on_selection(selected_node, selected_tri_id)
+        # Always keep the last selected object in the property panel
+        if obj is not None:
+            self._gui_selected_object = obj
 
     def is_selected(self, obj):
         """Returns true if obj is currently selected"""
@@ -214,8 +219,8 @@ class Scene(Node):
     
     def gui_selected(self, imgui):
         """GUI to edit the selected node"""
-        if self.selected_object:
-            s = self.selected_object
+        if self._gui_selected_object:
+            s = self._gui_selected_object
 
             # Draw object icon and name
             imgui.push_font(self.custom_font)
