@@ -68,7 +68,7 @@ class SMPLLayer(nn.Module, ABC):
     def faces(self):
         """Return the definition of the faces."""
         if self._faces is None:
-            self._faces = self.bm.f.to(dtype=torch.int32)
+            self._faces = torch.from_numpy(self.bm.faces.astype(np.int32))
         return self._faces
 
     @property
