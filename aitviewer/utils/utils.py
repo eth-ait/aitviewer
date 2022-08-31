@@ -88,7 +88,7 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
                 video_path_mp4]
 
     with open(os.devnull, 'w') as FNULL:
-        subprocess.Popen(command, stdout=FNULL).wait()
+        subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
     
     # Convert mp4 to GIF.
     if is_gif:
@@ -99,7 +99,7 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
                    video_path_candidate]
                    
         with open(os.devnull, 'w') as FNULL:
-            subprocess.Popen(command, stdout=FNULL).wait()
+            subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
 
 
 
