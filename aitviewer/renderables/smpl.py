@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import pickle as pkl
 import torch
+from scipy.spatial.transform import Rotation
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
@@ -511,6 +512,19 @@ class SMPLSequence(Node):
                 self.poses_body[self.current_frame_id] = self.edit_pose[3:]
                 self.edit_pose_dirty = False
                 self.redraw(current_frame_only=True)
+            imgui.same_line()
+            if imgui.button("Apply to all"):
+                edit_rots = Rotation.from_rotvec(np.reshape(self.edit_pose, (-1, 3)))
+                base_rots = Rotation.from_rotvec(np.reshape(self.poses[self.current_frame_id], (-1, 3)))
+                relative = edit_rots * base_rots.inv()
+                for i in range(self.n_frames):
+                    root = Rotation.from_rotvec(np.reshape(self.poses_root[i], (-1, 3)))
+                    self.poses_root[i] = torch.from_numpy((relative[0] * root).as_rotvec().flatten())
+
+                    body = Rotation.from_rotvec(np.reshape(self.poses_body[i], (-1, 3)))
+                    self.poses_body[i] = torch.from_numpy((relative[1:] * body).as_rotvec().flatten())
+                self.edit_pose_dirty = False
+                self.redraw()
             imgui.same_line()
             if imgui.button("Reset"):
                 self.edit_pose = self.poses[self.current_frame_id]
