@@ -161,6 +161,8 @@
 #endif
 
     uniform float draw_edges;
+    uniform bool use_uniform_color;
+    uniform vec4 uniform_color;
 
     const vec4 edge_color = vec4(0.0, 0.0, 0.0, 1.0);
 
@@ -191,6 +193,9 @@
         vec4 base_color = vec4(texture(diffuse_texture, g_uv).rgb, texture_alpha);
 #else
         vec4 base_color = g_color;
+        if(use_uniform_color) {
+            base_color = uniform_color;
+        }
 #endif
 
         vec3 color = compute_lighting(base_color.rgb, g_vert, normal, g_vert_light);

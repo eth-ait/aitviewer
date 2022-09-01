@@ -116,6 +116,7 @@ class Meshes(Node):
         self.norm_coloring = False
         self.normals_r = None
         self.need_upload = True
+        self._use_uniform_color = self.vertex_colors is None
 
     @property
     def vertices(self):
@@ -202,22 +203,31 @@ class Meshes(Node):
 
     @property
     def vertex_colors(self):
+        if self._vertex_colors is None:
+            self._vertex_colors = np.full((self.n_frames, self.n_vertices, 4), self.material.color)
         return self._vertex_colors
 
     @vertex_colors.setter
     def vertex_colors(self, vertex_colors):
         # Vertex colors cannot be empty
-        if vertex_colors is None:
-            self._vertex_colors = np.full((self.n_frames, self.n_vertices, 4), self.color)
-        elif isinstance(vertex_colors, tuple) and len(vertex_colors) == 4:
-            self._vertex_colors = np.full((self.n_frames, self.n_vertices, 4), vertex_colors)
+        if vertex_colors is None or isinstance(vertex_colors, tuple) and len(vertex_colors) == 4:
+            self._vertex_colors = None
+            self._use_uniform_color = True
         else:
+            if len(vertex_colors.shape) == 2:
+                vertex_colors = np.repeat(vertex_colors[np.newaxis], self.n_frames, axis=0)
+                print(vertex_colors.shape)
+            assert len(vertex_colors.shape) == 3
             self._vertex_colors = vertex_colors
-        self.redraw()
+            self._use_uniform_color = False
+            self.redraw()
     
     @property
     def current_vertex_colors(self):
-        return self.vertex_colors[self.current_frame_id]
+        if self._use_uniform_color:
+            return np.full((self.n_vertices, 4), self.material.color)
+        else:
+            return self.vertex_colors[self.current_frame_id]
 
     @property
     def face_colors(self):
@@ -228,24 +238,15 @@ class Meshes(Node):
         self._face_colors = face_colors
         if face_colors is not None:
             self._vertex_colors = np.tile(self.face_colors[:, :, np.newaxis], [1, 1, 3, 1])
+            self._use_uniform_color = False
         self.redraw()
 
     @Node.color.setter
     def color(self, color):
-        only_alpha_changed = (np.abs((np.array(color) - np.array(self.color)))[-1] > 0
-                              and (np.array(color)[:3] == np.array(self.color[:3])).all())
-
         self.material.color = color
 
-        # If only alpha changed, don't update all colors
-        if only_alpha_changed:
-            self._vertex_colors[..., -1] = color[-1]
-        # Otherwise, if no face colors, then override the existing vertex colors
-        elif self.face_colors is None:
+        if self.face_colors is None:
             self.vertex_colors = color
-
-        # Update color buffer
-        self.redraw()
 
     @property
     def flat_shading(self):
@@ -420,6 +421,8 @@ class Meshes(Node):
         else:
             prog, vao = (self.flat_prog, self.flat_vao) if self.flat_shading else (self.smooth_prog, self.smooth_vao)
             prog['norm_coloring'].value = self.norm_coloring
+            prog['use_uniform_color'] = self._use_uniform_color
+            prog['uniform_color'] = self.material.color
 
         prog['draw_edges'].value = 1.0 if self.draw_edges else 0.0
         prog['win_size'].value = kwargs['window_size']
