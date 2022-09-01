@@ -145,7 +145,7 @@ class SMPLSequence(Node):
                                             self.skeleton[:, 0], output_format='rotmat')
             global_oris = c2c(global_oris.reshape((self.n_frames, -1, 3, 3)))
         else:
-            global_oris = np.tile(np.eye(3), self.joints.shape[:-1])
+            global_oris = np.tile(np.eye(3), self.joints.shape[:-1])[np.newaxis]
 
         self.rbs = RigidBodies(self.joints, global_oris, length=0.1, name='Joint Angles')
         self.rbs.position = self.position
