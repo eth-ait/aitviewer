@@ -298,9 +298,12 @@ class Viewer(moderngl_window.WindowConfig):
         self.render_shadowmap()
         self.render_prepare()
         self.render_scene()
+        self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], (0.3, 0.7, 1, 1))
 
         if not export:
-            self.render_outline()
+            # If the selected object is a Node render its outline.
+            if isinstance(self.scene.selected_object, Node):
+                self.render_outline([self.scene.selected_object], (1.0, 0.86, 0.35, 1.0))
 
             # If visualize is True draw a texture with the object id to the screen for debugging.
             if self.visualize:
@@ -344,27 +347,23 @@ class Viewer(moderngl_window.WindowConfig):
         for r in rs:
             r.render_fragmap(self.ctx, self.scene.camera, self.frag_map_prog)
 
-    def render_outline(self):
-        # If no object is selcted, skip rendering the outline.
-        if self.scene.selected_object is None:
-            return
+    def render_outline(self, nodes, color):
+        # Prepare the outline buffer, all objects rendered to this buffer will be outlined.
+        self.outline_framebuffer.clear()
+        self.outline_framebuffer.use()
+        # Render outline of the nodes with outlining enabled, this potentially also renders their children.
+        for n in nodes:
+            n.render_outline(self.ctx, self.scene.camera, self.outline_prepare_prog)
 
-        # If the selected object is a Node render its outline.
-        if isinstance(self.scene.selected_object, Node):
-            # Prepare the outline buffer, all objects rendered to this buffer will be outlined.
-            self.outline_framebuffer.clear()
-            self.outline_framebuffer.use()
-            
-            # Render outline of the selected object, this potentially also renders its children.
-            self.scene.selected_object.render_outline(self.ctx, self.scene.camera, self.outline_prepare_prog)
-
-            # Render the outline effect to the window.
-            self.wnd.use()
-            self.ctx.enable_only(moderngl.NOTHING)
-            self.outline_texture.use(0)
-            self.outline_draw_prog['outline'] = 0
-            self.outline_draw_prog['outline_color'] = (1.0, 0.86, 0.35, 1.0)
-            self.outline_quad.render(self.outline_draw_prog)
+        # Render the outline effect to the window.
+        self.wnd.use()
+        self.wnd.fbo.depth_mask = False
+        self.ctx.enable_only(moderngl.NOTHING)
+        self.outline_texture.use(0)
+        self.outline_draw_prog['outline'] = 0
+        self.outline_draw_prog['outline_color'] = color
+        self.outline_quad.render(self.outline_draw_prog)
+        self.wnd.fbo.depth_mask = True
 
     def render_scene(self):
         """Render the current scene to the framebuffer without time accounting and GUI elements."""

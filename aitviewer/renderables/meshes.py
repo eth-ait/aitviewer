@@ -55,6 +55,7 @@ class Meshes(Node):
                  pickable=True,
                  flat_shading=False,
                  draw_edges=False,
+                 draw_outline=False,
                  **kwargs):
         """
         Initializer.
@@ -110,6 +111,7 @@ class Meshes(Node):
         # Misc.
         self._flat_shading = flat_shading
         self.draw_edges = draw_edges
+        self.draw_outline = draw_outline
         self.show_texture = self.has_texture
         self.norm_coloring = False
         self.normals_r = None
@@ -463,6 +465,8 @@ class Meshes(Node):
                                                self.flat_shading)
         _, self.draw_edges = imgui.checkbox('Draw edges [E]##draw_edges{}'.format(self.unique_name),
                                                self.draw_edges)
+        _, self.draw_outline = imgui.checkbox('Draw outline##draw_outline{}'.format(self.unique_name), 
+                                               self.draw_outline)
 
         # TODO: Add  export workflow for all nodes
         if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
@@ -476,6 +480,7 @@ class Meshes(Node):
     def gui_context_menu(self, imgui):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
+        _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
 
 class VariableTopologyMeshes(Node):
@@ -749,6 +754,7 @@ class VariableTopologyMeshes(Node):
     def gui_context_menu(self, imgui):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
+        _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
     def gui_position(self, imgui):
         # Position controls
@@ -795,6 +801,7 @@ class VariableTopologyMeshes(Node):
         _, self.norm_coloring = imgui.checkbox('Norm Coloring', self.norm_coloring)
         _, self.flat_shading = imgui.checkbox('Flat shading [F]', self.flat_shading)
         _, self.draw_edges = imgui.checkbox('Draw edges [E]', self.draw_edges)
+        _, self.draw_outline = imgui.checkbox('Draw outline', self.draw_outline)
 
         if show_advanced:
             if imgui.tree_node("Advanced material##advanced_material{}'".format(self.unique_name)):

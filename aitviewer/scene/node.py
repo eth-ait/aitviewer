@@ -61,6 +61,7 @@ class Node(object):
         self.is_renderable = False
         self.backface_culling = True
         self.backface_fragmap = False
+        self.draw_outline = False
 
         # Flags to enable rendering passes
         self.cast_shadow = False
