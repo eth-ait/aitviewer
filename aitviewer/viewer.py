@@ -41,6 +41,7 @@ from moderngl_window.opengl.vao import VAO
 from pathlib import Path
 from PIL import Image
 from tqdm import tqdm
+import trimesh
 
 
 
@@ -772,6 +773,14 @@ class Viewer(moderngl_window.WindowConfig):
         self.window_size = (width, height)
         self.imgui.resize(width, height)
         self.create_framebuffers()
+
+    def files_dropped_event(self, x: int, y: int, paths):
+        for path in paths:
+            base, ext = os.path.splitext(path)
+            if ext == ".obj" or ext == ".ply":
+                obj = trimesh.load(path)
+                obj_mesh = Meshes(obj.vertices, obj.faces, name=os.path.basename(base))
+                self.scene.add(obj_mesh)
 
     def key_event(self, key, action, modifiers):
         self.imgui.key_event(key, action, modifiers)
