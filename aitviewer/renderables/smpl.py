@@ -119,10 +119,10 @@ class SMPLSequence(Node):
             self.trans = trans - trans[0:1]
 
         # Edit mode
-        self.edit_mode = False
-        self.edit_joint = None
-        self.edit_pose = None
-        self.edit_pose_dirty = False
+        self._edit_mode = False
+        self._edit_joint = None
+        self._edit_pose = None
+        self._edit_pose_dirty = False
 
         # Nodes
         self.vertices, self.joints, self.faces, self.skeleton = self.fk()
@@ -269,9 +269,9 @@ class SMPLSequence(Node):
         """Get joints and/or vertices from the poses."""
         if current_frame_only:
             # Use current frame data.
-            if self.edit_mode:
-                poses_root = self.edit_pose[:3][None,:]
-                poses_body = self.edit_pose[3:][None,:]
+            if self._edit_mode:
+                poses_root = self._edit_pose[:3][None,:]
+                poses_body = self._edit_pose[3:][None,:]
             else:
                 poses_body = self.poses_body[self.current_frame_id][None,:]
                 poses_root = self.poses_root[self.current_frame_id][None,:]
@@ -286,12 +286,12 @@ class SMPLSequence(Node):
                 betas = self.betas
         else:
             # Use the whole sequence.
-            if self.edit_mode:
+            if self._edit_mode:
                 poses_root = self.poses_root.clone()
                 poses_body = self.poses_body.clone()
 
-                poses_root[self.current_frame_id] = self.edit_pose[:3]
-                poses_body[self.current_frame_id] = self.edit_pose[3:]
+                poses_root[self.current_frame_id] = self._edit_pose[:3]
+                poses_body[self.current_frame_id] = self._edit_pose[3:]
             else:
                 poses_body = self.poses_body
                 poses_root = self.poses_root
@@ -354,15 +354,15 @@ class SMPLSequence(Node):
 
     @hooked
     def on_before_frame_update(self):
-        if self.edit_pose_dirty:
-            self.edit_pose = self.poses[self.current_frame_id].clone()
+        if self._edit_pose_dirty:
+            self._edit_pose = self.poses[self.current_frame_id].clone()
             self.redraw(current_frame_only=True)
-            self.edit_pose_dirty = False
+            self._edit_pose_dirty = False
 
     @hooked
     def on_frame_update(self):
-        self.edit_pose = self.poses[self.current_frame_id].clone()
-        self.edit_pose_dirty = False
+        self._edit_pose = self.poses[self.current_frame_id].clone()
+        self._edit_pose_dirty = False
 
     def redraw(self, **kwargs):
         current_frame_only = kwargs.get('current_frame_only', False)
@@ -378,8 +378,8 @@ class SMPLSequence(Node):
                 self.skeleton_seq.current_joint_positions = joints
             
             # Use current frame data.
-            if self.edit_mode:
-                pose = self.edit_pose
+            if self._edit_mode:
+                pose = self._edit_pose
             else:
                 pose = torch.cat([self.poses_root[self.current_frame_id], self.poses_body[self.current_frame_id]], dim=-1)
 
@@ -401,12 +401,12 @@ class SMPLSequence(Node):
                 self.skeleton_seq.joint_positions = self.joints
 
             # Extract poses including the edited pose.
-            if self.edit_mode:
+            if self._edit_mode:
                 poses_root = self.poses_root.clone()
                 poses_body = self.poses_body.clone()
 
-                poses_root[self.current_frame_id] = self.edit_pose[:3]
-                poses_body[self.current_frame_id] = self.edit_pose[3:]
+                poses_root[self.current_frame_id] = self._edit_pose[:3]
+                poses_body[self.current_frame_id] = self._edit_pose[3:]
             else:
                 poses_body = self.poses_body
                 poses_root = self.poses_root
@@ -424,12 +424,17 @@ class SMPLSequence(Node):
 
         super().redraw(**kwargs)
 
-    def set_edit_mode(self, enabled):
-        if enabled == self.edit_mode:
+    @property
+    def edit_mode(self):
+        return self._edit_mode
+    
+    @edit_mode.setter
+    def edit_mode(self, enabled):
+        if enabled == self._edit_mode:
             return
             
         if not enabled:
-            self.edit_mode = False
+            self._edit_mode = False
 
             self.mesh_seq.backface_fragmap = False
             self.mesh_seq.color = self._view_mode_color
@@ -438,10 +443,10 @@ class SMPLSequence(Node):
             self.rbs.enabled = self._view_mode_joint_angles
             self.rbs.is_selectable = True
         else:
-            self.edit_mode = True
+            self._edit_mode = True
             self.rbs.enabled = True
             self.rbs.is_selectable = False
-            self.edit_pose = self.poses[self.current_frame_id].clone()
+            self._edit_pose = self.poses[self.current_frame_id].clone()
             
             # Disable picking for the mesh
             self.mesh_seq.backface_fragmap = True
@@ -451,7 +456,7 @@ class SMPLSequence(Node):
 
         self.redraw(current_frame_only=True)
 
-    def gui_joint(self, imgui, j, tree=None):
+    def _gui_joint(self, imgui, j, tree=None):
         name = "unknown"
         if self.smpl_layer.model_type == "smplh":
             if j < len(SMPLH_JOINT_NAMES):
@@ -467,17 +472,17 @@ class SMPLSequence(Node):
             imgui.text(f'{j} - {name}')
         
         if e:
-            aa = self.edit_pose[j * 3: (j + 1) * 3]
+            aa = self._edit_pose[j * 3: (j + 1) * 3]
             euler = aa2euler_numpy(aa.cpu().numpy(), degrees=True)
             u, euler = imgui.drag_float3(f'##joint{j}', *euler, 0.1, format='%.2f')
             if u:
                 aa = euler2aa_numpy(np.array(euler), degrees=True)
-                self.edit_pose[j * 3: (j + 1) * 3] = torch.from_numpy(aa)
-                self.edit_pose_dirty = True
+                self._edit_pose[j * 3: (j + 1) * 3] = torch.from_numpy(aa)
+                self._edit_pose_dirty = True
                 self.redraw(current_frame_only=True)
             if tree:
                 for c in tree.get(j, []):
-                    self.gui_joint(imgui, c, tree)
+                    self._gui_joint(imgui, c, tree)
                 imgui.tree_pop()
                 
     def gui(self, imgui):
@@ -485,9 +490,9 @@ class SMPLSequence(Node):
         super().gui_position(imgui)
 
         if imgui.radio_button("View mode", not self.edit_mode):
-            self.set_edit_mode(False)
+            self.edit_mode = False
         if imgui.radio_button("Edit mode", self.edit_mode):
-            self.set_edit_mode(True)
+            self.edit_mode = True
         
         imgui.spacing()
 
@@ -502,19 +507,19 @@ class SMPLSequence(Node):
             if not tree:
                 return
     
-            if self.edit_joint is None:            
-                self.gui_joint(imgui, 0, tree)
+            if self._edit_joint is None:            
+                self._gui_joint(imgui, 0, tree)
             else: 
-                self.gui_joint(imgui, self.edit_joint)
+                self._gui_joint(imgui, self._edit_joint)
             
             if imgui.button("Apply"):
-                self.poses_root[self.current_frame_id] = self.edit_pose[:3]
-                self.poses_body[self.current_frame_id] = self.edit_pose[3:]
-                self.edit_pose_dirty = False
+                self.poses_root[self.current_frame_id] = self._edit_pose[:3]
+                self.poses_body[self.current_frame_id] = self._edit_pose[3:]
+                self._edit_pose_dirty = False
                 self.redraw(current_frame_only=True)
             imgui.same_line()
             if imgui.button("Apply to all"):
-                edit_rots = Rotation.from_rotvec(np.reshape(self.edit_pose, (-1, 3)))
+                edit_rots = Rotation.from_rotvec(np.reshape(self._edit_pose, (-1, 3)))
                 base_rots = Rotation.from_rotvec(np.reshape(self.poses[self.current_frame_id], (-1, 3)))
                 relative = edit_rots * base_rots.inv()
                 for i in range(self.n_frames):
@@ -523,32 +528,33 @@ class SMPLSequence(Node):
 
                     body = Rotation.from_rotvec(np.reshape(self.poses_body[i], (-1, 3)))
                     self.poses_body[i] = torch.from_numpy((relative[1:] * body).as_rotvec().flatten())
-                self.edit_pose_dirty = False
+                self._edit_pose_dirty = False
                 self.redraw()
             imgui.same_line()
             if imgui.button("Reset"):
-                self.edit_pose = self.poses[self.current_frame_id]
-                self.edit_pose_dirty = False
+                self._edit_pose = self.poses[self.current_frame_id]
+                self._edit_pose_dirty = False
                 self.redraw(current_frame_only=True)
 
 
     def gui_context_menu(self, imgui):
-        if self.edit_mode and self.edit_joint is not None:
-            self.gui_joint(imgui, self.edit_joint)
+        if self.edit_mode and self._edit_joint is not None:
+            self._gui_joint(imgui, self._edit_joint)
         else:        
             if imgui.radio_button("View mode", not self.edit_mode):
-                self.set_edit_mode(False)
+                self.edit_mode = False
                 imgui.close_current_popup()
             if imgui.radio_button("Edit mode", self.edit_mode):
-                self.set_edit_mode(True)
+                self.edit_mode = True
                 imgui.close_current_popup()
         
     
     def on_selection(self, node, tri_id):
         if self.edit_mode:
-            self.edit_joint = self.rbs.get_index_from_node_and_triangle(node, tri_id)
-            if self.edit_joint is not None:
-                self.rbs.color_one(self.edit_joint, (0.3, 0.4, 1, 1))
+            # Find the index of the joint that is currently being edited.
+            self._edit_joint = self.rbs.get_index_from_node_and_triangle(node, tri_id)
+            if self._edit_joint is not None:
+                self.rbs.color_one(self._edit_joint, (0.3, 0.4, 1, 1))
             else:
                 # Reset color of all spheres to the default color
                 self.rbs.color = self.rbs.color

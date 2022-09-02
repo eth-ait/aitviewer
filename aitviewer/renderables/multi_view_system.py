@@ -35,9 +35,10 @@ class MultiViewSystem(Node):
         and the path to a directory with M subdirectories, containing N images each.
 
         :param camera_info_path: path to a camera info .npz file with the following file entries
-            'ids':        A np array of camera ids (M)
-            'intrinsics': A np array of camera intrinsics in the format used by OpenCV (M, 3, 3)
-            'extrinsics': A np array of camera extrinsics in the format used by OpenCV (M, 3, 4)
+            'ids':         A np array of camera ids (M)
+            'intrinsics':  A np array of camera intrinsics in the format used by OpenCV (M, 3, 3)
+            'extrinsics':  A np array of camera extrinsics in the format used by OpenCV (M, 3, 4)
+            'dist_coeffs': A np array of camera distortion coefficients in the format used by OpenCV (M, 5) 
         :param camera_images_path: path to a directory with M subdirectories, one for each camera
             with the camera id as name. Each directory contains N images for the respective camera
             with a filename ending with the frame number.
@@ -178,10 +179,12 @@ class MultiViewSystem(Node):
 
     @property
     def frustums_enabled(self):
+        """Returns True if the frustums are enabled and False otherwise."""
         return self._frustums_enabled
     
     @frustums_enabled.setter
     def frustums_enabled(self, enabled):
+        """Setting this to True shows the frustums of active cameras."""
         if enabled == self._frustums_enabled:
             return
         self._frustums_enabled = enabled
@@ -195,10 +198,12 @@ class MultiViewSystem(Node):
     
     @property
     def billboards_enabled(self):
+        """Returns True if the billboards are enabled and False otherwise."""
         return self._billboards_enabled
     
     @billboards_enabled.setter
     def billboards_enabled(self, enabled):
+        """Setting this to True shows the billobards of active cameras."""
         if enabled == self._billboards_enabled:
             return
         self._billboards_enabled = enabled
@@ -217,10 +222,12 @@ class MultiViewSystem(Node):
 
     @property
     def cameras_enabled(self):
+        """Returns True if the cameras are enabled and False otherwise."""
         return self._cameras_enabled
 
     @cameras_enabled.setter
     def cameras_enabled(self, enabled):
+        """Setting this to True shows the cameras as meshes in the scene."""
         if enabled == self._cameras_enabled:
             return
         self._cameras_enabled = enabled

@@ -198,9 +198,11 @@ class Node(object):
         self.current_frame_id = self.current_frame_id - 1 if self.current_frame_id > 0 else len(self) - 1
 
     def on_before_frame_update(self):
+        """Called when the current frame is about to change, 'self.current_frame_id' still has the id of the previous frame."""
         pass
 
     def on_frame_update(self):
+        """Called when the current frame is changed."""
         for n in self.nodes:
             n.current_frame_id = self.current_frame_id
 

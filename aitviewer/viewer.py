@@ -751,10 +751,6 @@ class Viewer(moderngl_window.WindowConfig):
 
     def select_object(self, x: int, y: int):
         """Selects the object at pixel coordinates x, y, returns True if an object is selected"""
-        # If the selection is locked, do nothing
-        if self.lock_selection:
-            return False
-
         mmi = self.mesh_mouse_intersection(x, y)
         if mmi is not None:
             node = mmi.node
@@ -762,8 +758,12 @@ class Viewer(moderngl_window.WindowConfig):
             # Traverse all parents until one is found that is selectable
             while node.parent is not None:
                 if node.is_selectable:
-                    self.scene.select(node, mmi.node, mmi.tri_id)
-                    return True
+                    # If the selection is locked only allow selecting the locked object
+                    if not self.lock_selection or node == self.scene.selected_object:
+                        self.scene.select(node, mmi.node, mmi.tri_id)
+                        return True
+                    else:
+                        return False
                 node = node.parent
         
         return False

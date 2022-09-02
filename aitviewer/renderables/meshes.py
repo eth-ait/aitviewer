@@ -216,7 +216,6 @@ class Meshes(Node):
         else:
             if len(vertex_colors.shape) == 2:
                 vertex_colors = np.repeat(vertex_colors[np.newaxis], self.n_frames, axis=0)
-                print(vertex_colors.shape)
             assert len(vertex_colors.shape) == 3
             self._vertex_colors = vertex_colors
             self._use_uniform_color = False
