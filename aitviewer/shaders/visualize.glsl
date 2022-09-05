@@ -1,4 +1,4 @@
-#version 330
+#version 400
 
 #if defined VERTEX_SHADER
 

@@ -53,6 +53,7 @@ class Viewer(moderngl_window.WindowConfig):
     window_type = 'pyqt5'
     size_mult = 1.0
     samples = 4
+    gl_version = (4, 0)
 
     def __init__(self, title="AITViewer", size=None, **kwargs):
         """
@@ -77,7 +78,7 @@ class Viewer(moderngl_window.WindowConfig):
             size=size,
             fullscreen=C.fullscreen,
             resizable=C.resizable,
-            gl_version=(3, 3),
+            gl_version=self.gl_version,
             aspect_ratio=None,  # Have to set this to None otherwise the window will enforce this aspect ratio.
             vsync=C.vsync,  # Set to False for some performance gains.
             samples=self.samples,
