@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -15,14 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import copy
-import os
+import imgui
 import moderngl
 import moderngl_window
-import imgui
-import shutil
-import tempfile
 import numpy as np
+import os
 import struct
+import tempfile
+import trimesh
 
 from array import array
 from aitviewer.configuration import CONFIG as C
@@ -41,8 +41,6 @@ from moderngl_window.opengl.vao import VAO
 from pathlib import Path
 from PIL import Image
 from tqdm import tqdm
-import trimesh
-
 
 
 MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')
@@ -598,7 +596,7 @@ class Viewer(moderngl_window.WindowConfig):
                 max_output_fps = 60.0
             self.export_fps = min(self.export_fps, max_output_fps)
             _, self.export_fps = imgui.drag_float('fps', self.export_fps, 0.1,
-                                                min_value=1.0, max_value=max_output_fps, format='%.1f')
+                                                  min_value=1.0, max_value=max_output_fps, format='%.1f')
             
             if self.export_animation:
                 imgui.same_line(spacing=23)
@@ -607,7 +605,9 @@ class Viewer(moderngl_window.WindowConfig):
             
             imgui.spacing()
             imgui.text(f"Output resolution: [{int(self.window_size[0] / self.export_downscale_factor)}]x[{int(self.window_size[1] / self.export_downscale_factor)}]")
-            _, self.export_downscale_factor = imgui.drag_float('Downscale', self.export_downscale_factor, min_value=1.0, max_value=100.0, change_speed=0.05, format='%.1f')
+            _, self.export_downscale_factor = imgui.drag_float('Downscale', self.export_downscale_factor,
+                                                               min_value=1.0, max_value=100.0,
+                                                               change_speed=0.05, format='%.1f')
             
             imgui.same_line(spacing=20)
             if imgui.button("1x"):

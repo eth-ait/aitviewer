@@ -18,7 +18,6 @@ import moderngl
 import numpy as np
 
 from aitviewer.renderables.coordinate_system import CoordinateSystem
-from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.plane import ChessboardPlane
 from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
@@ -46,7 +45,8 @@ class Scene(Node):
         # directional_lights.glsl as well!
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
         self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
-        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0), shadow_enabled=False))
+        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0),
+                                 shadow_enabled=False))
         self.add(*self.lights, show_in_hierarchy=False)
 
         # Scene items

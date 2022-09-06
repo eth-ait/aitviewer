@@ -14,18 +14,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+import cv2
+import moderngl
+import numpy as np
+import pickle
+
 from aitviewer.scene.camera import Camera, OpenCVCamera
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_screen_texture_program
 from aitviewer.utils.decorators import hooked
-from typing import List
-
-import cv2
-import pickle
-import moderngl
 from moderngl_window.opengl.vao import VAO
-import numpy as np
 from trimesh.triangles import points_to_barycentric
+from typing import List
 
 
 class Billboard(Node):
@@ -76,9 +76,9 @@ class Billboard(Node):
         self.outline = True
 
     @classmethod
-    def from_position_and_ar(cls, texture_paths, scale=1.0, **kwargs):
+    def from_images(cls, texture_paths, scale=1.0, **kwargs):
         """
-        Initialize a Billboard at the given world position and with a given scale.
+        Initialize Billboards at default location with the given textures.
         """
         # Load a single image so we can determine the aspect ratio.
         img = cv2.imread(texture_paths[0])
@@ -99,7 +99,7 @@ class Billboard(Node):
                                  texture_paths: List[str], image_process_fn=None):
         """
         Initialize a Billboard from a camera object, a distance from the camera, the size of the image in
-        pixels and the set of images.
+        pixels and the set of images. `image_process_fn` can be used to apply a function to each image.
         """
         frames = camera.n_frames
         frame_id = camera.current_frame_id
@@ -217,4 +217,4 @@ class Billboard(Node):
 
     def gui_material(self, imgui, show_advanced=True):
         _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name),
-                                                    self.texture_alpha, 0.0, 1.0, '%.2f')
+                                                   self.texture_alpha, 0.0, 1.0, '%.2f')

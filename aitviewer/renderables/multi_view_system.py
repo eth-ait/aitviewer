@@ -14,16 +14,14 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
-from collections import OrderedDict
-from aitviewer.scene import camera
-from aitviewer.scene.camera import OpenCVCamera
-from aitviewer.scene.node import Node
-from aitviewer.renderables.billboard import Billboard
-
 import numpy as np
 import os
 import re
+
+from collections import OrderedDict
+from aitviewer.scene.camera import OpenCVCamera
+from aitviewer.scene.node import Node
+from aitviewer.renderables.billboard import Billboard
 
 
 class MultiViewSystem(Node):
@@ -52,7 +50,7 @@ class MultiViewSystem(Node):
         :param viewer: the viewer, used for changing the view to one of the cameras'
         """
         # Load camera information.
-        camera_info = np.load(open(camera_info_path, 'rb'))
+        camera_info = np.load(camera_info_path)
 
         # Compute max number of images per camera and use it as number of frames for this node.
         camera_n_frames = []

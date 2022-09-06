@@ -78,7 +78,7 @@ class Arrows(Node):
     def current_tips(self):
         return self.tips[self.current_frame_id]
     
-    @current_origins.setter
+    @current_tips.setter
     def current_tips(self, tips):
         self.tips[self.current_frame_id] = tips
     

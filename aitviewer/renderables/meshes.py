@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,15 +17,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 
 import moderngl
-from moderngl_window.opengl.vao import VAO
 import numpy as np
 import trimesh
 import tqdm
 import re
 import pickle
-
-from functools import lru_cache
-from PIL import Image
 
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_smooth_lit_with_edges_program
@@ -35,7 +31,10 @@ from aitviewer.utils.decorators import hooked
 from aitviewer.utils.utils import compute_vertex_and_face_normals
 from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
+from functools import lru_cache
+from moderngl_window.opengl.vao import VAO
 from trimesh.triangles import points_to_barycentric
+from PIL import Image
 
 
 class Meshes(Node):
@@ -209,12 +208,17 @@ class Meshes(Node):
 
     @vertex_colors.setter
     def vertex_colors(self, vertex_colors):
-        # Vertex colors cannot be empty
-        if vertex_colors is None or isinstance(vertex_colors, tuple) and len(vertex_colors) == 4:
+        # If vertex_colors are None, we resort to the material color.
+        if vertex_colors is None:
             self._vertex_colors = None
             self._use_uniform_color = True
+        elif isinstance(vertex_colors, tuple) and len(vertex_colors) == 4:
+            self.vertex_colors = None
+            self._use_uniform_color = True
+            self.material.color = vertex_colors
         else:
             if len(vertex_colors.shape) == 2:
+                assert vertex_colors.shape[0] == self.n_vertices
                 vertex_colors = np.repeat(vertex_colors[np.newaxis], self.n_frames, axis=0)
             assert len(vertex_colors.shape) == 3
             self._vertex_colors = vertex_colors

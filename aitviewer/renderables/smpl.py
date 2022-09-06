@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import pickle as pkl
 import torch
-from scipy.spatial.transform import Rotation
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
@@ -35,8 +34,9 @@ from aitviewer.utils import to_torch
 from aitviewer.utils import local_to_global
 from aitviewer.utils import interpolate_positions
 from aitviewer.utils import to_numpy as c2c
-
+from scipy.spatial.transform import Rotation
 from smplx.joint_names import JOINT_NAMES, SMPLH_JOINT_NAMES
+
 
 class SMPLSequence(Node):
     """
@@ -142,7 +142,7 @@ class SMPLSequence(Node):
         # First convert the relative joint angles to global joint angles in rotation matrix form.
         if self.smpl_layer.model_type != "flame":
             global_oris = local_to_global(torch.cat([self.poses_root, self.poses_body], dim=-1),
-                                            self.skeleton[:, 0], output_format='rotmat')
+                                          self.skeleton[:, 0], output_format='rotmat')
             global_oris = c2c(global_oris.reshape((self.n_frames, -1, 3, 3)))
         else:
             global_oris = np.tile(np.eye(3), self.joints.shape[:-1])[np.newaxis]
@@ -159,7 +159,7 @@ class SMPLSequence(Node):
         self.mesh_seq.position = self.position
         self.mesh_seq.rotation = self.rotation
         self._add_node(self.mesh_seq, gui_elements=['material'])
-        
+
         # Save view mode state to restore when exiting edit mode.
         self._view_mode_color = self.mesh_seq.color
         self._view_mode_joint_angles = self._show_joint_angles
@@ -192,9 +192,9 @@ class SMPLSequence(Node):
                 trans = resample_positions(trans, fps_in, fps_out)
 
         i_root_end = 3
-        i_body_end = i_root_end + smpl_layer.bm.NUM_BODY_JOINTS*3
-        i_left_hand_end = i_body_end + smpl_layer.bm.NUM_HAND_JOINTS*3
-        i_right_hand_end = i_left_hand_end + smpl_layer.bm.NUM_HAND_JOINTS*3
+        i_body_end = i_root_end + smpl_layer.bm.NUM_BODY_JOINTS * 3
+        i_left_hand_end = i_body_end + smpl_layer.bm.NUM_HAND_JOINTS * 3
+        i_right_hand_end = i_left_hand_end + smpl_layer.bm.NUM_HAND_JOINTS * 3
 
         return cls(poses_body=poses[:, i_root_end:i_body_end],
                    poses_root=poses[:, :i_root_end],
@@ -263,25 +263,24 @@ class SMPLSequence(Node):
     @property
     def poses(self):
         return torch.cat((self.poses_root, self.poses_body), dim=-1)
-    
 
     def fk(self, current_frame_only=False):
         """Get joints and/or vertices from the poses."""
         if current_frame_only:
             # Use current frame data.
             if self._edit_mode:
-                poses_root = self._edit_pose[:3][None,:]
-                poses_body = self._edit_pose[3:][None,:]
+                poses_root = self._edit_pose[:3][None, :]
+                poses_body = self._edit_pose[3:][None, :]
             else:
-                poses_body = self.poses_body[self.current_frame_id][None,:]
-                poses_root = self.poses_root[self.current_frame_id][None,:]
-            
-            poses_left_hand = None if self.poses_left_hand is None else self.poses_left_hand[self.current_frame_id][None,:]
-            poses_right_hand = None if self.poses_right_hand is None else self.poses_right_hand[self.current_frame_id][None,:]
-            trans = self.trans[self.current_frame_id][None,:]
+                poses_body = self.poses_body[self.current_frame_id][None, :]
+                poses_root = self.poses_root[self.current_frame_id][None, :]
+
+            poses_left_hand = None if self.poses_left_hand is None else self.poses_left_hand[self.current_frame_id][None, :]
+            poses_right_hand = None if self.poses_right_hand is None else self.poses_right_hand[self.current_frame_id][None, :]
+            trans = self.trans[self.current_frame_id][None, :]
 
             if self.betas.shape[0] == self.n_frames:
-                betas = self.betas[self.current_frame_id][None,:]
+                betas = self.betas[self.current_frame_id][None, :]
             else:
                 betas = self.betas
         else:
@@ -295,19 +294,19 @@ class SMPLSequence(Node):
             else:
                 poses_body = self.poses_body
                 poses_root = self.poses_root
-                
+
             poses_left_hand = self.poses_left_hand
             poses_right_hand = self.poses_right_hand
-            trans=self.trans
-            betas=self.betas
-        
+            trans = self.trans
+            betas = self.betas
+
         verts, joints = self.smpl_layer(poses_root=poses_root,
                                         poses_body=poses_body,
                                         poses_left_hand=poses_left_hand,
                                         poses_right_hand=poses_right_hand,
                                         betas=betas,
                                         trans=trans)
-                                        
+
         # Transform output vertices and joints into our viewer's coordinate system (where Y is up).
         # We do this on the joints and not on the root pose of SMPL because the SMPL root does not correspond
         # to the SMPL origin as pointed out by: https://github.com/eth-ait/aitviewer/issues/5
@@ -315,7 +314,7 @@ class SMPLSequence(Node):
             to_y_up = torch.Tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]]).to(verts.device, dtype=verts.dtype)
             verts = torch.matmul(to_y_up.unsqueeze(0), verts.unsqueeze(-1)).squeeze(-1)
             joints = torch.matmul(to_y_up.unsqueeze(0), joints.unsqueeze(-1)).squeeze(-1)
-        
+
         skeleton = self.smpl_layer.skeletons()['body'].T
         faces = self.smpl_layer.bm.faces.astype(np.int64)
         joints = joints[:, :skeleton.shape[0]]
@@ -376,12 +375,13 @@ class SMPLSequence(Node):
 
             if self._is_rigged:
                 self.skeleton_seq.current_joint_positions = joints
-            
+
             # Use current frame data.
             if self._edit_mode:
                 pose = self._edit_pose
             else:
-                pose = torch.cat([self.poses_root[self.current_frame_id], self.poses_body[self.current_frame_id]], dim=-1)
+                pose = torch.cat([self.poses_root[self.current_frame_id], self.poses_body[self.current_frame_id]],
+                                 dim=-1)
 
             # Update rigid bodies.
             if self.smpl_layer.model_type != 'flame':
@@ -389,7 +389,7 @@ class SMPLSequence(Node):
                 global_oris = global_oris.reshape((-1, 3, 3))
                 self.rbs.current_rb_ori = c2c(global_oris)
             self.rbs.current_rb_pos = self.joints[self.current_frame_id]
-            
+
             # Update mesh.
             self.mesh_seq.current_vertices = vertices
         else:
@@ -414,7 +414,7 @@ class SMPLSequence(Node):
             # Update rigid bodies.
             if self.smpl_layer.model_type != 'flame':
                 global_oris = local_to_global(torch.cat([poses_root, poses_body], dim=-1),
-                                                self.skeleton[:, 0], output_format='rotmat')
+                                              self.skeleton[:, 0], output_format='rotmat')
                 global_oris = global_oris.reshape((self.n_frames, -1, 3, 3))
                 self.rbs.rb_ori = c2c(global_oris)
             self.rbs.rb_pos = self.joints
@@ -427,18 +427,18 @@ class SMPLSequence(Node):
     @property
     def edit_mode(self):
         return self._edit_mode
-    
+
     @edit_mode.setter
     def edit_mode(self, enabled):
         if enabled == self._edit_mode:
             return
-            
+
         if not enabled:
             self._edit_mode = False
 
             self.mesh_seq.backface_fragmap = False
             self.mesh_seq.color = self._view_mode_color
-            
+
             self.rbs.color = (0, 1, 0.5, 1.0)
             self.rbs.enabled = self._view_mode_joint_angles
             self.rbs.is_selectable = True
@@ -447,7 +447,7 @@ class SMPLSequence(Node):
             self.rbs.enabled = True
             self.rbs.is_selectable = False
             self._edit_pose = self.poses[self.current_frame_id].clone()
-            
+
             # Disable picking for the mesh
             self.mesh_seq.backface_fragmap = True
             self.rbs.color = (1, 0, 0.5, 1.0)
@@ -464,13 +464,13 @@ class SMPLSequence(Node):
         else:
             if j < len(JOINT_NAMES):
                 name = JOINT_NAMES[j]
-        
+
         if tree:
             e = imgui.tree_node(f'{j} - {name}')
         else:
             e = True
             imgui.text(f'{j} - {name}')
-        
+
         if e:
             aa = self._edit_pose[j * 3: (j + 1) * 3]
             euler = aa2euler_numpy(aa.cpu().numpy(), degrees=True)
@@ -484,7 +484,7 @@ class SMPLSequence(Node):
                 for c in tree.get(j, []):
                     self._gui_joint(imgui, c, tree)
                 imgui.tree_pop()
-                
+
     def gui(self, imgui):
         super().gui_animation(imgui)
         super().gui_position(imgui)
@@ -493,25 +493,25 @@ class SMPLSequence(Node):
             self.edit_mode = False
         if imgui.radio_button("Edit mode", self.edit_mode):
             self.edit_mode = True
-        
+
         imgui.spacing()
 
         if self.edit_mode:
             skel = self.smpl_layer.skeletons()['body'].cpu().numpy()
-            
+
             tree = {}
             for i in range(skel.shape[1]):
                 if skel[0, i] != -1:
                     tree.setdefault(skel[0, i], []).append(skel[1, i])
-                    
+
             if not tree:
                 return
-    
-            if self._edit_joint is None:            
+
+            if self._edit_joint is None:
                 self._gui_joint(imgui, 0, tree)
-            else: 
+            else:
                 self._gui_joint(imgui, self._edit_joint)
-            
+
             if imgui.button("Apply"):
                 self.poses_root[self.current_frame_id] = self._edit_pose[:3]
                 self.poses_body[self.current_frame_id] = self._edit_pose[3:]
@@ -536,19 +536,17 @@ class SMPLSequence(Node):
                 self._edit_pose_dirty = False
                 self.redraw(current_frame_only=True)
 
-
     def gui_context_menu(self, imgui):
         if self.edit_mode and self._edit_joint is not None:
             self._gui_joint(imgui, self._edit_joint)
-        else:        
+        else:
             if imgui.radio_button("View mode", not self.edit_mode):
                 self.edit_mode = False
                 imgui.close_current_popup()
             if imgui.radio_button("Edit mode", self.edit_mode):
                 self.edit_mode = True
                 imgui.close_current_popup()
-        
-    
+
     def on_selection(self, node, tri_id):
         if self.edit_mode:
             # Find the index of the joint that is currently being edited.
@@ -558,7 +556,7 @@ class SMPLSequence(Node):
             else:
                 # Reset color of all spheres to the default color
                 self.rbs.color = self.rbs.color
-    
+
     def render_outline(self, ctx, camera, prog):
         # Only render outline of the mesh, skipping skeleton and rigid bodies.
         self.mesh_seq.render_outline(ctx, camera, prog)

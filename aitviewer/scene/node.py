@@ -14,12 +14,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from functools import lru_cache
+import moderngl
 import numpy as np
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.scene.material import Material
-import moderngl
+from functools import lru_cache
+
 
 class Node(object):
     """Interface for nodes."""
@@ -356,10 +357,9 @@ class Node(object):
         """Render the current frame in this sequence."""
         pass
 
-    def render_positions(self):
+    def render_positions(self, prog):
         """
-        Render with a VAO with only positions bound, 
-        used for shadow mapping, fragmap and depth prepass.
+        Render with a VAO with only positions bound, used for shadow mapping, fragmap and depth prepass.
         """
         pass
 

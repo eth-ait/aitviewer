@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -15,11 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
-import os
+import moderngl
+
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_simple_unlit_program
 from moderngl_window.opengl.vao import VAO
-import moderngl
 
 
 class PointClouds(Node):
@@ -135,7 +135,6 @@ class PointClouds(Node):
     @Node.once
     def make_renderable(self, ctx):
         ctx.point_size = self.point_size
-
         self.prog = get_simple_unlit_program()
         self.vbo_points = ctx.buffer(reserve=self.max_n_points * 3 * 4, dynamic=True)
         self.vbo_colors = ctx.buffer(reserve=self.max_n_points * 4 * 4, dynamic=True)

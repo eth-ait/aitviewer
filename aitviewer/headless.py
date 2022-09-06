@@ -14,18 +14,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import os
-import tempfile
-import shutil
-
-from aitviewer.scene.camera import PinholeCamera
-from aitviewer.utils import images_to_video
 from aitviewer.viewer import Viewer
-from tqdm import tqdm
 
 
 class HeadlessRenderer(Viewer):
-    gl_version = (3, 3)
+    gl_version = (4, 0)
     samples = 0  # Headless rendering does not like super sampling.
     window_type = 'headless'
 
@@ -43,7 +36,6 @@ class HeadlessRenderer(Viewer):
         :param frame_dir: Where to store the individual frames or None if you don't care.
         :param video_dir: If set will automatically generate a video from the images found in `frame_dir`. Must
           be specified if `frame_dir` is None.
-        :param log: Log some info.
         :param output_fps: Fps of the output video, if None uses 60fps as default
         """
         if frame_dir is None and video_dir is None:

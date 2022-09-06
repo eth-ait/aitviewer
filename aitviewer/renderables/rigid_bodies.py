@@ -15,7 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
-import os
 
 from aitviewer.scene.node import Node
 from aitviewer.renderables.spheres import Spheres
@@ -62,7 +61,8 @@ class RigidBodies(Node):
             line = line / np.linalg.norm(line, axis=-1, keepdims=True) * length
             color = c.copy()
             color[i] = 1.0
-            axs = Arrows(self.rb_pos, self.rb_pos + line, r_base=r_base, r_head=r_head, color=tuple(color), is_selectable=False)
+            axs = Arrows(self.rb_pos, self.rb_pos + line, r_base=r_base, r_head=r_head, color=tuple(color),
+                         is_selectable=False)
             axs.position = self.position
             self._add_node(axs, has_gui=False, show_in_hierarchy=False)
             self.coords.append(axs)

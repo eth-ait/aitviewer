@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -74,18 +74,18 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
     
     # Create mp4 from frames.
     command = ['ffmpeg',
-                '-framerate', str(input_fps),  # must be this early in the command, otherwise it is not applied.
-                '-start_number', str(start_frame),
-                '-i', os.path.join(frame_dir, frame_format),
-                '-c:v', 'libx264',
-                '-preset', 'slow',
-                '-profile:v', 'high',
-                '-level:v', '4.0',
-                '-pix_fmt', 'yuv420p',
-                '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',  # Avoid error when image res is not divisible by 2.
-                '-r', str(output_fps),
-                '-y',
-                video_path_mp4]
+               '-framerate', str(input_fps),  # must be this early in the command, otherwise it is not applied.
+               '-start_number', str(start_frame),
+               '-i', os.path.join(frame_dir, frame_format),
+               '-c:v', 'libx264',
+               '-preset', 'slow',
+               '-profile:v', 'high',
+               '-level:v', '4.0',
+               '-pix_fmt', 'yuv420p',
+               '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',  # Avoid error when image res is not divisible by 2.
+               '-r', str(output_fps),
+               '-y',
+               video_path_mp4]
 
     with open(os.devnull, 'w') as FNULL:
         subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
@@ -100,7 +100,6 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
                    
         with open(os.devnull, 'w') as FNULL:
             subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
-
 
 
 def interpolate_positions(positions, ts_in, ts_out):
@@ -138,6 +137,7 @@ def compute_vertex_and_face_normals_torch(vertices, faces, vertex_faces, normali
     :param vertices: A tensor of shape (N, V, 3).
     :param faces: A tensor of shape (F, 3) indexing into `vertices`.
     :param vertex_faces: A tensor of shape (V, MAX_VERTEX_DEGREE) that lists the face IDs each vertex is a part of.
+    :param normalize: Whether to make the normals unit length or not.
     :return: The vertex and face normals as tensors of shape (N, V, 3) and (N, F, 3) respectively.
     """
     vs = vertices[:, faces.to(dtype=torch.long)]

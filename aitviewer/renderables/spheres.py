@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@ import numpy as np
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
+
 
 def _create_spheres(radius=1.0, rings=16, sectors=32, n_spheres=1, create_faces=True):
     """
