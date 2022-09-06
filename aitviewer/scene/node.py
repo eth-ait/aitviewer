@@ -14,12 +14,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from functools import lru_cache
+import moderngl
 import numpy as np
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.scene.material import Material
-from moderngl_window.opengl.vao import VAO
+from functools import lru_cache
 
 
 class Node(object):
@@ -34,6 +34,7 @@ class Node(object):
                  color=(0.5, 0.5, 0.5, 1.0),
                  material=None,
                  render_priority=1,
+                 is_selectable=True,
                  n_frames=1):
         """
         :param name: Name of the node
@@ -60,11 +61,14 @@ class Node(object):
         self.render_priority = render_priority
         self.is_renderable = False
         self.backface_culling = True
+        self.backface_fragmap = False
+        self.draw_outline = False
 
         # Flags to enable rendering passes
         self.cast_shadow = False
         self.fragmap = False
         self.depth_prepass = False
+        self.outline = False
 
         # GUI
         self.name = name if name is not None else type(self).__name__
@@ -76,8 +80,10 @@ class Node(object):
         self._has_gui = True
         self._gui_elements = []
         self._show_in_hierarchy = True
-
+        self.is_selectable = is_selectable
+        
         self.nodes = []
+        self.parent = None
 
     # Transform
     @property
@@ -145,10 +151,18 @@ class Node(object):
         if len(points.shape) == 2 and points.shape[-1] == 3:
             points = points[np.newaxis]
         assert len(points.shape) == 3
-        return np.array([
-            [points[:, :, 0].min(), points[:, :, 0].max()],
-            [points[:, :, 1].min(), points[:, :, 1].max()],
-            [points[:, :, 2].min(), points[:, :, 2].max()]]) * self.scale
+
+        # Compute min and max coordinates of the bounding box ignoring NaNs.
+        val = np.array([
+            [np.nanmin(points[:, :, 0]), np.nanmax(points[:, :, 0])],
+            [np.nanmin(points[:, :, 1]), np.nanmax(points[:, :, 1])],
+            [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]]) * self.scale
+
+        # If any of the elements is NaN return an empty bounding box.
+        if np.isnan(val).any():
+            return np.array([[0, 0], [0, 0], [0, 0]])
+        else:
+            return val
 
     @property
     def n_frames(self):
@@ -169,6 +183,7 @@ class Node(object):
     def current_frame_id(self, frame_id):
         if self.n_frames == 1 or frame_id == self._current_frame_id:
             return
+        self.on_before_frame_update()
         if frame_id < 0:
             self._current_frame_id = 0
         elif frame_id >= len(self):
@@ -183,7 +198,12 @@ class Node(object):
     def previous_frame(self):
         self.current_frame_id = self.current_frame_id - 1 if self.current_frame_id > 0 else len(self) - 1
 
+    def on_before_frame_update(self):
+        """Called when the current frame is about to change, 'self.current_frame_id' still has the id of the previous frame."""
+        pass
+
     def on_frame_update(self):
+        """Called when the current frame is changed."""
         for n in self.nodes:
             n.current_frame_id = self.current_frame_id
 
@@ -212,6 +232,7 @@ class Node(object):
         n._expanded = expanded
         n._enabled = enabled
         self.nodes.append(n)
+        n.parent = self
 
     def _add_nodes(self, *nodes, **kwargs):
         """Add multiple nodes"""
@@ -336,17 +357,16 @@ class Node(object):
         """Render the current frame in this sequence."""
         pass
 
-    def render_positions(self):
+    def render_positions(self, prog):
         """
-        Render with a VAO with only positions bound, 
-        used for shadow mapping, fragmap and depth prepass.
+        Render with a VAO with only positions bound, used for shadow mapping, fragmap and depth prepass.
         """
         pass
 
     def redraw(self, **kwargs):
         """ Perform update and redraw operations. Push to the GPU when finished. Recursively redraw child nodes"""
         for n in self.nodes:
-            n.redraw()
+            n.redraw(**kwargs)
 
     def set_camera_matrices(self, prog, camera, **kwargs):
         """Set the model view projection matrix in the given program."""
@@ -385,7 +405,7 @@ class Node(object):
 
         self.render_positions(prog)
 
-    def render_fragmap(self, camera, prog, window_size):
+    def render_fragmap(self, ctx, camera, prog, uid=None):
         if not self.fragmap:
             return
 
@@ -395,9 +415,24 @@ class Node(object):
         # Transpose because np is row-major but OpenGL expects column-major.
         prog['projection'].write(p.T.astype('f4').tobytes())
         prog['modelview'].write(mv.T.astype('f4').tobytes())
-        prog['obj_id'] = self.uid
 
-        self.render_positions(prog)    
+        # Render with the specified object uid, if None use the node uid instead.
+        prog['obj_id'] = uid or self.uid
+
+        if self.backface_culling or self.backface_fragmap:
+            ctx.enable(moderngl.CULL_FACE)
+        else:
+            ctx.disable(moderngl.CULL_FACE)
+
+        # If backface_fragmap is enabled for this node only render backfaces
+        if self.backface_fragmap:
+            ctx.cull_face = 'front'
+            
+        self.render_positions(prog)
+
+        # Restore cull face to back
+        if self.backface_fragmap:
+            ctx.cull_face = 'back'
 
     def render_depth_prepass(self, camera, **kwargs):
         if not self.depth_prepass:
@@ -408,6 +443,21 @@ class Node(object):
         prog['mvp'].write(mvp.T.tobytes())
 
         self.render_positions(prog)  
+    
+    def render_outline(self, ctx, camera, prog):
+        if self.outline:
+            mvp = camera.get_view_projection_matrix() @ self.model_matrix()
+            prog['mvp'].write(mvp.T.tobytes())
+
+            if self.backface_culling:
+                ctx.enable(moderngl.CULL_FACE)
+            else:
+                ctx.disable(moderngl.CULL_FACE)
+            self.render_positions(prog)
+        
+        # Render children node recursively.
+        for n in self.nodes:
+            n.render_outline(ctx, camera, prog)
 
     def release(self):
         """
@@ -417,3 +467,13 @@ class Node(object):
         """
         for n in self.nodes:
             n.release()
+    
+    def on_selection(self, node, tri_id):
+        """
+        Called when the node is selected
+
+        :param node:  the node which was clicked (can be None if the selection wasn't a mouse event)
+        :param tri_id: the id of the triangle that was clicked from the 'node' mesh 
+                       (can be None if the selection wasn't a mouse event)
+        """
+        pass

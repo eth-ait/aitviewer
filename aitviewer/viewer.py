@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -15,19 +15,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import copy
-import os
+import imgui
 import moderngl
 import moderngl_window
-import imgui
-import shutil
-import tempfile
 import numpy as np
+import os
 import struct
+import tempfile
+import trimesh
 
 from array import array
 from aitviewer.configuration import CONFIG as C
+from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.scene.camera import PinholeCamera
 from aitviewer.scene.scene import Scene
+from aitviewer.scene.node import Node
 from aitviewer.streamables.streamable import Streamable
 from aitviewer.utils import images_to_video, PerfTimer
 from collections import namedtuple
@@ -41,7 +43,6 @@ from PIL import Image
 from tqdm import tqdm
 
 
-
 MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')
 
 
@@ -50,6 +51,7 @@ class Viewer(moderngl_window.WindowConfig):
     window_type = 'pyqt5'
     size_mult = 1.0
     samples = 4
+    gl_version = (4, 0)
 
     def __init__(self, title="AITViewer", size=None, **kwargs):
         """
@@ -74,7 +76,7 @@ class Viewer(moderngl_window.WindowConfig):
             size=size,
             fullscreen=C.fullscreen,
             resizable=C.resizable,
-            gl_version=(3, 3),
+            gl_version=self.gl_version,
             aspect_ratio=None,  # Have to set this to None otherwise the window will enforce this aspect ratio.
             vsync=C.vsync,  # Set to False for some performance gains.
             samples=self.samples,
@@ -102,17 +104,6 @@ class Viewer(moderngl_window.WindowConfig):
         self.raw_depth_prog = self.load_program('shadow_mapping/raw_depth.glsl')
         self.depth_only_prog = self.load_program('shadow_mapping/depth_only.glsl')
 
-        # Mesh mouse intersection
-        self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
-        self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
-        self.offscreen_p_tri_id = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
-        self.offscreen_p = self.ctx.framebuffer(
-            color_attachments=[
-                self.offscreen_p_viewpos,
-                self.offscreen_p_tri_id
-            ],
-            depth_attachment=self.offscreen_p_depth
-        )
         # Shaders for mesh mouse intersection
         self.frag_map_prog = self.load_program('fragment_picking/frag_map.glsl')
         self.frag_pick_prog = self.load_program('fragment_picking/frag_pick.glsl')
@@ -121,9 +112,19 @@ class Viewer(moderngl_window.WindowConfig):
         self.picker_output = self.ctx.buffer(reserve=5*4)  # 3 floats, 2 ints
         self.picker_vao = VAO(mode=moderngl.POINTS)
 
-        # For debugging
-        self.offscreen_quad = geometry.quad_2d(size=(0.5, 0.5), pos=(0.75, 0.75))
+        # Shaders for drawing outlines
+        self.outline_prepare_prog = self.load_program('outline/outline_prepare.glsl')
+        self.outline_draw_prog = self.load_program('outline/outline_draw.glsl')
+        self.outline_quad = geometry.quad_2d(size=(2.0, 2.0), pos=(0.0, 0.0))
 
+        # Create framebuffers
+        self.create_framebuffers()
+
+        # For debugging
+        self.visualize = False
+        self.vis_prog =  self.load_program('visualize.glsl')
+        self.vis_quad = geometry.quad_2d(size=(0.9, 0.9), pos=(0.5, 0.5))
+        
         # Custom UI Font
         self.font_dir = Path(__file__).parent / 'resources' / 'fonts'
         self.fonts = imgui.get_io().fonts
@@ -150,10 +151,10 @@ class Viewer(moderngl_window.WindowConfig):
         self.dark_mode = C.dark_mode
         self.playback_fps = C.playback_fps
         self.shadows_enabled = C.shadows_enabled
-        self.show_shadow_map = C.show_shadow_map
         self.auto_set_floor = C.auto_set_floor
         self.auto_set_camera_target = C.auto_set_camera_target
         self.backface_culling = C.backface_culling
+        self.lock_selection = False
 
         self.show_camera_target = False
 
@@ -163,11 +164,24 @@ class Viewer(moderngl_window.WindowConfig):
         self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
 
-        self.mmi = None  # Mesh mouse intersection result
-        self.animation_range = [0, -1]
-        self.video_as_gif = False
-        self.video_rotate = False
+        # Mouse mesh intersection in inspect mode.
+        self.mmi = None
 
+        # Mouse selection
+        self._move_threshold = 3
+        self._mouse_moved = False
+        self._mouse_down_position = np.array([0, 0])
+
+        # Export settings
+        self.export_animation = True
+        self.export_animation_range = [0, -1]
+        self.export_duration = 10
+        self.export_as_gif = False
+        self.export_rotate_camera = False
+        self.export_seconds_per_rotation = 10
+        self.export_fps = 30
+        self.export_downscale_factor = 1.0
+        
         # Key Shortcuts
         self._exit_key = self.wnd.keys.ESCAPE
         self._pause_key = self.wnd.keys.SPACE
@@ -175,35 +189,59 @@ class Viewer(moderngl_window.WindowConfig):
         self._previous_frame_key = self.wnd.keys.COMMA
         self._shadow_key = self.wnd.keys.S
         self._orthographic_camera_key = self.wnd.keys.O
-        self._mode_inspect = self.wnd.keys.I
-        self._mode_view = self.wnd.keys.V
         self._dark_mode_key = self.wnd.keys.D
         self._screenshot_key = self.wnd.keys.P
+        self._middle_mouse_button = 3  # middle
         self._right_mouse_button = 2  # right
         self._left_mouse_button = 1  # left
         self._save_cam_key = self.wnd.keys.C
         self._load_cam_key = self.wnd.keys.L
         self._show_camera_target_key = self.wnd.keys.T
+        self._visualize_key = self.wnd.keys.Z
+        self._flat_shading_key = self.wnd.keys.F
+        self._draw_edges_key = self.wnd.keys.E
+        self._lock_selection_key = self.wnd.keys.K
+        self._mode_inspect_key = self.wnd.keys.I
+        self._mode_view_key = self.wnd.keys.V
         self._shortcut_names = {self.wnd.keys.SPACE: "Space",
                                 self.wnd.keys.C: "C",
                                 self.wnd.keys.D: "D",
                                 self.wnd.keys.I: "I",
                                 self.wnd.keys.L: "L",
+                                self.wnd.keys.K: "K",
                                 self.wnd.keys.O: "O",
                                 self.wnd.keys.P: "P",
                                 self.wnd.keys.S: "S",
-                                self.wnd.keys.T: "T"}
+                                self.wnd.keys.T: "T",
+                                self.wnd.keys.Z: "Z"}
 
         # Disable exit on escape key
         self.window.exit_key = None
         self._exit_popup_open = False
 
-    def run(self, *args, log=True):
+    def create_framebuffers(self):
         """
-        Enter a blocking visualization loop. This is built following `moderngl_window.run_window_config`.
-        :param args: The arguments passed to `config_cls` constructor.
-        :param log: Whether to log to the console.
+        Create all framebuffers which depend on the window size.
+        This is called once at startup and every time the window is resized.
         """
+        # Mesh mouse intersection
+        self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
+        self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
+        self.offscreen_p_tri_id = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
+        self.offscreen_p = self.ctx.framebuffer(
+            color_attachments=[
+                self.offscreen_p_viewpos,
+                self.offscreen_p_tri_id
+            ],
+            depth_attachment=self.offscreen_p_depth
+        )
+        self.offscreen_p_tri_id.filter = (moderngl.NEAREST, moderngl.NEAREST)
+
+        # Outline rendering
+        self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
+        self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
+    
+    def _init_scene(self):
         self.scene.make_renderable(self.ctx)
         if self.auto_set_floor:
             self.scene.auto_set_floor()
@@ -211,8 +249,16 @@ class Viewer(moderngl_window.WindowConfig):
         if self.auto_set_camera_target:
             self.scene.auto_set_camera_target()
         self.scene.set_lights(self.dark_mode)
+        
+    def run(self, *args, log=True):
+        """
+        Enter a blocking visualization loop. This is built following `moderngl_window.run_window_config`.
+        :param args: The arguments passed to `config_cls` constructor.
+        :param log: Whether to log to the console.
+        """
+        self._init_scene()
 
-        self.animation_range[-1] = self.scene.n_frames - 1
+        self.export_animation_range[-1] = self.scene.n_frames - 1
 
         self.timer.start()
         self._last_frame_rendered_at = self.timer.time
@@ -229,9 +275,8 @@ class Viewer(moderngl_window.WindowConfig):
         if duration > 0 and log:
             print("Duration: {0:.2f}s @ {1:.2f} FPS".format(duration, self.window.frames / duration))
 
-    def render(self, time, frame_time):
+    def render(self, time, frame_time, export=False):
         """The main drawing function."""
-
         # Advance up to 100 frames to avoid looping for too long if the playback speed is too high
         for _ in range(100):
             # Check if we need to advance the sequences. 
@@ -245,22 +290,33 @@ class Viewer(moderngl_window.WindowConfig):
         #Update camera matrices that will be used for rendering
         self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
 
-        self.streamable_capture()
-        self.render_fragmap()
+        if not export:
+            self.streamable_capture()
+            self.render_fragmap()
+
         self.render_shadowmap()
         self.render_prepare()
         self.render_scene()
+        self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], (0.3, 0.7, 1, 1))
 
-        if self.show_shadow_map:
-            self.offscreen_p_depth.use(location=0)
-            self.offscreen_quad.render(self.frag_map_prog)
+        if not export:
+            # If the selected object is a Node render its outline.
+            if isinstance(self.scene.selected_object, Node):
+                self.render_outline([self.scene.selected_object], (1.0, 0.86, 0.35, 1.0))
 
-        # FPS accounting.
-        self._past_frametimes[:-1] = self._past_frametimes[1:]
-        self._past_frametimes[-1] = frame_time
+            # If visualize is True draw a texture with the object id to the screen for debugging.
+            if self.visualize:
+                self.ctx.enable_only(moderngl.NOTHING)
+                self.offscreen_p_tri_id.use(location=0)
+                self.vis_prog['hash_color'] = True
+                self.vis_quad.render(self.vis_prog)
 
-        # Render the UI components.
-        self.gui()
+            # FPS accounting.
+            self._past_frametimes[:-1] = self._past_frametimes[1:]
+            self._past_frametimes[-1] = frame_time
+
+            # Render the UI components.
+            self.gui()
 
     def streamable_capture(self):
         # Collect all streamable nodes
@@ -288,7 +344,25 @@ class Viewer(moderngl_window.WindowConfig):
         self.offscreen_p.use()
         rs = self.scene.collect_nodes()
         for r in rs:
-            r.render_fragmap(self.scene.camera, self.frag_map_prog, self.wnd.buffer_size)
+            r.render_fragmap(self.ctx, self.scene.camera, self.frag_map_prog)
+
+    def render_outline(self, nodes, color):
+        # Prepare the outline buffer, all objects rendered to this buffer will be outlined.
+        self.outline_framebuffer.clear()
+        self.outline_framebuffer.use()
+        # Render outline of the nodes with outlining enabled, this potentially also renders their children.
+        for n in nodes:
+            n.render_outline(self.ctx, self.scene.camera, self.outline_prepare_prog)
+
+        # Render the outline effect to the window.
+        self.wnd.use()
+        self.wnd.fbo.depth_mask = False
+        self.ctx.enable_only(moderngl.NOTHING)
+        self.outline_texture.use(0)
+        self.outline_draw_prog['outline'] = 0
+        self.outline_draw_prog['outline_color'] = color
+        self.outline_quad.render(self.outline_draw_prog)
+        self.wnd.fbo.depth_mask = True
 
     def render_scene(self):
         """Render the current scene to the framebuffer without time accounting and GUI elements."""
@@ -338,7 +412,23 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui(self):
         imgui.new_frame()
+        
+        # Create a context menu when right clicking on the background.
+        if (not any([imgui.is_window_hovered(), imgui.is_any_item_hovered()]) 
+            and imgui.is_mouse_released(button=1)
+            and not self._mouse_moved):
+            # Select the object under the cursor
+            if self.select_object(*imgui.get_io().mouse_pos) and hasattr(self.scene.selected_object, 'gui_context_menu'):
+                imgui.open_popup("Context Menu")
 
+        # Draw the context menu for the selected object
+        if imgui.begin_popup("Context Menu"):
+            if self.scene.selected_object is None or not hasattr(self.scene.selected_object, 'gui_context_menu'):
+                imgui.close_current_popup()
+            else:
+                self.scene.selected_object.gui_context_menu(imgui)
+            imgui.end_popup()
+        
         # Reset user interacting state
         self.imgui_user_interacting = False
 
@@ -351,11 +441,12 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.render()
         self.imgui.render(imgui.get_draw_data())
 
+        self.prevent_background_interactions()
+
     def gui_scene(self):
         # Render scene GUI
         imgui.begin(self.scene.name, True)
         self.scene.gui(imgui)
-        self.prevent_background_interactions()
         imgui.end()
 
     def gui_menu(self):
@@ -372,11 +463,6 @@ class Viewer(moderngl_window.WindowConfig):
                 clicked_export, selected_export = imgui.menu_item(
                     "Save as video..", None, False, True)
 
-                clicked_export360, _ = imgui.menu_item(
-                    "Save as 360 video..", None, False, enabled=isinstance(self.scene.camera, PinholeCamera))
-                if clicked_export360:
-                    self.to_360_deg_video()
-
                 clicked_screenshot, selected_screenshot = imgui.menu_item(
                     "Screenshot", self._shortcut_names[self._screenshot_key], False, True)
                 if clicked_screenshot:
@@ -387,9 +473,15 @@ class Viewer(moderngl_window.WindowConfig):
             if imgui.begin_menu("View", True):
                 _, self.shadows_enabled = imgui.menu_item("Render Shadows", self._shortcut_names[self._shadow_key],
                                                           self.shadows_enabled, True)
-                # _, self.show_shadow_map = imgui.menu_item("Show Shadow Map", None, self.show_shadow_map, True)
                 _, self.dark_mode = imgui.menu_item("Dark Mode", self._shortcut_names[self._dark_mode_key],
                                                     self.dark_mode, True)
+
+                _, self.lock_selection = imgui.menu_item("Lock selection", self._shortcut_names[self._lock_selection_key], 
+                                                         self.lock_selection, True)
+                
+                imgui.end_menu()
+            
+            if imgui.begin_menu("Camera", True):
                 _, self.show_camera_target = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
                                                     self.show_camera_target, True)
 
@@ -411,13 +503,12 @@ class Viewer(moderngl_window.WindowConfig):
                 clicked_load_cam, selected_load_cam = imgui.menu_item("Load Camera",
                                                                 self._shortcut_names[self._load_cam_key],
                                                                 False, True)
-
                 if clicked_load_cam:
                     self.reset_camera()
                     self.scene.camera.load_cam()
 
                 imgui.end_menu()
-
+                
             if imgui.begin_menu("Mode", True):
                 for id, mode in self.modes.items():
                     mode_clicked, _ = imgui.menu_item(mode['title'], mode['shortcut'], id == self.selected_mode, True)
@@ -425,38 +516,120 @@ class Viewer(moderngl_window.WindowConfig):
                         self.selected_mode = id
 
                 imgui.end_menu()
+
+            if imgui.begin_menu("Debug", True):
+                _, self.visualize = imgui.menu_item("Visualize debug texture", self._shortcut_names[self._visualize_key], 
+                                                    self.visualize, True)
+
+                imgui.end_menu()
+
             imgui.end_main_menu_bar()
 
         if clicked_export:
             imgui.open_popup("Export Video")
-        if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
-            imgui.text("Enter Range for Video Export.")
-            rcu, animation_range = imgui.drag_int2('Range##range_control', *self.animation_range,
-                                                   min_value=0,  max_value=self.scene.n_frames-1)
-            if rcu:
-                self.animation_range[0] = max(animation_range[0], 0)
-                self.animation_range[1] = min(animation_range[-1], self.scene.n_frames-1)
-            _, self.video_as_gif = imgui.checkbox("GIF instead of MP4", self.video_as_gif)
-            
-            if isinstance(self.scene.camera, PinholeCamera):
-                _, self.video_rotate = imgui.checkbox("Animate and rotate", self.video_rotate)
-            else:
-                imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
-                imgui.checkbox("Animate and rotate", False)
-                imgui.pop_style_var(1)
+            self.toggle_animation(False)
 
+        imgui.set_next_window_size(530,0)
+        if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
+            if self.scene.n_frames == 1:
+                imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
+                self.export_animation = False
+
+            if imgui.radio_button("Animation", self.export_animation):
+                self.export_animation = True
+
+            if self.scene.n_frames == 1:
+                imgui.pop_style_var()
+                self.export_animation = False
+
+            if imgui.radio_button("360 shot", not self.export_animation):
+                self.export_animation = False
+            
+            if self.export_animation:
+                _, animation_range = imgui.drag_int2('Animation range', *self.export_animation_range, min_value=0, max_value=self.scene.n_frames - 1)
+                if animation_range[0] != self.export_animation_range[0]:
+                    self.export_animation_range[0] = animation_range[0]
+                    self.export_animation_range[1] = max(animation_range[0], animation_range[1])
+                elif animation_range[-1] != self.export_animation_range[1]:
+                    self.export_animation_range[1] = animation_range[1]
+                    self.export_animation_range[0] = min(animation_range[0], animation_range[1])
+                
+                _, self.playback_fps = imgui.drag_float('Playback fps', self.playback_fps, 0.1,
+                                                         min_value=1.0, max_value=120.0, format='%.1f')
+            else:
+                _, self.scene.current_frame_id = imgui.slider_int('Frame', self.scene.current_frame_id,
+                                                                   min_value=0, max_value=self.scene.n_frames - 1)
+                _, self.export_duration = imgui.drag_float('Duration (s)', self.export_duration, min_value=0.1, max_value=10000.0, change_speed=0.05, format='%.1f')
+
+            if self.export_animation:
+                if isinstance(self.scene.camera, PinholeCamera):
+                    _, self.export_rotate_camera = imgui.checkbox("Rotate camera", self.export_rotate_camera)
+                else:
+                    imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
+                    imgui.checkbox("Rotate camera (only available for PinholeCamera)", False)
+                    imgui.pop_style_var(1)
+
+            if not self.export_animation or self.export_rotate_camera:
+                _, self.export_seconds_per_rotation = imgui.drag_float('Rotation time (s)', self.export_seconds_per_rotation, min_value=0.1, max_value=10000.0, change_speed=0.05, format='%.1f')
+                imgui.same_line()
+                if imgui.button("Once"):
+                    if self.export_animation:
+                        self.export_seconds_per_rotation = (self.export_animation_range[1] - self.export_animation_range[0] + 1) / self.playback_fps
+                    else:
+                        self.export_seconds_per_rotation = self.export_duration
+            
+            imgui.spacing()
+            imgui.separator()
+            imgui.spacing()
+
+            # Output settings.
+            imgui.text("Output")
+            imgui.spacing()
+            if imgui.radio_button("MP4", not self.export_as_gif):
+                self.export_as_gif = False
+            if imgui.radio_button("GIF", self.export_as_gif):
+                self.export_as_gif = True
+
+            if self.export_as_gif:
+                max_output_fps = 30.0
+            else:
+                max_output_fps = 60.0
+            self.export_fps = min(self.export_fps, max_output_fps)
+            _, self.export_fps = imgui.drag_float('fps', self.export_fps, 0.1,
+                                                  min_value=1.0, max_value=max_output_fps, format='%.1f')
+            
+            if self.export_animation:
+                imgui.same_line(spacing=23)
+                if imgui.button("Use playback fps"):
+                    self.export_fps = self.playback_fps
+            
+            imgui.spacing()
+            imgui.text(f"Output resolution: [{int(self.window_size[0] / self.export_downscale_factor)}]x[{int(self.window_size[1] / self.export_downscale_factor)}]")
+            _, self.export_downscale_factor = imgui.drag_float('Downscale', self.export_downscale_factor,
+                                                               min_value=1.0, max_value=100.0,
+                                                               change_speed=0.05, format='%.1f')
+            
+            imgui.same_line(spacing=20)
+            if imgui.button("1x"):
+                self.export_downscale_factor = 1.0
+            imgui.same_line()
+            if imgui.button("2x"):
+                self.export_downscale_factor = 2.0
+            imgui.same_line()
+            if imgui.button("4x"):
+                self.export_downscale_factor = 4.0
             
             imgui.spacing()
 
             # Draw a cancel and exit button on the same line using the available space
             button_width = (imgui.get_content_region_available()[0] - imgui.get_style().item_spacing[0]) * 0.5
-            
+
             # Style the cancel with a grey color
             imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
             imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
             imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
 
-            if imgui.button("cancel", width=button_width):
+            if imgui.button("Cancel", width=button_width):
                 imgui.close_current_popup()
 
             imgui.pop_style_color()
@@ -464,11 +637,20 @@ class Viewer(moderngl_window.WindowConfig):
             imgui.pop_style_color()
 
             imgui.same_line()
-            if imgui.button("export", button_width):
+            if imgui.button("Export", button_width):
                 imgui.close_current_popup()
-                self.to_video(self.video_rotate)
+                self.export_video(
+                    os.path.join(C.export_dir, 'videos', self.window.title + ('.gif' if self.export_as_gif else '.mp4')),
+                    animation=self.export_animation,
+                    animation_range=self.export_animation_range,
+                    duration=self.export_duration,
+                    frame=self.scene.current_frame_id,
+                    output_fps=self.export_fps,
+                    rotate_camera=not self.export_animation or self.export_rotate_camera,
+                    seconds_per_rotation=self.export_seconds_per_rotation,
+                    downscale_factor=self.export_downscale_factor
+                )
 
-            self.prevent_background_interactions()
             imgui.end_popup()
 
     def gui_playback(self):
@@ -557,7 +739,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.picker_vao.transform(self.frag_pick_prog, self.picker_output, vertices=1)
         x, y, z, obj_id, tri_id = struct.unpack('3f2i', self.picker_output.read())
 
-        if obj_id > 0 and tri_id > 0:
+        if obj_id >= 0 and tri_id >= 0:
             node = self.scene.get_node_by_uid(obj_id)
             # Camera space to world space
             point_world = np.array(np.linalg.inv(self.scene.camera.get_view_matrix()) @ np.array((x, y, z, 1.0)))[:-1]
@@ -568,9 +750,37 @@ class Viewer(moderngl_window.WindowConfig):
 
         return None
 
+    def select_object(self, x: int, y: int):
+        """Selects the object at pixel coordinates x, y, returns True if an object is selected"""
+        mmi = self.mesh_mouse_intersection(x, y)
+        if mmi is not None:
+            node = mmi.node
+
+            # Traverse all parents until one is found that is selectable
+            while node.parent is not None:
+                if node.is_selectable:
+                    # If the selection is locked only allow selecting the locked object
+                    if not self.lock_selection or node == self.scene.selected_object:
+                        self.scene.select(node, mmi.node, mmi.tri_id)
+                        return True
+                    else:
+                        return False
+                node = node.parent
+        
+        return False
+
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
         self.imgui.resize(width, height)
+        self.create_framebuffers()
+
+    def files_dropped_event(self, x: int, y: int, paths):
+        for path in paths:
+            base, ext = os.path.splitext(path)
+            if ext == ".obj" or ext == ".ply":
+                obj = trimesh.load(path)
+                obj_mesh = Meshes(obj.vertices, obj.faces, name=os.path.basename(base))
+                self.scene.add(obj_mesh)
 
     def key_event(self, key, action, modifiers):
         self.imgui.key_event(key, action, modifiers)
@@ -612,10 +822,10 @@ class Viewer(moderngl_window.WindowConfig):
                     self.reset_camera()
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
 
-            elif key == self._mode_view:
+            elif key == self._mode_view_key:
                 self.selected_mode = 'view'
 
-            elif key == self._mode_inspect:
+            elif key == self._mode_inspect_key:
                 self.selected_mode = 'inspect'
 
             elif key == self._dark_mode_key:
@@ -632,6 +842,22 @@ class Viewer(moderngl_window.WindowConfig):
                 if self._using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.load_cam()
+            
+            elif key == self._visualize_key:
+                self.visualize = not self.visualize
+            
+            elif key == self._flat_shading_key:
+                selected = self.scene.selected_object
+                if isinstance(selected, Meshes) or isinstance(selected, VariableTopologyMeshes):
+                    selected.flat_shading = not selected.flat_shading
+
+            elif key == self._draw_edges_key:
+                selected = self.scene.selected_object
+                if isinstance(selected, Meshes) or isinstance(selected, VariableTopologyMeshes):
+                    selected.draw_edges = not selected.draw_edges
+            
+            elif key == self._lock_selection_key:
+                self.lock_selection = not self.lock_selection
 
         if action == self.wnd.keys.ACTION_RELEASE:
             pass
@@ -646,16 +872,36 @@ class Viewer(moderngl_window.WindowConfig):
         self.imgui.mouse_press_event(x, y, button)
 
         if not self.imgui_user_interacting:
-            self._pan_camera = button == self._right_mouse_button
-            self._rotate_camera = button == self._left_mouse_button
+            # Pan or rotate camera on middle click.
+            if button == self._middle_mouse_button:
+                self._pan_camera = self.wnd.modifiers.shift
+                self._rotate_camera = not self.wnd.modifiers.shift
+
+            # Rotate camera on left click.
+            if button == self._left_mouse_button:
+                self._rotate_camera = True
+                self._pan_camera = False
+            
+            if button == self._right_mouse_button:
+                self._pan_camera = True
+                self._rotate_camera = False
+
+            self._mouse_down_position = np.array([x, y])
+            self._mouse_moved = False
 
     def mouse_release_event(self, x: int, y: int, button: int):
         self.imgui.mouse_release_event(x, y, button)
 
-        if button == self._right_mouse_button:
-            self._pan_camera = False
-        if button == self._left_mouse_button:
-            self._rotate_camera = False
+        self._pan_camera = False
+        self._rotate_camera = False
+
+        if not self.imgui_user_interacting:
+            # Select the mesh under the cursor on left click.
+            if button == self._left_mouse_button and not self._mouse_moved:
+                if not self.select_object(x, y):
+                    # If selection is enabled and nothing was selected clear the previous selection
+                    if not self.lock_selection:
+                        self.scene.select(None)
 
     def mouse_drag_event(self, x: int, y: int, dx: int, dy: int):
         self.imgui.mouse_drag_event(x, y, dx, dy)
@@ -670,6 +916,9 @@ class Viewer(moderngl_window.WindowConfig):
                 if self._using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.rotate_azimuth_elevation(dx, dy)
+            
+            if not self._mouse_moved and np.linalg.norm(np.array([x, y]) - self._mouse_down_position) > self._move_threshold:
+                self._mouse_moved = True
 
     def mouse_scroll_event(self, x_offset: float, y_offset: float):
         self.imgui.mouse_scroll_event(x_offset, y_offset)
@@ -682,10 +931,14 @@ class Viewer(moderngl_window.WindowConfig):
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
 
-    def save_current_frame_as_image(self, frame_dir, frame_id):
+    def save_current_frame_as_image(self, frame_dir, frame_id, downscale_factor=None):
         """Saves the current frame as an image to disk."""
         image = self.get_current_frame_as_image()
         image_name = os.path.join(frame_dir, 'frame_{:0>6}.png'.format(frame_id))
+        if downscale_factor is not None and downscale_factor != 1.0:
+            w = int(image.width / downscale_factor)
+            h = int(image.height / downscale_factor)
+            image = image.resize((w, h), Image.LANCZOS)
         image.save(image_name)
 
     def get_current_frame_as_image(self):
@@ -716,101 +969,106 @@ class Viewer(moderngl_window.WindowConfig):
         self.render_scene()
         self.save_current_frame_as_image(frame_dir, self.scene.current_frame_id)
 
-    def to_video(self, rotate=False):
-        """Render the loaded animations to video."""
-
-        if self.animation_range[-1] < self.animation_range[0]:
-            print("No frames rendered.")
-            return
-
-        if rotate and not isinstance(self.scene.camera, PinholeCamera):
+    def export_video(
+        self, 
+        output_path,
+        frame_dir=None,
+        animation=True,
+        animation_range=None,
+        duration=10.0,
+        frame=None,
+        output_fps=60.0,
+        rotate_camera=False,
+        seconds_per_rotation=10.0,
+        downscale_factor=None,
+        ):
+        if rotate_camera and not isinstance(self.scene.camera, PinholeCamera):
             print("Cannot export an animated video while using a camera that is not a PinholeCamera")
             return 
+        
 
-        # Start all sequences from 0 but remember where we left off.
-        saved_curr_frame = self.scene.current_frame_id
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # If frame_dir is None use the temporary directory.
+            if frame_dir is None:
+                frame_dir = temp_dir
+            else:
+                # We want to avoid overriding anything in an existing directory, so add suffixes.
+                format_str = "{:0>4}"
+                counter = 0
+                candidate_dir = os.path.join(frame_dir, format_str.format(counter))
+                while os.path.exists(candidate_dir):
+                    counter += 1
+                    candidate_dir = os.path.join(frame_dir, format_str.format(counter))
+                frame_dir = os.path.abspath(candidate_dir)
 
-        # Create a temporary directory to render frames to.
-        frame_dir = tempfile.TemporaryDirectory().name
-        os.makedirs(frame_dir)
+                # The frame dir does not yet exist (we've made sure of it).
+                os.makedirs(frame_dir)
 
-        # Store the current camera and create a copy of if required
-        saved_camera = self.scene.camera
-        if rotate:
-            self.scene.camera = copy.deepcopy(self.scene.camera)
+            # Render each frame to an image file.
+            print("Saving frames to {}".format(frame_dir))
+        
+            # Store the current camera and create a copy of it if required.
+            saved_camera = self.scene.camera
+            if rotate_camera:
+                self.scene.camera = copy.deepcopy(self.scene.camera)
+            
+            # Remember viewer data.
+            saved_curr_frame = self.scene.current_frame_id
+            saved_run_animations = self.run_animations
+            
+            if animation:
+                if animation_range is None:
+                    animation_range = [0, self.scene.n_frames - 1]
 
-        az_delta = 2 * np.pi / (self.animation_range[-1]+1)
+                if animation_range[1] < animation_range[0]:
+                    print("No frames rendered.")
+                    return
 
-        # Render each frame to an image file.
-        print("Saving frames to {}".format(frame_dir))
-        progress_bar = tqdm(total=self.animation_range[-1]-self.animation_range[0], desc='Rendering frames')
+                # Compute duration of the animation at given playback speed
+                animation_frames = (animation_range[1] - animation_range[0]) + 1
+                duration = animation_frames / self.playback_fps
 
-        for i, f in enumerate(range(self.animation_range[0], self.animation_range[-1]+1)):
-            if rotate:
-                self.scene.camera.rotate_azimuth(az_delta)
+                # Setup viewer for rendering the animation
+                self.run_animations = True
+                self.scene.current_frame_id = animation_range[0]
+                self._last_frame_rendered_at = 0
+            else:
+                self.run_animations = False
+                self.scene.current_frame_id = frame
 
-            self.scene.current_frame_id = f
-            self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
-            self.render_shadowmap()
-            self.render_prepare()
-            self.render_scene()
-            self.save_current_frame_as_image(frame_dir, i)
-            progress_bar.update()
-        progress_bar.close()
+            # Compute exact number of frames if we have the same playback and output fps
+            if animation and abs(self.playback_fps - output_fps) < 0.1:
+                frames = (animation_range[1] - animation_range[0]) + 1
+                self.run_animations = False
+                exact_playback = True
+            else:
+                frames = int(np.ceil(duration * output_fps))
+                exact_playback = False
 
-        # Export to video.
-        suffix = '.gif' if self.video_as_gif else '.mp4'
-        images_to_video(frame_dir, C.export_dir + '/videos/' + self.window.title + suffix, input_fps=self.playback_fps,
-                        output_fps=60)
+            dt = 1 / output_fps
+            time = 0
 
-        # Remove temp frames.
-        shutil.rmtree(frame_dir)
+            # Compute camera speed.
+            az_delta = 2 * np.pi / seconds_per_rotation * (duration / frames)
+            for i in tqdm(range(frames), desc='Rendering frames'):
+                if rotate_camera:
+                    self.scene.camera.rotate_azimuth(az_delta)
 
-        # Reset frame IDs.
-        self.scene.current_frame_id = saved_curr_frame
-        self.scene.camera = saved_camera
+                self.render(time, time + dt, export=True)
+                self.save_current_frame_as_image(frame_dir, i, downscale_factor=downscale_factor)
 
-        print("Done.")
+                if exact_playback:
+                    self.scene.next_frame()
 
-    def to_360_deg_video(self):
-        """Matrix shot. Keeps the look-at point fixed and rotates the camera around it."""
-        if not isinstance(self.scene.camera, PinholeCamera):
-            print("Cannot export a 360 video while using a camera that is not a PinholeCamera")
-            return
+                time += dt
+                
+            # Export to video.
+            images_to_video(frame_dir, output_path, input_fps=output_fps, output_fps=output_fps)
+            
+            # Reset viewer data.
+            self.scene.camera = saved_camera
+            self.scene.current_frame_id = saved_curr_frame
+            self.run_animations = saved_run_animations
+            self._last_frame_rendered_at = self.timer.time
 
-        n_frames = 360
-        saved_camera = copy.deepcopy(self.scene.camera)
-
-        angles = -np.arange(0, 2*np.pi, 2*np.pi/n_frames)
-        cam_centered = self.scene.camera.position - self.scene.camera.target
-        new_x = cam_centered[0] * np.cos(angles) - cam_centered[2] * np.sin(angles) + self.scene.camera.target[0]
-        new_z = cam_centered[0] * np.sin(angles) + cam_centered[2] * np.cos(angles) + self.scene.camera.target[2]
-        circle = np.stack([new_x, np.zeros_like(new_x) + self.scene.camera.position[1], new_z]).T
-
-        # Create a temporary directory to render frames to.
-        frame_dir = tempfile.TemporaryDirectory().name
-        os.makedirs(frame_dir)
-
-        # Render each frame to an image file.
-        print("Saving frames to {}".format(frame_dir))
-        progress_bar = tqdm(total=n_frames, desc='Rendering frames')
-        for f in range(circle.shape[0]):
-            self.scene.camera.position = circle[f]
-            self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
-            self.render_shadowmap()
-            self.render_prepare()
-            self.render_scene()
-            self.save_current_frame_as_image(frame_dir, f)
-            progress_bar.update()
-        progress_bar.close()
-
-        # Export to video.
-        images_to_video(frame_dir, C.export_dir + '/videos/' + self.window.title + '_360deg.mp4')
-
-        # Remove temp frames.
-        shutil.rmtree(frame_dir)
-
-        # Reset Camera.
-        self.scene.camera = saved_camera
-
-        print("Done.")
+            print("Done.")

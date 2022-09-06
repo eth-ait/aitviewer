@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -14,11 +14,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from abc import ABC, abstractmethod
 import numpy as np
 import joblib
 import os
 
+from abc import ABC, abstractmethod
 from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.meshes import Meshes
@@ -27,9 +27,8 @@ from aitviewer.scene.camera_utils import look_at
 from aitviewer.scene.camera_utils import orthographic_projection
 from aitviewer.scene.camera_utils import perspective_projection
 from aitviewer.scene.node import Node
-from trimesh.transformations import rotation_matrix
-
 from aitviewer.utils.decorators import hooked
+from trimesh.transformations import rotation_matrix
 
 
 def _transform_vector(transform, vector):
@@ -91,23 +90,24 @@ class CameraInterface(ABC):
     def right(self):
         pass
     
-    def gui(self):
+    def gui(self, imgui):
         pass
 
 
 class Camera(Node, CameraInterface):
     """ 
-    A base camera object that provides rendering of a camera mesh and visualization of the camera frustum and coordinate system.
-    Subclasses of this class must implement the CameraInterface abstract methods.
+    A base camera object that provides rendering of a camera mesh and visualization of the camera frustum and coordinate
+    system. Subclasses of this class must implement the CameraInterface abstract methods.
     """
     def __init__(self, inactive_color=(0.5, 0.5, 0.5, 1), active_color=(0.6, 0.1, 0.1, 1), viewer=None, **kwargs):
         """ Initializer
         :param inactive_color: Color that will be used for rendering this object when inactive
         :param active_color:   Color that will be used for rendering this object when active
-        :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
+        :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this
+         camera in the viewer
         """
 
-        super(Camera, self).__init__(**kwargs)
+        super(Camera, self).__init__(icon='\u0084', **kwargs)
 
         # Camera object geometry
         vertices = np.array([
@@ -153,7 +153,8 @@ class Camera(Node, CameraInterface):
         self.active_color = active_color
         self.inactive_color = inactive_color
 
-        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True, position=kwargs.get('position'), rotation=kwargs.get('rotation'))
+        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True, position=kwargs.get('position'),
+                           rotation=kwargs.get('rotation'), is_selectable=False)
         self.mesh.color = self.inactive_color
         self.add(self.mesh, show_in_hierarchy=False)
 
@@ -242,11 +243,26 @@ class Camera(Node, CameraInterface):
 
         self.current_frame_id = frame_id
 
+    def render_outline(self, ctx, camera, prog):
+        # Only render the mesh outline, this avoids outlining 
+        # the frustum and coordinate system visualization.
+        self.mesh.render_outline(ctx, camera, prog)
+
+    def view_from_camera(self):
+        """If the viewer is specified for this camera, change the current view to view from this camera"""
+        if self.viewer:
+            self.hide_frustum()
+            self.viewer.set_temp_camera(self)
+
     def gui(self, imgui):
         if self.viewer:
             if imgui.button("View from camera"):
-                self.hide_frustum()
-                self.viewer.set_temp_camera(self)
+                self.view_from_camera()
+    
+    def gui_context_menu(self, imgui):
+        if self.viewer:
+            if imgui.menu_item("View from camera", shortcut=None, selected=False, enabled=True)[1]:
+                self.view_from_camera()
 
 
 class WeakPerspectiveCamera(Camera):
@@ -344,6 +360,15 @@ class WeakPerspectiveCamera(Camera):
     @hooked
     def gui(self, imgui):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
+        if u:
+            if show:
+                self.show_frustum(self.cols, self.rows, self.far)
+            else:
+                self.hide_frustum()
+
+    @hooked
+    def gui_context_menu(self, imgui):
+        u, show = imgui.menu_item("Show frustum", shortcut=None, selected=self.frustum is not None, enabled=True)
         if u:
             if show:
                 self.show_frustum(self.cols, self.rows, self.far)
@@ -472,7 +497,16 @@ class OpenCVCamera(Camera):
                 self.show_frustum(self.cols, self.rows, self.far)
             else:
                 self.hide_frustum()
-        
+    
+    @hooked
+    def gui_context_menu(self, imgui):
+        u, show = imgui.menu_item("Show frustum", shortcut=None, selected=self.frustum is not None, enabled=True)
+        if u:
+            if show:
+                self.show_frustum(self.cols, self.rows, self.far)
+            else:
+                self.hide_frustum()        
+
 
 class PinholeCamera(CameraInterface):
     """
@@ -495,6 +529,10 @@ class PinholeCamera(CameraInterface):
 
         self.near = znear
         self.far = zfar
+
+        # GUI options
+        self.name = 'Camera'
+        self.icon = '\u0084'
 
     @property
     def position(self):

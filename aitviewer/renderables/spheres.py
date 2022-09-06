@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@ import numpy as np
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
+
 
 def _create_spheres(radius=1.0, rings=16, sectors=32, n_spheres=1, create_faces=True):
     """
@@ -108,7 +109,7 @@ class Spheres(Node):
 
         # A mesh representing the spheres for a single frame
         self.mesh = Meshes(self.sphere_vertices, self.sphere_faces, self.sphere_normals, material=self.material,
-                           cast_shadow=False, pickable=False)
+                           cast_shadow=False, is_selectable=False)
         self.mesh.position = self.position
             
         self.add(self.mesh, show_in_hierarchy=False)
@@ -116,15 +117,28 @@ class Spheres(Node):
     @property
     def vertex_colors(self):
         return np.full((self.n_spheres * self.n_vertices, 4), self.color)
+        
+    @vertex_colors.setter
+    def vertex_colors(self, vertex_colors):
+        self.mesh.vertex_colors = vertex_colors
+
+    @property
+    def current_sphere_positions(self):
+        return self.sphere_positions[self.current_frame_id]
+    
+    @current_sphere_positions.setter
+    def current_sphere_positions(self, positions):
+        assert len(positions.shape) == 2
+        self.sphere_positions[self.current_frame_id] = positions
 
     def on_frame_update(self):  
         self.redraw()
     
-    def redraw(self):
+    def redraw(self, **kwargs):
         current_pos = self.sphere_positions[self.current_frame_id]
         vertices = np.reshape(self.sphere_vertices, [-1, self.n_vertices, 3]) * self.radius + current_pos[:, np.newaxis]
         self.mesh._vertices =np.reshape(vertices, [-1, 3])[np.newaxis]
-        self.mesh.redraw()
+        super().redraw(**kwargs)
 
     @Node.once
     def make_renderable(self, ctx):
@@ -137,6 +151,12 @@ class Spheres(Node):
     @color.setter
     def color(self, color):
         self.mesh.color = color
+
+    def get_index_from_node_and_triangle(self, node, tri_id):
+        if node == self.mesh:
+            return tri_id // (self.spheres_data['faces'].shape[1])
+        
+        return None
 
     def gui_scale(self, imgui):
         # Scale controls

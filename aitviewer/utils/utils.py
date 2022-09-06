@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
     """Convert the rendered images into a video. The video path format determines whether this will be rendered as
     a GIF or an MP4 (default)."""
     if not os.path.exists(frame_dir):
-        raise ValueError("Could not find directory containing frames {}".format(frame_dir))
+        raise ValueError(f"Could not find directory containing frames {frame_dir}")
 
     is_mp4 = video_path.endswith('.mp4')
     is_gif = video_path.endswith('.gif')
@@ -59,44 +59,47 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
 
     # Make sure we don't override an existing video.
     counter = 0
-    video_path_candidate = video_path.replace(suffix, '_{}{}'.format(counter, suffix))
+    video_path_candidate = video_path.replace(suffix, f'_{counter}{suffix}')
     while os.path.exists(video_path_candidate):
         counter += 1
-        video_path_candidate = video_path.replace(suffix, '_{}{}'.format(counter, suffix))
+        video_path_candidate = video_path.replace(suffix, f'_{counter}{suffix}')
 
     print("Rendering to video {}".format(os.path.abspath(video_path_candidate)))
 
     if is_mp4:
-        command = ['ffmpeg',
-                   '-framerate', str(input_fps),  # must be this early in the command, otherwise it is not applied
-                   '-start_number', str(start_frame),
-                   '-i', os.path.join(frame_dir, frame_format),
-                   '-c:v', 'libx264',
-                   '-preset', 'slow',
-                   '-profile:v', 'high',
-                   '-level:v', '4.0',
-                   '-pix_fmt', 'yuv420p',
-                   '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',  # Avoid error when image res is not divisible by 2.
-                   '-r', str(output_fps),
-                   '-y',
-                   video_path_candidate]
-    elif is_gif:
-        command = ['ffmpeg',
-                   '-start_number', str(start_frame),
-                   '-framerate', str(input_fps),  # must be this early in the command, otherwise it is not applied
-                   '-loglevel', 'panic',
-                   '-i', os.path.join(frame_dir, frame_format),
-                   '-y',
-                   '-filter_complex', "[0:v] fps=15,scale=w=1080:h=-1,split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1",
-                   '-r', str(output_fps),
-                   video_path_candidate]
+        video_path_mp4 = video_path_candidate
     else:
-        print("Unknown video format, only '.mp4' or '.gif' is supported.")
-        return
+        # If GIF we first create a temporary mp4 and then convert that to GIF to reduce palette artifacts.
+        video_path_mp4 = video_path_candidate.replace(suffix, f'_temp.mp4')
+    
+    # Create mp4 from frames.
+    command = ['ffmpeg',
+               '-framerate', str(input_fps),  # must be this early in the command, otherwise it is not applied.
+               '-start_number', str(start_frame),
+               '-i', os.path.join(frame_dir, frame_format),
+               '-c:v', 'libx264',
+               '-preset', 'slow',
+               '-profile:v', 'high',
+               '-level:v', '4.0',
+               '-pix_fmt', 'yuv420p',
+               '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',  # Avoid error when image res is not divisible by 2.
+               '-r', str(output_fps),
+               '-y',
+               video_path_mp4]
 
-    FNULL = open(os.devnull, 'w')
-    subprocess.Popen(command, stdout=FNULL).wait()
-    FNULL.close()
+    with open(os.devnull, 'w') as FNULL:
+        subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
+    
+    # Convert mp4 to GIF.
+    if is_gif:
+        command = ['ffmpeg',
+                   '-i', video_path_mp4,
+                   '-y',
+                   '-filter_complex', f"[0:v] split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
+                   video_path_candidate]
+                   
+        with open(os.devnull, 'w') as FNULL:
+            subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
 
 
 def interpolate_positions(positions, ts_in, ts_out):
@@ -134,6 +137,7 @@ def compute_vertex_and_face_normals_torch(vertices, faces, vertex_faces, normali
     :param vertices: A tensor of shape (N, V, 3).
     :param faces: A tensor of shape (F, 3) indexing into `vertices`.
     :param vertex_faces: A tensor of shape (V, MAX_VERTEX_DEGREE) that lists the face IDs each vertex is a part of.
+    :param normalize: Whether to make the normals unit length or not.
     :return: The vertex and face normals as tensors of shape (N, V, 3) and (N, F, 3) respectively.
     """
     vs = vertices[:, faces.to(dtype=torch.long)]

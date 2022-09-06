@@ -60,12 +60,28 @@ class Arrows(Node):
         # Nodes
         self.material.color = color
         self.bases_r = Lines(lines=self.get_line_coords(self.origins, self.mid_points), mode='lines', r_base=r_base,
-                             color=color, cast_shadow=False)
+                             color=color, cast_shadow=False, is_selectable=False)
         self.arrows_r = Lines(lines=self.get_line_coords(self.mid_points, self.tips), mode='lines', r_base=r_head,
-                              r_tip=0.0, color=color, cast_shadow=False)
+                              r_tip=0.0, color=color, cast_shadow=False, is_selectable=False)
 
         self._add_nodes(self.bases_r, self.arrows_r, show_in_hierarchy=False)
 
+    @property
+    def current_origins(self):
+        return self.origins[self.current_frame_id]
+    
+    @current_origins.setter
+    def current_origins(self, origins):
+        self.origins[self.current_frame_id] = origins
+
+    @property
+    def current_tips(self):
+        return self.tips[self.current_frame_id]
+    
+    @current_tips.setter
+    def current_tips(self, tips):
+        self.tips[self.current_frame_id] = tips
+    
     @property
     def mid_points(self):
         return self.origins + (self.tips - self.origins) * (1 - self.p)
@@ -75,7 +91,14 @@ class Arrows(Node):
         c[:, 0::2] = starts
         c[:, 1::2] = ends
         return c
-
+    
+    def get_index_from_node_and_triangle(self, node, tri_id):
+        idx = self.bases_r.get_index_from_node_and_triangle(node, tri_id)
+        if idx is not None:
+            return idx
+        
+        return self.arrows_r.get_index_from_node_and_triangle(node, tri_id)
+    
     def redraw(self, **kwargs):
         self.bases_r.lines = self.get_line_coords(self.origins, self.mid_points)
         self.bases_r.redraw(**kwargs)

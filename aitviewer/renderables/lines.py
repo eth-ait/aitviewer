@@ -243,7 +243,7 @@ class Lines(Node):
 
         vs, fs, ns = self.get_mesh()
         material = kwargs.get('material', Material(color=color, ambient=0.2))
-        self.mesh = Meshes(vs, fs, ns, color=color, material=material, cast_shadow=cast_shadow)
+        self.mesh = Meshes(vs, fs, ns, color=color, material=material, cast_shadow=cast_shadow, is_selectable=False)
         self.mesh.position = self.position
         self.add(self.mesh, has_gui=True, show_in_hierarchy=False)
 
@@ -254,15 +254,30 @@ class Lines(Node):
     @lines.setter
     def lines(self, value):
         self._lines = value if len(value.shape) == 3 else value[np.newaxis]
+    
+    @property
+    def current_lines(self):
+        return self._lines[self.current_frame_id]
+    
+    @current_lines.setter
+    def current_lines(self, lines):
+        assert len(lines.shape) == 2
+        self._lines[self.current_frame_id] = lines
 
     def gui(self, imgui):
         self.mesh.gui(imgui)
 
     def redraw(self, **kwargs):
-        vs, fs, ns = self.get_mesh()
-        self.mesh.vertices = vs
-        self.mesh.faces = fs
-        super().redraw()
+        if kwargs.get('current_frame_only', False):
+            vs, fs, ns = self.get_mesh(current_frame_only=True)
+            self.mesh.current_vertices = vs
+            self.mesh.faces = fs
+        else:
+            vs, fs, ns = self.get_mesh()
+            self.mesh.vertices = vs
+            self.mesh.faces = fs
+
+        super().redraw(**kwargs)
 
     @property
     def color(self):
@@ -272,15 +287,24 @@ class Lines(Node):
     def color(self, color):
         self.mesh.color = color
 
-    def get_mesh(self):
+    def get_mesh(self, current_frame_only=False):
         # Extract pairs of lines such that line i goes from v0s[i] to v1s[i].
+        if current_frame_only:
+            index = self.current_frame_id
+        else:
+            index = slice(None)
+
         if self.mode == 'lines':
             assert self.lines.shape[1] % 2 == 0
-            v0s = self.lines[:, ::2]
-            v1s = self.lines[:, 1::2]
+            v0s = self.lines[index, ::2]
+            v1s = self.lines[index, 1::2]
         else:
-            v0s = self.lines[:, :-1]
-            v1s = self.lines[:, 1:]
+            v0s = self.lines[index, :-1]
+            v1s = self.lines[index, 1:]
+
+        if current_frame_only:
+            v0s = v0s[np.newaxis]
+            v1s = v1s[np.newaxis]
 
         # Data is in the form of (F, N_LINES, V, 3), convert it to (F*N_LINES, 3)
         n_lines = v0s.shape[1]
@@ -295,14 +319,29 @@ class Lines(Node):
 
         # Convert to (F, N_LINES*V, 3)
         n_vertices = data['vertices'].shape[1]
-        vs = np.reshape(data['vertices'], [self.n_frames, -1, 3])
-        ns = np.reshape(data['normals'], [self.n_frames, -1, 3])
+
+        if current_frame_only:
+            vs = np.reshape(data['vertices'], [-1, 3])
+            ns = np.reshape(data['normals'], [-1, 3])
+        else:
+            vs = np.reshape(data['vertices'], [self.n_frames, -1, 3])
+            ns = np.reshape(data['normals'], [self.n_frames, -1, 3])
+
         fs = []
         for i in range(n_lines):
             fs.append(data['faces'] + i * n_vertices)
         fs = np.concatenate(fs)
 
         return vs, fs, ns
+
+    def get_index_from_node_and_triangle(self, node, tri_id):
+        if node == self.mesh:
+            if self.mode == 'lines':
+                n_lines = self.lines.shape[1] // 2
+            else:
+                n_lines = self.lines.shape[1] - 1
+            return tri_id // (self.mesh.faces.shape[0] // n_lines)
+        return None
 
 
 class LinesWithGeometryShader(Node):
