@@ -21,6 +21,7 @@ from aitviewer.scene.node import Node
 from aitviewer.shaders import get_simple_unlit_program
 from moderngl_window.opengl.vao import VAO
 
+from aitviewer.utils.decorators import hooked
 
 class PointClouds(Node):
     """
@@ -147,3 +148,8 @@ class PointClouds(Node):
         self.set_camera_matrices(self.prog, camera, **kwargs)
         # Draw only as many points as we have set in the buffer.
         self.vao.render(self.prog, vertices=len(self.current_points))
+
+    @hooked
+    def release(self):
+        if self.is_renderable:
+            self.vao.release()

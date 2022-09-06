@@ -392,7 +392,8 @@ class Meshes(Node):
             self.positions_vao.release(buffer=False)
 
             self.vbo_vertices.release()
-            self.vbo_indices.release()
+            if self.vbo_indices is not None:
+                self.vbo_indices.release()
             self.vbo_normals.release()
             self.vbo_colors.release()
 
@@ -841,3 +842,13 @@ class VariableTopologyMeshes(Node):
                         self.current_mesh.material.ambient = ambient
 
                 imgui.tree_pop()
+
+    @hooked
+    def release(self):
+        if self.preload:
+            for m in self._all_meshes:
+                m.release()
+        else:
+            m = self._current_mesh.get(self.current_frame_id, None)
+            if m is not None:
+                m.release()

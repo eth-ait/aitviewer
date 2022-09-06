@@ -22,6 +22,7 @@ from aitviewer.scene.node import Node
 from aitviewer.shaders import get_smooth_lit_with_edges_program, get_chessboard_program
 from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
+from aitviewer.utils.decorators import hooked
 
 
 class Plane(Node):
@@ -95,6 +96,14 @@ class Plane(Node):
         set_material_properties(self.prog, self.material)
         self.receive_shadow(self.prog, **kwargs)
         self.vao.render(moderngl.TRIANGLE_STRIP)
+
+    @hooked
+    def release(self):
+        if self.is_renderable:
+            self.vbo_vertices.release()
+            self.vbo_normals.release()
+            self.vbo_colors.release()
+            self.vao.release()
 
 
 class ChessboardPlane(Node):
