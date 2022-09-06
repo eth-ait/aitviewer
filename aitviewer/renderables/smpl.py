@@ -353,15 +353,16 @@ class SMPLSequence(Node):
 
     @hooked
     def on_before_frame_update(self):
-        if self._edit_pose_dirty:
+        if self._edit_mode and self._edit_pose_dirty:
             self._edit_pose = self.poses[self.current_frame_id].clone()
             self.redraw(current_frame_only=True)
             self._edit_pose_dirty = False
 
     @hooked
     def on_frame_update(self):
-        self._edit_pose = self.poses[self.current_frame_id].clone()
-        self._edit_pose_dirty = False
+        if self.edit_mode:
+            self._edit_pose = self.poses[self.current_frame_id].clone()
+            self._edit_pose_dirty = False
 
     def redraw(self, **kwargs):
         current_frame_only = kwargs.get('current_frame_only', False)
