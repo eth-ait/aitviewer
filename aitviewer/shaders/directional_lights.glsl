@@ -37,13 +37,13 @@ vec3 directionalLight(DirLight dirLight, vec3 color, vec3 fragPos, vec3 normal, 
 float shadow_calculation(sampler2DShadow shadow_map, vec4 frag_pos_light_space, vec3 light_dir, vec3 normal) {
     // perform perspective divide (not needed for orthographic projection)
     vec3 projCoords = frag_pos_light_space.xyz / frag_pos_light_space.w;
-    
+
     // transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
-    
+
     // get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
     // float closestDepth = texture(shadow_map, projCoords.xy).r;
-    
+
     // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
 

@@ -111,13 +111,13 @@ class Spheres(Node):
         self.mesh = Meshes(self.sphere_vertices, self.sphere_faces, self.sphere_normals, material=self.material,
                            cast_shadow=False, is_selectable=False)
         self.mesh.position = self.position
-            
+
         self.add(self.mesh, show_in_hierarchy=False)
 
     @property
     def vertex_colors(self):
         return np.full((self.n_spheres * self.n_vertices, 4), self.color)
-        
+
     @vertex_colors.setter
     def vertex_colors(self, vertex_colors):
         self.mesh.vertex_colors = vertex_colors
@@ -125,15 +125,15 @@ class Spheres(Node):
     @property
     def current_sphere_positions(self):
         return self.sphere_positions[self.current_frame_id]
-    
+
     @current_sphere_positions.setter
     def current_sphere_positions(self, positions):
         assert len(positions.shape) == 2
         self.sphere_positions[self.current_frame_id] = positions
 
-    def on_frame_update(self):  
+    def on_frame_update(self):
         self.redraw()
-    
+
     def redraw(self, **kwargs):
         current_pos = self.sphere_positions[self.current_frame_id]
         vertices = np.reshape(self.sphere_vertices, [-1, self.n_vertices, 3]) * self.radius + current_pos[:, np.newaxis]
@@ -143,11 +143,11 @@ class Spheres(Node):
     @Node.once
     def make_renderable(self, ctx):
         self.redraw()
-    
+
     @property
     def color(self):
         return self.mesh.color
-    
+
     @color.setter
     def color(self, color):
         self.mesh.color = color
@@ -155,7 +155,7 @@ class Spheres(Node):
     def get_index_from_node_and_triangle(self, node, tri_id):
         if node == self.mesh:
             return tri_id // (self.spheres_data['faces'].shape[1])
-        
+
         return None
 
     def gui_scale(self, imgui):

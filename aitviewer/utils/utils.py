@@ -71,7 +71,7 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
     else:
         # If GIF we first create a temporary mp4 and then convert that to GIF to reduce palette artifacts.
         video_path_mp4 = video_path_candidate.replace(suffix, f'_temp.mp4')
-    
+
     # Create mp4 from frames.
     command = ['ffmpeg',
                '-framerate', str(input_fps),  # must be this early in the command, otherwise it is not applied.
@@ -89,7 +89,7 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
 
     with open(os.devnull, 'w') as FNULL:
         subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
-    
+
     # Convert mp4 to GIF.
     if is_gif:
         command = ['ffmpeg',
@@ -97,7 +97,7 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
                    '-y',
                    '-filter_complex', f"[0:v] split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
                    video_path_candidate]
-                   
+
         with open(os.devnull, 'w') as FNULL:
             subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
 

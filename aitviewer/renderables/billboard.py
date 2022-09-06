@@ -43,7 +43,7 @@ class Billboard(Node):
         :param texture_paths: A list of length N containing paths to the textures as image files.
         """
         super(Billboard, self).__init__(n_frames=len(texture_paths), **kwargs)
-        
+
         if len(vertices.shape) == 2:
             vertices = vertices[np.newaxis]
         else:
@@ -121,9 +121,9 @@ class Billboard(Node):
 
             # NDC of corners at the computed distance
             corners = np.array([
-                [ 1,  1, z], 
-                [ 1, -1, z], 
-                [-1,  1, z], 
+                [ 1,  1, z],
+                [ 1, -1, z],
+                [-1,  1, z],
                 [-1, -1, z],
             ])
 
@@ -166,7 +166,7 @@ class Billboard(Node):
         if self.current_frame_id != self._current_texture_id:
             if self.texture:
                 self.texture.release()
-                
+
             path = self.texture_paths[self.current_frame_id]
             if path.endswith((".pickle", "pkl")):
                 img = pickle.load(open(path, "rb"))
@@ -181,7 +181,7 @@ class Billboard(Node):
         self.texture.use(0)
 
         self.set_camera_matrices(self.prog, camera, **kwargs)
-        
+
         # Compute the index of the first vertex to use if we have a sequence of vertices of length > 1
         first = 4 * self.current_frame_id if self.vertices.shape[0] > 1 else 0
         self.vao.render(moderngl.TRIANGLE_STRIP, vertices=4, first=first)
@@ -199,17 +199,17 @@ class Billboard(Node):
 
             self.vbo_vertices.release()
             self.vbo_uvs.release()
-            
+
             if self.texture:
                 self.texture.release()
-    
+
     def is_transparent(self):
         return self.texture_alpha < 1.0
-    
+
     def closest_vertex_in_triangle(self, tri_id, point):
         vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
         return np.linalg.norm((vertices - point), axis=-1).argmin()
-        
+
     def get_bc_coords_from_points(self, tri_id, points):
         vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
         indices = np.array([ [0, 1, 2], [1, 2, 3] ])

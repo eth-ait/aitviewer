@@ -255,11 +255,11 @@ class Lines(Node):
     @lines.setter
     def lines(self, value):
         self._lines = value if len(value.shape) == 3 else value[np.newaxis]
-    
+
     @property
     def current_lines(self):
         return self._lines[self.current_frame_id]
-    
+
     @current_lines.setter
     def current_lines(self, lines):
         assert len(lines.shape) == 2

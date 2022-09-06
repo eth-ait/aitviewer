@@ -52,7 +52,7 @@ class Scene(Node):
         # Scene items
         self.origin = CoordinateSystem(name="Origin", length=0.1)
         self.add(self.origin, has_gui=False)
-        
+
         self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0),  (0.82, 0.82, 0.82, 1.0), name="Floor")
         self.floor.material.diffuse = 0.1
         self.add(self.floor)
@@ -71,7 +71,7 @@ class Scene(Node):
         self.selected_object = None
         # Object shown in the property panel
         self._gui_selected_object = None
-        
+
     def render(self, **kwargs):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
 
@@ -99,10 +99,10 @@ class Scene(Node):
             else:
                 # Otherwise append to transparent list
                 transparent.append(r)
-        
+
         # Draw back to front by sorting transparent objects based on distance to camera.
-        # As an approximation we only sort using the origin of the object 
-        # which may be incorrect for large objects or objects significantly 
+        # As an approximation we only sort using the origin of the object
+        # which may be incorrect for large objects or objects significantly
         # offset from their origin, but works in many cases.
         for r in sorted(transparent, key=lambda r: np.linalg.norm(r.position - self.camera.position), reverse=True):
             # Render to depth buffer only
@@ -124,7 +124,7 @@ class Scene(Node):
 
         # Restore the default depth comparison function
         self.ctx.depth_func = '<'
-    
+
     def safe_render_depth_prepass(self, r, **kwargs):
         if not r.is_renderable:
             r.make_renderable(self.ctx)
@@ -203,7 +203,7 @@ class Scene(Node):
             if n.uid == uid:
                 return n
         return None
-    
+
     def select(self, obj, selected_node=None, selected_tri_id=None):
         """Set 'obj' as the selected object"""
         self.selected_object = obj
@@ -216,7 +216,7 @@ class Scene(Node):
     def is_selected(self, obj):
         """Returns true if obj is currently selected"""
         return obj == self.selected_object
-    
+
     def gui_selected(self, imgui):
         """GUI to edit the selected node"""
         if self._gui_selected_object:
@@ -244,19 +244,19 @@ class Scene(Node):
         imgui.separator()
         imgui.spacing()
         self.gui_selected(imgui)
-        
+
     def gui_camera(self, imgui):
         # Camera GUI
         imgui.push_font(self.custom_font)
         imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
 
-        flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
+        flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
         if self.is_selected(self.camera):
             flags |= imgui.TREE_NODE_SELECTED
         camera_expanded = imgui.tree_node(f"{self.camera.icon} {self.camera.name}##tree_node_r_camera", flags)
         if imgui.is_item_clicked():
             self.select(self.camera)
-            
+
         imgui.pop_style_var()
         imgui.pop_font()
         if camera_expanded:
@@ -268,7 +268,7 @@ class Scene(Node):
             imgui.push_font(self.custom_font)
             imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
 
-            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
+            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
             if self.is_selected(light):
                 flags |= imgui.TREE_NODE_SELECTED
             light_expanded = imgui.tree_node(f"{light.icon} {light.name}##tree_node_r", flags)
@@ -294,11 +294,11 @@ class Scene(Node):
 
             # Title
             imgui.push_font(self.custom_font)
-            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))               
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
 
-            flags = imgui.TREE_NODE_OPEN_ON_ARROW | imgui.TREE_NODE_FRAME_PADDING 
+            flags = imgui.TREE_NODE_OPEN_ON_ARROW | imgui.TREE_NODE_FRAME_PADDING
             if r.expanded:
-                flags |= imgui.TREE_NODE_DEFAULT_OPEN 
+                flags |= imgui.TREE_NODE_DEFAULT_OPEN
             if self.is_selected(r):
                 flags |= imgui.TREE_NODE_SELECTED
             if not any(c.show_in_hierarchy for c in r.nodes) or not r.has_gui:

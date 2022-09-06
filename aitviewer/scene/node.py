@@ -81,7 +81,7 @@ class Node(object):
         self._gui_elements = []
         self._show_in_hierarchy = True
         self.is_selectable = is_selectable
-        
+
         self.nodes = []
         self.parent = None
 
@@ -124,14 +124,14 @@ class Node(object):
         trans[:3, 3] = np.array(pos)
 
         scale = np.diag([scale, scale, scale, 1])
-        
+
         return (trans @ rotation @ scale).astype('f4')
 
     def model_matrix(self):
         """Construct model matrix from this node's orientation and position."""
         return self._compute_model_matrix(
-               tuple(self.position), 
-               tuple(map(tuple, self.rotation)), 
+               tuple(self.position),
+               tuple(map(tuple, self.rotation)),
                self.scale)
 
     @property
@@ -269,7 +269,7 @@ class Node(object):
         self._expanded = expanded
 
     def is_transparent(self):
-        """ 
+        """
         Returns true if the object is transparent and should thus be sorted when rendering.
         Subclasses should implement this method to be rendered correctly when transparent.
         """
@@ -391,7 +391,7 @@ class Node(object):
                     # Bind shadowmap to slot i + 1, we reserve slot 0 for the mesh texture
                     # and use slots 1 to (#lights + 1) for shadow maps
                     light.shadow_map.use(location=i + 1)
-            
+
             # Set sampler uniforms
             uniform = program[f'shadow_maps']
             uniform.value = 1 if uniform.array_length == 1 else [*range(1, len(lights) + 1)]
@@ -427,7 +427,7 @@ class Node(object):
         # If backface_fragmap is enabled for this node only render backfaces
         if self.backface_fragmap:
             ctx.cull_face = 'front'
-            
+
         self.render_positions(prog)
 
         # Restore cull face to back
@@ -442,8 +442,8 @@ class Node(object):
         mvp = camera.get_view_projection_matrix() @ self.model_matrix()
         prog['mvp'].write(mvp.T.tobytes())
 
-        self.render_positions(prog)  
-    
+        self.render_positions(prog)
+
     def render_outline(self, ctx, camera, prog):
         if self.outline:
             mvp = camera.get_view_projection_matrix() @ self.model_matrix()
@@ -454,26 +454,26 @@ class Node(object):
             else:
                 ctx.disable(moderngl.CULL_FACE)
             self.render_positions(prog)
-        
+
         # Render children node recursively.
         for n in self.nodes:
             n.render_outline(ctx, camera, prog)
 
     def release(self):
         """
-        Release all OpenGL resources used by this node and any of its children. 
-        Subclasses that instantiate OpenGL objects should 
+        Release all OpenGL resources used by this node and any of its children.
+        Subclasses that instantiate OpenGL objects should
         implement this method with '@hooked' to avoid leaking resources.
         """
         for n in self.nodes:
             n.release()
-    
+
     def on_selection(self, node, tri_id):
         """
         Called when the node is selected
 
         :param node:  the node which was clicked (can be None if the selection wasn't a mouse event)
-        :param tri_id: the id of the triangle that was clicked from the 'node' mesh 
+        :param tri_id: the id of the triangle that was clicked from the 'node' mesh
                        (can be None if the selection wasn't a mouse event)
         """
         pass

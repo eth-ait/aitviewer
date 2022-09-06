@@ -47,7 +47,7 @@ class HeadlessRenderer(Viewer):
 
         self._init_scene()
         self.export_video(
-            output_path=video_dir, 
+            output_path=video_dir,
             frame_dir=frame_dir,
             animation=True,
             output_fps=output_fps,

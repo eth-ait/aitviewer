@@ -150,9 +150,9 @@ class ChessboardPlane(Node):
         normals = np.tile(np.cross(v2, v1), (4, 1))
 
         uvs = np.array([
-            0, 0, 
-            0, 1, 
-            1, 0, 
+            0, 0,
+            0, 1,
+            1, 0,
             1, 1
         ], dtype=np.float32)
 
@@ -184,7 +184,7 @@ class ChessboardPlane(Node):
         set_material_properties(self.prog, self.material)
 
         self.vao.render(moderngl.TRIANGLE_STRIP)
-    
+
     @property
     def bounds(self):
         return self.get_bounds(self.vertices)

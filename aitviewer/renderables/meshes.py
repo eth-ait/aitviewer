@@ -138,7 +138,7 @@ class Meshes(Node):
     @property
     def current_vertices(self):
         return self.vertices[self.current_frame_id]
-    
+
     @current_vertices.setter
     def current_vertices(self, vertices):
         self._vertices[self.current_frame_id] = vertices
@@ -224,7 +224,7 @@ class Meshes(Node):
             self._vertex_colors = vertex_colors
             self._use_uniform_color = False
             self.redraw()
-    
+
     @property
     def current_vertex_colors(self):
         if self._use_uniform_color:
@@ -254,7 +254,7 @@ class Meshes(Node):
     @property
     def flat_shading(self):
         return self._flat_shading
-    
+
     @flat_shading.setter
     def flat_shading(self, flat_shading):
         if self._flat_shading != flat_shading:
@@ -402,7 +402,7 @@ class Meshes(Node):
                 self.texture.release()
 
     def render(self, camera, **kwargs):
-        # Check if flat shading changed, in which case we need to update the VBOs.    
+        # Check if flat shading changed, in which case we need to update the VBOs.
         if self.has_texture:
             self.texture_prog['texture_alpha'].value = self.texture_alpha
         vao = self._prepare_vao(camera, **kwargs)
@@ -439,7 +439,7 @@ class Meshes(Node):
     def _show_normals(self):
         """Create and add normals at runtime"""
         vn = self.vertex_normals
-        
+
         bounds = self.bounds
         diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
 
@@ -466,12 +466,12 @@ class Meshes(Node):
         _, self.show_texture = imgui.checkbox('Render Texture##render_texture{}'.format(self.unique_name),
                                               self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
-                                               self.norm_coloring)                                       
+                                               self.norm_coloring)
         _, self.flat_shading = imgui.checkbox('Flat shading [F]##flat_shading{}'.format(self.unique_name),
                                                self.flat_shading)
         _, self.draw_edges = imgui.checkbox('Draw edges [E]##draw_edges{}'.format(self.unique_name),
                                                self.draw_edges)
-        _, self.draw_outline = imgui.checkbox('Draw outline##draw_outline{}'.format(self.unique_name), 
+        _, self.draw_outline = imgui.checkbox('Draw outline##draw_outline{}'.format(self.unique_name),
                                                self.draw_outline)
 
         # TODO: Add  export workflow for all nodes
@@ -539,7 +539,7 @@ class VariableTopologyMeshes(Node):
             for f in range(self.n_frames):
                 m = self._construct_mesh_at_frame(f)
                 self._all_meshes.append(m)
-        # Set to true after changing the color and used when preloading 
+        # Set to true after changing the color and used when preloading
         # is not enabled to override the current mesh color with the new color
         self._override_color = False
 
@@ -589,14 +589,14 @@ class VariableTopologyMeshes(Node):
 
     @classmethod
     def from_directory(cls, path, preload=False, vertex_scale=1.0, high_quality=False, **kwargs):
-        """ 
+        """
         Initialize from a directory containing mesh and texture data.
 
         Mesh files must be in pickle (.pkl) or obj (.obj) format, their name
         must start with 'mesh' and end with a frame number.
 
         Texture files must be in pickle (.pkl), png (.png) or jpeg (.jpg or .jpeg) format
-        and their name must match the respective mesh filename with 'atlas' instead of 'mesh' 
+        and their name must match the respective mesh filename with 'atlas' instead of 'mesh'
         at the start of the filename.
 
         Example:
@@ -683,7 +683,7 @@ class VariableTopologyMeshes(Node):
 
     @property
     def current_mesh(self):
-        if self.preload: 
+        if self.preload:
             return self._all_meshes[self.current_frame_id]
         else:
             m = self._current_mesh.get(self.current_frame_id, None)
@@ -699,7 +699,7 @@ class VariableTopologyMeshes(Node):
 
                 # Set mesh material
                 m.material = self.material
-                
+
                 # Set draw settings.
                 m.flat_shading = self.flat_shading
                 m.draw_edges = self.draw_edges
@@ -721,7 +721,7 @@ class VariableTopologyMeshes(Node):
 
     def get_bc_coords_from_points(self, tri_id, points):
         return self.current_mesh.get_bc_coords_from_points(tri_id, points)
-    
+
     def is_transparent(self):
         return self.color[3] < 1.0
 
@@ -748,12 +748,12 @@ class VariableTopologyMeshes(Node):
 
     def render_shadowmap(self, light_mvp, program):
         self.current_mesh.render_shadowmap(light_mvp, program)
-    
+
     def render_fragmap(self, ctx, camera, prog, uid=None):
         # Since the current mesh is not a child node we cannot capture its selection.
         # Therefore we draw to the fragmap using our own id instead of the mesh id.
         self.current_mesh.render_fragmap(ctx, camera, prog, self.uid)
-    
+
     def render_outline(self, ctx, camera, prog):
         self.current_mesh.render_outline(ctx, camera, prog)
 
