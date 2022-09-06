@@ -27,7 +27,7 @@ import trimesh
 from array import array
 from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
-from aitviewer.scene.camera import PinholeCamera
+from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.scene import Scene
 from aitviewer.scene.node import Node
 from aitviewer.streamables.streamable import Streamable
@@ -96,10 +96,6 @@ class Viewer(moderngl_window.WindowConfig):
         self.imgui = ModernglWindowRenderer(self.wnd)
         self.imgui_user_interacting = False
 
-        # Setup scene
-        self.scene = Scene()
-        self.scene.camera = PinholeCamera(45.0)
-
         # Shaders for rendering the shadow map
         self.raw_depth_prog = self.load_program('shadow_mapping/raw_depth.glsl')
         self.depth_only_prog = self.load_program('shadow_mapping/depth_only.glsl')
@@ -120,23 +116,16 @@ class Viewer(moderngl_window.WindowConfig):
         # Create framebuffers
         self.create_framebuffers()
 
-        # For debugging
-        self.visualize = False
-        self.vis_prog =  self.load_program('visualize.glsl')
-        self.vis_quad = geometry.quad_2d(size=(0.9, 0.9), pos=(0.5, 0.5))
-        
         # Custom UI Font
         self.font_dir = Path(__file__).parent / 'resources' / 'fonts'
         self.fonts = imgui.get_io().fonts
         self.custom_font = self.fonts.add_font_from_file_ttf(os.path.join(self.font_dir, 'Custom.ttf'), 15)
-        self.scene.custom_font = self.custom_font
         self.imgui.refresh_font_texture()
 
         self.modes = {
             'view': {'title': ' View', 'shortcut': 'V'},
             'inspect': {'title': ' Inspect', 'shortcut': 'I'},
         }
-        self.selected_mode = 'view'
 
         self.gui_controls = {
             'menu': self.gui_menu,
@@ -146,42 +135,14 @@ class Viewer(moderngl_window.WindowConfig):
             'exit': self.gui_exit,
         }
 
-        # Settings
-        self.run_animations = C.run_animations
-        self.dark_mode = C.dark_mode
-        self.playback_fps = C.playback_fps
-        self.shadows_enabled = C.shadows_enabled
-        self.auto_set_floor = C.auto_set_floor
-        self.auto_set_camera_target = C.auto_set_camera_target
-        self.backface_culling = C.backface_culling
-        self.lock_selection = False
+        # Debug
+        self.vis_prog =  self.load_program('visualize.glsl')
+        self.vis_quad = geometry.quad_2d(size=(0.9, 0.9), pos=(0.5, 0.5))
 
-        self.show_camera_target = False
+        # Initialize viewer
+        self.scene = None
+        self.reset()
 
-        self._pan_camera = False
-        self._rotate_camera = False
-        self._using_temp_camera = False
-        self._past_frametimes = np.zeros([60]) - 1.0
-        self._last_frame_rendered_at = 0
-
-        # Mouse mesh intersection in inspect mode.
-        self.mmi = None
-
-        # Mouse selection
-        self._move_threshold = 3
-        self._mouse_moved = False
-        self._mouse_down_position = np.array([0, 0])
-
-        # Export settings
-        self.export_animation = True
-        self.export_animation_range = [0, -1]
-        self.export_duration = 10
-        self.export_as_gif = False
-        self.export_rotate_camera = False
-        self.export_seconds_per_rotation = 10
-        self.export_fps = 30
-        self.export_downscale_factor = 1.0
-        
         # Key Shortcuts
         self._exit_key = self.wnd.keys.ESCAPE
         self._pause_key = self.wnd.keys.SPACE
@@ -240,7 +201,53 @@ class Viewer(moderngl_window.WindowConfig):
         # Outline rendering
         self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
         self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
-    
+
+    def reset(self):
+        if self.scene is not None:
+            self.scene.release()
+
+        # Setup scene
+        self.scene = Scene()
+        self.scene.camera = ViewerCamera(45.0)
+        self.scene.custom_font = self.custom_font
+
+        # Settings
+        self.run_animations = C.run_animations
+        self.dark_mode = C.dark_mode
+        self.playback_fps = C.playback_fps
+        self.shadows_enabled = C.shadows_enabled
+        self.auto_set_floor = C.auto_set_floor
+        self.auto_set_camera_target = C.auto_set_camera_target
+        self.backface_culling = C.backface_culling
+        self.lock_selection = False
+        self.show_camera_target = False
+        self.selected_mode = 'view'
+        self.visualize = False
+
+        self._pan_camera = False
+        self._rotate_camera = False
+        self._using_temp_camera = False
+        self._past_frametimes = np.zeros([60]) - 1.0
+        self._last_frame_rendered_at = 0
+
+        # Mouse mesh intersection in inspect mode.
+        self.mmi = None
+
+        # Mouse selection
+        self._move_threshold = 3
+        self._mouse_moved = False
+        self._mouse_down_position = np.array([0, 0])
+
+        # Export settings
+        self.export_animation = True
+        self.export_animation_range = [0, -1]
+        self.export_duration = 10
+        self.export_as_gif = False
+        self.export_rotate_camera = False
+        self.export_seconds_per_rotation = 10
+        self.export_fps = 30
+        self.export_downscale_factor = 1.0
+
     def _init_scene(self):
         self.scene.make_renderable(self.ctx)
         if self.auto_set_floor:
@@ -401,11 +408,11 @@ class Viewer(moderngl_window.WindowConfig):
             fwd = self.scene.camera.forward
             pos = self.scene.camera.position
 
-            self.scene.camera = PinholeCamera(45)
+            self.scene.camera = ViewerCamera(45)
             self.scene.camera.position = np.copy(pos)
             self.scene.camera.target = pos + fwd * 3
             self.scene.camera.update_matrices(self.window_size[0], self.window_size[1])
-            
+
     def set_temp_camera(self, camera):
         self.scene.camera = camera
         self._using_temp_camera = True
@@ -982,10 +989,10 @@ class Viewer(moderngl_window.WindowConfig):
         seconds_per_rotation=10.0,
         downscale_factor=None,
         ):
-        if rotate_camera and not isinstance(self.scene.camera, PinholeCamera):
-            print("Cannot export an animated video while using a camera that is not a PinholeCamera")
-            return 
-        
+        if rotate_camera and not isinstance(self.scene.camera, ViewerCamera):
+            print("Cannot export a video with camera rotation while using a camera that is not a ViewerCamera")
+            return
+
 
         with tempfile.TemporaryDirectory() as temp_dir:
             # If frame_dir is None use the temporary directory.

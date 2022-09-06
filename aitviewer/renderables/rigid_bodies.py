@@ -64,6 +64,7 @@ class RigidBodies(Node):
             axs = Arrows(self.rb_pos, self.rb_pos + line, r_base=r_base, r_head=r_head, color=tuple(color),
                          is_selectable=False)
             axs.position = self.position
+            axs.rotation = self.rotation
             self._add_node(axs, has_gui=False, show_in_hierarchy=False)
             self.coords.append(axs)
 

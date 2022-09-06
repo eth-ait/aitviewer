@@ -198,18 +198,17 @@ class Camera(Node, CameraInterface):
 
             # Compute frustum coordinates
             self.update_matrices(width, height)
-            V = self.get_view_matrix()
             P = self.get_projection_matrix()
-            ndc_from_world = P @ V
-            world_from_ndc = np.linalg.inv(ndc_from_world)
+            ndc_from_view = P
+            view_from_ndc = np.linalg.inv(ndc_from_view)
 
             def transform(x):
-                v = world_from_ndc @ np.append(x, 1.0)
+                v = view_from_ndc @ np.append(x, 1.0)
                 return v[:3] / v[3]
 
             # Comput z coordinate of a point at the given distance
-            world_p = self.position + self.forward *  distance
-            ndc_p = (ndc_from_world @ np.concatenate([world_p, np.array([1])]))
+            view_p = np.array([0.0, 0.0, -distance])
+            ndc_p = (ndc_from_view @ np.concatenate([view_p, np.array([1])]))
 
             # Compute z after perspective division
             z = ndc_p[2] / ndc_p[3]
@@ -219,12 +218,12 @@ class Camera(Node, CameraInterface):
                 [-1, -1,  z], [-1,  1,  z],
                 [ 1, -1, -1], [ 1,  1, -1],
                 [ 1, -1,  z], [ 1,  1,  z],
-                
+
                 [-1, -1, -1], [-1, -1, z],
                 [-1,  1, -1], [-1,  1, z],
                 [ 1, -1, -1], [ 1, -1, z],
                 [ 1,  1, -1], [ 1,  1, z],
-                
+
                 [-1, -1, -1], [ 1, -1, -1],
                 [-1, -1,  z], [ 1, -1,  z],
                 [-1,  1, -1], [ 1,  1, -1],
@@ -234,11 +233,14 @@ class Camera(Node, CameraInterface):
             lines = np.apply_along_axis(transform, 1, lines)
             all_lines[i] = lines
 
-        self.frustum = Lines(all_lines, r_base=0.005, mode='lines', color=(0.1, 0.1, 0.1, 1), cast_shadow=False)
+        self.frustum = Lines(all_lines, r_base=0.005, mode='lines', color=(0.1, 0.1, 0.1, 1), cast_shadow=False,
+                             position=self.position, rotation=self.rotation)
         self.add(self.frustum, show_in_hierarchy=False)
 
-        orientation = np.array([ self.right,  self.up, self.forward ]).T
-        self.origin = RigidBodies(self.position[np.newaxis], orientation[np.newaxis])
+        ori = np.eye(3, dtype=np.float)
+        ori[:, 2] *= -1
+        self.origin = RigidBodies(np.array([0.0, 0.0, 0.0])[np.newaxis], ori[np.newaxis],
+                                  position=self.position, rotation=self.rotation)
         self.add(self.origin, show_in_hierarchy=False)
 
         self.current_frame_id = frame_id
@@ -408,10 +410,6 @@ class OpenCVCamera(Camera):
         self.far = far
 
     @property
-    def position(self):
-        return -self.Rt[:, 0:3].T @ self.Rt[:, 3]
-
-    @property
     def forward(self):
         return self.Rt[2, :3]
     
@@ -508,9 +506,110 @@ class OpenCVCamera(Camera):
                 self.hide_frustum()        
 
 
-class PinholeCamera(CameraInterface):
+class PinholeCamera(Camera):
     """
     Your classic pinhole camera.
+    """
+    def __init__(self, position, target, cols, rows, fov=45, near=C.znear, far=C.zfar, viewer=None, **kwargs):
+        self._positions = position if len(position.shape) == 2 else position[np.newaxis]
+        self._targets = target if len(target.shape) == 2 else target[np.newaxis]
+        assert self._positions.shape[0] == self._targets.shape[0], f"position and target array shape mismatch: {self._positions.shape} and {self._targets.shape}"
+
+        super(PinholeCamera, self).__init__(n_frames=self._positions.shape[0], viewer=viewer, **kwargs)
+        self._world_up = np.array([0.0, 1.0, 0.0])
+        self.position = self.current_position
+        self.rotation = self.current_rotation
+
+        self.cols = cols
+        self.rows = rows
+
+        self.near = near
+        self.far = far
+        self.fov = fov
+
+    @hooked
+    def on_frame_update(self):
+        self.position = self.current_position
+        self.rotation = self.current_rotation
+
+    @property
+    def forward(self):
+        forward = self.current_target - self.current_position
+        forward = forward / np.linalg.norm(forward)
+        return forward / np.linalg.norm(forward)
+
+    @property
+    def up(self):
+        up = np.cross(self.forward, self.right)
+        return up
+
+    @property
+    def right(self):
+        right = np.cross(self._world_up, self.forward)
+        return right / np.linalg.norm(right)
+
+    @property
+    def current_target(self):
+        return self._targets[self.current_frame_id]
+
+    @property
+    def current_position(self):
+        return self._positions[self.current_frame_id]
+
+    @property
+    def current_rotation(self):
+        return np.array([-self.right, self.up, -self.forward]).T
+
+    def update_matrices(self, width, height):
+        #Compute projection matrix
+        P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
+
+        #Compute view matrix
+        V = look_at(self.current_position, self.current_target, self._world_up)
+
+        #Update camera matrices
+        self.projection_matrix = P.astype('f4')
+        self.view_matrix = V.astype('f4')
+        self.view_projection_matrix = np.matmul(P, V).astype('f4')
+
+    def get_projection_matrix(self):
+        if self.projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the projection matrix")
+        return self.projection_matrix
+
+    def get_view_matrix(self):
+        if self.view_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view matrix")
+        return self.view_matrix
+
+    def get_view_projection_matrix(self):
+        if self.view_projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
+        return self.view_projection_matrix
+
+    @hooked
+    def gui(self, imgui):
+        u, show = imgui.checkbox("Show frustum", self.frustum is not None)
+        if u:
+            if show:
+                self.show_frustum(self.cols, self.rows, self.far)
+            else:
+                self.hide_frustum()
+
+    @hooked
+    def gui_context_menu(self, imgui):
+        u, show = imgui.menu_item("Show frustum", shortcut=None, selected=self.frustum is not None, enabled=True)
+        if u:
+            if show:
+                self.show_frustum(self.cols, self.rows, self.far)
+            else:
+                self.hide_frustum()
+
+
+class ViewerCamera(CameraInterface):
+    """
+    The camera used by the Viewer. It can be either a Pinhole or Orthographic camera.
+    This camera also supports orbiting, panning and generating camera rays.
     """
 
     def __init__(self, fov=45, orthographic=None, znear=C.znear, zfar=C.zfar):
@@ -557,7 +656,8 @@ class PinholeCamera(CameraInterface):
 
     @property
     def right(self):
-        return np.cross(self.up, self.forward)
+        right = np.cross(self.up, self.forward)
+        return right / np.linalg.norm(right)
 
     def save_cam(self):
         """Saves the current camera parameters"""
@@ -672,9 +772,7 @@ class PinholeCamera(CameraInterface):
 
     def rotate_azimuth_elevation(self, mouse_dx, mouse_dy):
         """Rotate the camera left-right and up-down (roll is not allowed)."""
-        cam_pose = np.linalg.inv(self.view_matrix)
-
-        z_axis = cam_pose[:3, 2]
+        z_axis = -self.forward
         dot = np.dot(z_axis, self.up)
         rot = np.eye(4)
 
@@ -682,11 +780,11 @@ class PinholeCamera(CameraInterface):
         if not (mouse_dy > 0 and dot > 0 and 1 - dot < 0.001) and not (mouse_dy < 0 and dot < 0 and 1 + dot < 0.001):
             # We are either hovering exactly below or above the scene's target but we want to move away or we are
             # not hitting the singularity anyway.
-            x_axis = cam_pose[:3, 0]
+            x_axis = -self.right
             rot_x = rotation_matrix(self.ROT_FACTOR * -mouse_dy, x_axis, self.target)
             rot = rot_x @ rot
 
-        y_axis = cam_pose[:3, 1]
+        y_axis = np.cross(self.forward, self.right)
         x_speed = self.ROT_FACTOR / 10 if 1 - np.abs(dot) < 0.01 else self.ROT_FACTOR
         rot = rotation_matrix(x_speed * -mouse_dx, y_axis, self.target) @ rot
 
