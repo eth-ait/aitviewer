@@ -48,7 +48,7 @@
 
 #if TEXTURE
         vs_out.uv = in_uv;
-#else   
+#else
         vs_out.color = in_color;
 #endif
 
@@ -111,7 +111,7 @@
                         area / length(pp2));
         return dist;
     }
-    
+
     void main() {
         vec3 edge_dist = distanceToEdge(gl_in[0].gl_Position, gl_in[1].gl_Position, gl_in[2].gl_Position, win_size);
 
@@ -144,7 +144,7 @@
 
             for(int j = 0; j < NR_DIR_LIGHTS; j++) {
                 g_vert_light[j] = gs_in[i].vert_light[j];
-            } 
+            }
             EmitVertex();
         }
 
@@ -203,7 +203,7 @@
 
 #if !TEXTURE
         if (norm_coloring) {
-            f_color = vec4(.5 + .5 * normal, g_color.w);
+            f_color = vec4(.5 + .5 * normal, base_color.w);
         }
 #endif
 
