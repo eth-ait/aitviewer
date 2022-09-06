@@ -21,8 +21,6 @@ https://user-images.githubusercontent.com/5639197/188625409-1c86b12e-4e91-48ba-a
 
 ![AITV SMPL Editing](https://user-images.githubusercontent.com/5639197/188625764-351100e9-992e-430c-b170-69d4f142f5dd.gif)
 
-![AITV Interface](https://raw.githubusercontent.com/eth-ait/aitviewer/main/aitv_screenshot.png)
-
 ## Installation
 Basic Installation:
 ```commandline
