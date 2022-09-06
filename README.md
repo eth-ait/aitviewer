@@ -2,7 +2,10 @@
 
 A set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and Mac OS X.
 
+https://user-images.githubusercontent.com/5639197/188603130-acbee213-b682-4407-860b-46a960f7ea6c.mp4
+
 ![AITV Sample](https://raw.githubusercontent.com/eth-ait/aitviewer/main/aitv_sample.png)
+
 
 ## Features
 * Easy to use Python interface.
