@@ -1,4 +1,4 @@
-#version 330
+#version 400
 //
 // Picks a point from the depth buffer and returns the position in camera space, along with the object and triangle id
 // Adapted from https://github.com/moderngl/moderngl-window/blob/master/examples/resources/programs/fragment_picking/picker.glsl

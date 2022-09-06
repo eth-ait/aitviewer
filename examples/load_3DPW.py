@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

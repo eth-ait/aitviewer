@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@ import numpy as np
 from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.headless import HeadlessRenderer
+
 
 if __name__ == '__main__':
     # Load an AMASS sequence.

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -14,9 +14,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
+
 
 if __name__ == '__main__':
     smpl_template = SMPLSequence.t_pose()

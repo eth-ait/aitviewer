@@ -18,7 +18,6 @@ import moderngl
 import numpy as np
 
 from aitviewer.renderables.coordinate_system import CoordinateSystem
-from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.plane import ChessboardPlane
 from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
@@ -46,7 +45,8 @@ class Scene(Node):
         # directional_lights.glsl as well!
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
         self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
-        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0), shadow_enabled=False))
+        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0),
+                                 shadow_enabled=False))
         self.add(*self.lights, show_in_hierarchy=False)
 
         # Scene items
@@ -67,6 +67,11 @@ class Scene(Node):
 
         self.custom_font = None
 
+        # Currently selected object, None if no object is selected
+        self.selected_object = None
+        # Object shown in the property panel
+        self._gui_selected_object = None
+        
     def render(self, **kwargs):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
 
@@ -198,72 +203,128 @@ class Scene(Node):
             if n.uid == uid:
                 return n
         return None
+    
+    def select(self, obj, selected_node=None, selected_tri_id=None):
+        """Set 'obj' as the selected object"""
+        self.selected_object = obj
+        if isinstance(obj, Node):
+            self.selected_object.on_selection(selected_node, selected_tri_id)
+        # Always keep the last selected object in the property panel
+        if obj is not None:
+            self._gui_selected_object = obj
+
+    def is_selected(self, obj):
+        """Returns true if obj is currently selected"""
+        return obj == self.selected_object
+    
+    def gui_selected(self, imgui):
+        """GUI to edit the selected node"""
+        if self._gui_selected_object:
+            s = self._gui_selected_object
+
+            # Draw object icon and name
+            imgui.push_font(self.custom_font)
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
+            e = imgui.tree_node(f"{s.icon} {s.name}##gui_selected", imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING)
+            imgui.pop_style_var()
+            imgui.pop_font()
+
+            # Draw gui
+            s.gui(imgui)
+
+            if e:
+                imgui.tree_pop()
 
     def gui(self, imgui):
         """GUI to control scene settings."""
         self.gui_camera(imgui)
         self.gui_lights(imgui)
         self.gui_renderables(imgui, self.nodes)
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        self.gui_selected(imgui)
         
     def gui_camera(self, imgui):
         # Camera GUI
         imgui.push_font(self.custom_font)
-        camera_expanded = imgui.tree_node("\u0084 Camera##tree_node_r_camera")
+        imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
+
+        flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
+        if self.is_selected(self.camera):
+            flags |= imgui.TREE_NODE_SELECTED
+        camera_expanded = imgui.tree_node(f"{self.camera.icon} {self.camera.name}##tree_node_r_camera", flags)
+        if imgui.is_item_clicked():
+            self.select(self.camera)
+            
+        imgui.pop_style_var()
         imgui.pop_font()
         if camera_expanded:
-            self.camera.gui(imgui)
             imgui.tree_pop()
-        imgui.spacing()
 
     def gui_lights(self, imgui):
         # Lights GUI
         for _, light in enumerate(self.lights):
             imgui.push_font(self.custom_font)
-            light_expanded = imgui.tree_node("\u0085 {}##tree_node_r".format(light.name))
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
+
+            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
+            if self.is_selected(light):
+                flags |= imgui.TREE_NODE_SELECTED
+            light_expanded = imgui.tree_node(f"{light.icon} {light.name}##tree_node_r", flags)
+            if imgui.is_item_clicked():
+                self.select(light)
+
+            imgui.pop_style_var()
             imgui.pop_font()
             if light_expanded:
-                light.gui(imgui)
                 imgui.tree_pop()
-                imgui.spacing()
 
     def gui_renderables(self, imgui, rs):
         # Nodes GUI
-        for i, r in enumerate(rs):
-            if r.show_in_hierarchy:
-                # Visibility
-                curr_enabled = r.enabled
-                if not curr_enabled:
-                    imgui.push_style_color(imgui.COLOR_TEXT, 1.0, 1.0, 1.0, 0.4)
+        for r in rs:
+            # Skip nodes that shouldn't appear in the hierarchy.
+            if not r.show_in_hierarchy:
+                continue
 
-                # Title
-                imgui.push_font(self.custom_font)
+            # Visibility
+            curr_enabled = r.enabled
+            if not curr_enabled:
+                imgui.push_style_color(imgui.COLOR_TEXT, 1.0, 1.0, 1.0, 0.4)
+
+            # Title
+            imgui.push_font(self.custom_font)
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))               
+
+            flags = imgui.TREE_NODE_OPEN_ON_ARROW | imgui.TREE_NODE_FRAME_PADDING 
+            if r.expanded:
+                flags |= imgui.TREE_NODE_DEFAULT_OPEN 
+            if self.is_selected(r):
+                flags |= imgui.TREE_NODE_SELECTED
+            if not any(c.show_in_hierarchy for c in r.nodes) or not r.has_gui:
+                flags |= imgui.TREE_NODE_LEAF
+            r.expanded = imgui.tree_node("{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name), flags)
+            if imgui.is_item_clicked():
+                self.select(r)
+
+            imgui.pop_style_var()
+            imgui.pop_font()
+
+            # Aligns checkbox to the right side of the window
+            # https://github.com/ocornut/imgui/issues/196
+            imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
+            eu, enabled = imgui.checkbox('##enabled_r_{}'.format(r.unique_name), r.enabled)
+            if eu:
+                r.enabled = enabled
+
+            if r.expanded:
                 if r.has_gui:
-                    r.expanded = imgui.tree_node("{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name),
-                                                 r.expanded and imgui.TREE_NODE_DEFAULT_OPEN)
-                else:
-                    imgui.spacing()
-                    imgui.same_line(spacing=24)
-                    imgui.text("{} {}".format(r.icon, r.name))
-                imgui.pop_font()
-
-                # Aligns checkbox to the right side of the window
-                # https://github.com/ocornut/imgui/issues/196
-                imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
-                eu, enabled = imgui.checkbox('##enabled_r_{}'.format(r.unique_name), r.enabled)
-                if eu:
-                    r.enabled = enabled
-
-                if r.has_gui and r.expanded:
-                    # Render this elements GUI
-                    r.gui(imgui)
-                    # Recursively render the GUI of this elements children renderables
+                    # Recursively render children nodes
                     self.gui_renderables(imgui, r.nodes)
+                imgui.tree_pop()
 
-                    imgui.spacing()
-                    imgui.tree_pop()
-
-                if not curr_enabled:
-                    imgui.pop_style_color(1)
+            if not curr_enabled:
+                imgui.pop_style_color(1)
 
     def add_light(self, light):
         self.lights.append(light)

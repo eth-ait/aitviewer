@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -44,16 +44,18 @@ class ClickingViewer(Viewer):
         ms.current_frame_id = seq.current_frame_id
         self.scene.add(ms)
 
-    @hooked
     def mouse_press_event(self, x: int, y: int, button: int):
         if not self.imgui_user_interacting and self.selected_mode == 'inspect':
             result = self.mesh_mouse_intersection(x, y)
             if result is not None:
                 self.interact_with_sequence(result, button)
+        else:
+            # Pass the event to the viewer if we didn't handle it.
+            super().mouse_press_event(x, y, button)
 
     def interact_with_sequence(self, intersection, button):
         """
-        Called when the user clicked on a mesh.
+        Called when the user clicked on a mesh while holding ctrl.
         :param intersection: The result of intersecting the user click with the scene.
         :param button: The mouse button the user clicked.
         """

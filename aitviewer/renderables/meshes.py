@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,15 +17,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 
 import moderngl
-from moderngl_window.opengl.vao import VAO
 import numpy as np
 import trimesh
 import tqdm
 import re
 import pickle
-
-from functools import lru_cache
-from PIL import Image
 
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_smooth_lit_with_edges_program
@@ -35,7 +31,10 @@ from aitviewer.utils.decorators import hooked
 from aitviewer.utils.utils import compute_vertex_and_face_normals
 from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
+from functools import lru_cache
+from moderngl_window.opengl.vao import VAO
 from trimesh.triangles import points_to_barycentric
+from PIL import Image
 
 
 class Meshes(Node):
@@ -55,6 +54,7 @@ class Meshes(Node):
                  pickable=True,
                  flat_shading=False,
                  draw_edges=False,
+                 draw_outline=False,
                  **kwargs):
         """
         Initializer.
@@ -105,14 +105,17 @@ class Meshes(Node):
         self.cast_shadow = cast_shadow
         self.fragmap = pickable
         self.depth_prepass = True
+        self.outline = True
 
         # Misc.
         self._flat_shading = flat_shading
         self.draw_edges = draw_edges
+        self.draw_outline = draw_outline
         self.show_texture = self.has_texture
         self.norm_coloring = False
         self.normals_r = None
         self.need_upload = True
+        self._use_uniform_color = self.vertex_colors is None
 
     @property
     def vertices(self):
@@ -130,6 +133,16 @@ class Meshes(Node):
         # Must clear all LRU caches where the vertices are used.
         self.compute_vertex_and_face_normals.cache_clear()
 
+        self.redraw()
+
+    @property
+    def current_vertices(self):
+        return self.vertices[self.current_frame_id]
+    
+    @current_vertices.setter
+    def current_vertices(self, vertices):
+        self._vertices[self.current_frame_id] = vertices
+        self.compute_vertex_and_face_normals.cache_clear()
         self.redraw()
 
     @property
@@ -189,18 +202,35 @@ class Meshes(Node):
 
     @property
     def vertex_colors(self):
+        if self._vertex_colors is None:
+            self._vertex_colors = np.full((self.n_frames, self.n_vertices, 4), self.material.color)
         return self._vertex_colors
 
     @vertex_colors.setter
     def vertex_colors(self, vertex_colors):
-        # Vertex colors cannot be empty
+        # If vertex_colors are None, we resort to the material color.
         if vertex_colors is None:
-            self._vertex_colors = np.full((self.n_frames, self.n_vertices, 4), self.color)
+            self._vertex_colors = None
+            self._use_uniform_color = True
         elif isinstance(vertex_colors, tuple) and len(vertex_colors) == 4:
-            self._vertex_colors = np.full((self.n_frames, self.n_vertices, 4), vertex_colors)
+            self.vertex_colors = None
+            self._use_uniform_color = True
+            self.material.color = vertex_colors
         else:
+            if len(vertex_colors.shape) == 2:
+                assert vertex_colors.shape[0] == self.n_vertices
+                vertex_colors = np.repeat(vertex_colors[np.newaxis], self.n_frames, axis=0)
+            assert len(vertex_colors.shape) == 3
             self._vertex_colors = vertex_colors
-        self.redraw()
+            self._use_uniform_color = False
+            self.redraw()
+    
+    @property
+    def current_vertex_colors(self):
+        if self._use_uniform_color:
+            return np.full((self.n_vertices, 4), self.material.color)
+        else:
+            return self.vertex_colors[self.current_frame_id]
 
     @property
     def face_colors(self):
@@ -211,24 +241,15 @@ class Meshes(Node):
         self._face_colors = face_colors
         if face_colors is not None:
             self._vertex_colors = np.tile(self.face_colors[:, :, np.newaxis], [1, 1, 3, 1])
+            self._use_uniform_color = False
         self.redraw()
 
     @Node.color.setter
     def color(self, color):
-        only_alpha_changed = (np.abs((np.array(color) - np.array(self.color)))[-1] > 0
-                              and (np.array(color)[:3] == np.array(self.color[:3])).all())
-
         self.material.color = color
 
-        # If only alpha changed, don't update all colors
-        if only_alpha_changed:
-            self._vertex_colors[..., -1] = color[-1]
-        # Otherwise, if no face colors, then override the existing vertex colors
-        elif self.face_colors is None:
+        if self.face_colors is None:
             self.vertex_colors = color
-
-        # Update color buffer
-        self.redraw()
 
     @property
     def flat_shading(self):
@@ -239,14 +260,6 @@ class Meshes(Node):
         if self._flat_shading != flat_shading:
             self._flat_shading = flat_shading
             self.redraw()
-
-    @property
-    def current_vertices(self):
-        return self.vertices[self.current_frame_id]
-
-    @property
-    def current_vertex_colors(self):
-        return self.vertex_colors[self.current_frame_id]
 
     def closest_vertex_in_triangle(self, tri_id, point):
         face_vertex_id = np.linalg.norm((self.current_vertices[self.faces[tri_id]] - point), axis=-1).argmin()
@@ -314,7 +327,7 @@ class Meshes(Node):
         if self.has_texture:
             self.vbo_uvs.write(self.uv_coords.astype('f4').tobytes())
 
-    def redraw(self):
+    def redraw(self, **kwargs):
         self._need_upload = True
 
     # noinspection PyAttributeOutsideInit
@@ -373,19 +386,20 @@ class Meshes(Node):
 
     @hooked
     def release(self):
-        self.smooth_vao.release()
-        self.flat_vao.release()
-        self.positions_vao.release(buffer=False)
+        if self.is_renderable:
+            self.smooth_vao.release()
+            self.flat_vao.release()
+            self.positions_vao.release(buffer=False)
 
-        self.vbo_vertices.release()
-        self.vbo_indices.release()
-        self.vbo_normals.release()
-        self.vbo_colors.release()
+            self.vbo_vertices.release()
+            self.vbo_indices.release()
+            self.vbo_normals.release()
+            self.vbo_colors.release()
 
-        if self.has_texture:
-            self.texture_vao.release()
-            self.vbo_uvs.release()
-            self.texture.release()
+            if self.has_texture:
+                self.texture_vao.release()
+                self.vbo_uvs.release()
+                self.texture.release()
 
     def render(self, camera, **kwargs):
         # Check if flat shading changed, in which case we need to update the VBOs.    
@@ -410,6 +424,8 @@ class Meshes(Node):
         else:
             prog, vao = (self.flat_prog, self.flat_vao) if self.flat_shading else (self.smooth_prog, self.smooth_vao)
             prog['norm_coloring'].value = self.norm_coloring
+            prog['use_uniform_color'] = self._use_uniform_color
+            prog['uniform_color'] = self.material.color
 
         prog['draw_edges'].value = 1.0 if self.draw_edges else 0.0
         prog['win_size'].value = kwargs['window_size']
@@ -451,10 +467,12 @@ class Meshes(Node):
                                               self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
                                                self.norm_coloring)                                       
-        _, self.flat_shading = imgui.checkbox('Flat shading##flat_shading{}'.format(self.unique_name),
+        _, self.flat_shading = imgui.checkbox('Flat shading [F]##flat_shading{}'.format(self.unique_name),
                                                self.flat_shading)
-        _, self.draw_edges = imgui.checkbox('Draw edges##draw_edges{}'.format(self.unique_name),
+        _, self.draw_edges = imgui.checkbox('Draw edges [E]##draw_edges{}'.format(self.unique_name),
                                                self.draw_edges)
+        _, self.draw_outline = imgui.checkbox('Draw outline##draw_outline{}'.format(self.unique_name), 
+                                               self.draw_outline)
 
         # TODO: Add  export workflow for all nodes
         if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
@@ -464,6 +482,11 @@ class Meshes(Node):
         if self.normals_r is None:
             if imgui.button('Show Normals ##show_normals{}'.format(self.unique_name)):
                 self._show_normals()
+
+    def gui_context_menu(self, imgui):
+        _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
+        _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
+        _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
 
 class VariableTopologyMeshes(Node):
@@ -693,6 +716,15 @@ class VariableTopologyMeshes(Node):
     def bounds(self):
         return self.current_mesh.get_bounds(self.current_mesh.vertices)
 
+    def closest_vertex_in_triangle(self, tri_id, point):
+        return self.current_mesh.closest_vertex_in_triangle(tri_id, point)
+
+    def get_bc_coords_from_points(self, tri_id, points):
+        return self.current_mesh.get_bc_coords_from_points(tri_id, points)
+    
+    def is_transparent(self):
+        return self.color[3] < 1.0
+
     # noinspection PyAttributeOutsideInit
     @Node.once
     def make_renderable(self, ctx):
@@ -716,6 +748,19 @@ class VariableTopologyMeshes(Node):
 
     def render_shadowmap(self, light_mvp, program):
         self.current_mesh.render_shadowmap(light_mvp, program)
+    
+    def render_fragmap(self, ctx, camera, prog, uid=None):
+        # Since the current mesh is not a child node we cannot capture its selection.
+        # Therefore we draw to the fragmap using our own id instead of the mesh id.
+        self.current_mesh.render_fragmap(ctx, camera, prog, self.uid)
+    
+    def render_outline(self, ctx, camera, prog):
+        self.current_mesh.render_outline(ctx, camera, prog)
+
+    def gui_context_menu(self, imgui):
+        _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
+        _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
+        _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
     def gui_position(self, imgui):
         # Position controls
@@ -760,8 +805,9 @@ class VariableTopologyMeshes(Node):
 
         _, self.show_texture  = imgui.checkbox('Render Texture', self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring', self.norm_coloring)
-        _, self.flat_shading = imgui.checkbox('Flat shading', self.flat_shading)
-        _, self.draw_edges = imgui.checkbox('Draw edges', self.draw_edges)
+        _, self.flat_shading = imgui.checkbox('Flat shading [F]', self.flat_shading)
+        _, self.draw_edges = imgui.checkbox('Draw edges [E]', self.draw_edges)
+        _, self.draw_outline = imgui.checkbox('Draw outline', self.draw_outline)
 
         if show_advanced:
             if imgui.tree_node("Advanced material##advanced_material{}'".format(self.unique_name)):
