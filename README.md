@@ -7,6 +7,8 @@ A set of tools to visualize and interact with sequences of 3D data with cross-pl
 ## Features
 * Easy to use Python interface.
 * Load [SMPL[-H | -X]](https://smpl.is.tue.mpg.de/) / [MANO](https://mano.is.tue.mpg.de/) / [FLAME](https://flame.is.tue.mpg.de/) sequences and display them in an interactive viewer.
+* Manually editable SMPL sequences.
+* Render 3D data on top of images via weak-perspective or OpenCV camera models.
 * Built-in extensible GUI (based on Dear ImGui).
 * Prebuilt renderable primitives (cylinders, spheres, point clouds, etc).
 * Render videos of the currently loaded sequences.
@@ -61,15 +63,23 @@ v.run()
 
 ## Examples
 
-Check out the [examples](examples/) for a few examples how to use the viewer. Some examples are:
+Check out the [examples](examples/) for a few examples how to use the viewer:
 
-**`load_3dpw.py`**: Loads an SMPL sequence from the 3DPW dataset and displays it in the viewer.
+**`load_3DPW.py`**: Loads an SMPL sequence from the 3DPW dataset and displays it in the viewer.
 
-**`load_amass.py`**: Loads an SMPL sequence from the AMASS dataset and displays it in the viewer.
+**`load_AMASS.py`**: Loads an SMPL sequence from the AMASS dataset and displays it in the viewer.
+
+**`load_DIP.py`**: Loads an SMPL and IMU sequence taken from the TotalCapture dataset as used by [DIP](https://github.com/eth-ait/dip18).
 
 **`load_obj.py`**: Loads meshes from OBJ files.
 
+**`load_ROMP.py`**: Loads the result of [ROMP](https://github.com/Arthur151/ROMP) and overlays it on top of the input image with either a weak-perspective or an OpenCV camera.
+
 **`load_template.py`**: Loads the template meshes of SMPL-H, MANO, and FLAME.
+
+**`load_VIBE.py`**: Loads the result of [VIBE](https://github.com/mkocabas/VIBE) and overlays it on top of the input image.
+
+**`quick_start.py`**: The above quickstart example.
 
 **`render_primitives.py`**: Renders a bunch of spheres and lines.
 
