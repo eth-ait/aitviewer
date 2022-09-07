@@ -41,34 +41,25 @@ class CameraInterface(ABC):
     An abstract class which describes the interface expected by the viewer for using this object as a camera
     """
 
-    @abstractmethod
-    def update_matrices(self, width, height):
-        """
-        Update the matrices of this camera, should always be called before using any of the get_*_matrix() methods.
-        """
-        pass
+    def __init__(self):
+        self.projection_matrix = None
+        self.view_matrix = None
+        self.view_projection_matrix = None
 
-    @abstractmethod
     def get_projection_matrix(self):
-        """
-        Returns the matrix that projects 3D coordinates in camera space to the image plane.
-        """
-        pass
+        if self.projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the projection matrix")
+        return self.projection_matrix
 
-    @abstractmethod
     def get_view_matrix(self):
-        """
-        Returns the matrix that projects 3D coordinates in camera space to the image plane.
-        """
-        pass
+        if self.view_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view matrix")
+        return self.view_matrix
 
-    @abstractmethod
     def get_view_projection_matrix(self):
-        """
-        Returns the view-projection matrix, i.e. the 4x4 matrix that maps from homogenous world coordinates to image
-        space.
-        """
-        pass
+        if self.view_projection_matrix is None:
+            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
+        return self.view_projection_matrix
 
     @property
     @abstractmethod
@@ -106,7 +97,6 @@ class Camera(Node, CameraInterface):
         :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this
          camera in the viewer
         """
-
         super(Camera, self).__init__(icon='\u0084', **kwargs)
 
         # Camera object geometry
@@ -344,21 +334,6 @@ class WeakPerspectiveCamera(Camera):
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
 
-    def get_projection_matrix(self):
-        if self.projection_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the projection matrix")
-        return self.projection_matrix
-
-    def get_view_matrix(self):
-        if self.view_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the view matrix")
-        return self.view_matrix
-
-    def get_view_projection_matrix(self):
-        if self.view_projection_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
-        return self.view_projection_matrix
-
     @hooked
     def gui(self, imgui):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
@@ -472,21 +447,6 @@ class OpenCVCamera(Camera):
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
 
-    def get_projection_matrix(self):
-        if self.projection_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the projection matrix")
-        return self.projection_matrix
-
-    def get_view_matrix(self):
-        if self.view_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the view matrix")
-        return self.view_matrix
-
-    def get_view_projection_matrix(self):
-        if self.view_projection_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
-        return self.view_projection_matrix
-
     @hooked
     def gui(self, imgui):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
@@ -561,31 +521,16 @@ class PinholeCamera(Camera):
         return np.array([-self.right, self.up, -self.forward]).T
 
     def update_matrices(self, width, height):
-        #Compute projection matrix
+        # Compute projection matrix.
         P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
 
-        #Compute view matrix
+        # Compute view matrix.
         V = look_at(self.current_position, self.current_target, self._world_up)
 
-        #Update camera matrices
+        # Update camera matrices.
         self.projection_matrix = P.astype('f4')
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
-
-    def get_projection_matrix(self):
-        if self.projection_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the projection matrix")
-        return self.projection_matrix
-
-    def get_view_matrix(self):
-        if self.view_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the view matrix")
-        return self.view_matrix
-
-    def get_view_projection_matrix(self):
-        if self.view_projection_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
-        return self.view_projection_matrix
 
     @hooked
     def gui(self, imgui):
@@ -613,6 +558,7 @@ class ViewerCamera(CameraInterface):
     """
 
     def __init__(self, fov=45, orthographic=None, znear=C.znear, zfar=C.zfar):
+        super(ViewerCamera, self).__init__()
         self.fov = fov
         self.is_ortho = orthographic is not None
         self.ortho_size = 1.0 if orthographic is None else orthographic
@@ -694,7 +640,7 @@ class ViewerCamera(CameraInterface):
             self.far = cam_dict['far']
 
     def update_matrices(self, width, height):
-        #Compute projection matrix
+        # Compute projection matrix.
         if self.is_ortho:
             yscale = self.ortho_size
             xscale = width / height * yscale
@@ -702,28 +648,13 @@ class ViewerCamera(CameraInterface):
         else:
             P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
 
-        #Compute view matrix
+        # Compute view matrix.
         V = look_at(self.position, self.target, self.up)
 
-        #Update camera matrices
+        # Update camera matrices.
         self.projection_matrix = P.astype('f4')
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
-
-    def get_projection_matrix(self):
-        if self.projection_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the projection matrix")
-        return self.projection_matrix
-
-    def get_view_matrix(self):
-        if self.view_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the view matrix")
-        return self.view_matrix
-
-    def get_view_projection_matrix(self):
-        if self.view_projection_matrix is None:
-            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
-        return self.view_projection_matrix
 
     def dolly_zoom(self, speed, move_target=False):
         """
