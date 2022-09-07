@@ -38,13 +38,6 @@ class HeadlessRenderer(Viewer):
           be specified if `frame_dir` is None.
         :param output_fps: Fps of the output video, if None uses 60fps as default
         """
-        if frame_dir is None and video_dir is None:
-            raise ValueError("You should either specify a path where to render the images to or where to "
-                             "save the video to.")
-
-        if video_dir is not None:
-            assert video_dir.endswith(".mp4")
-
         self._init_scene()
         self.export_video(
             output_path=video_dir,

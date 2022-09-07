@@ -31,7 +31,8 @@ from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.scene import Scene
 from aitviewer.scene.node import Node
 from aitviewer.streamables.streamable import Streamable
-from aitviewer.utils import images_to_video, PerfTimer
+from aitviewer.utils import PerfTimer
+from aitviewer.utils.utils import get_video_paths, video_to_gif
 from collections import namedtuple
 from moderngl_window import activate_context
 from moderngl_window import geometry
@@ -41,6 +42,7 @@ from moderngl_window.opengl.vao import VAO
 from pathlib import Path
 from PIL import Image
 from tqdm import tqdm
+import skvideo.io
 
 
 MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')
@@ -994,89 +996,125 @@ class Viewer(moderngl_window.WindowConfig):
             print("Cannot export a video with camera rotation while using a camera that is not a ViewerCamera")
             return
 
+        if frame_dir is None and output_path is None:
+            print("You must either specify a path where to render the images to or where to save the video to")
+            return
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # If frame_dir is None use the temporary directory.
-            if frame_dir is None:
-                frame_dir = temp_dir
-            else:
-                # We want to avoid overriding anything in an existing directory, so add suffixes.
-                format_str = "{:0>4}"
-                counter = 0
+        if frame_dir is not None:
+            # We want to avoid overriding anything in an existing directory, so add suffixes.
+            format_str = "{:0>4}"
+            counter = 0
+            candidate_dir = os.path.join(frame_dir, format_str.format(counter))
+            while os.path.exists(candidate_dir):
+                counter += 1
                 candidate_dir = os.path.join(frame_dir, format_str.format(counter))
-                while os.path.exists(candidate_dir):
-                    counter += 1
-                    candidate_dir = os.path.join(frame_dir, format_str.format(counter))
-                frame_dir = os.path.abspath(candidate_dir)
+            frame_dir = os.path.abspath(candidate_dir)
 
-                # The frame dir does not yet exist (we've made sure of it).
-                os.makedirs(frame_dir)
-
-            # Render each frame to an image file.
+            # The frame dir does not yet exist (we've made sure of it).
+            os.makedirs(frame_dir)
             print("Saving frames to {}".format(frame_dir))
 
-            # Store the current camera and create a copy of it if required.
-            saved_camera = self.scene.camera
+        # Store the current camera and create a copy of it if required.
+        saved_camera = self.scene.camera
+        if rotate_camera:
+            self.scene.camera = copy.deepcopy(self.scene.camera)
+
+        # Remember viewer data.
+        saved_curr_frame = self.scene.current_frame_id
+        saved_run_animations = self.run_animations
+
+        if animation:
+            if animation_range is None:
+                animation_range = [0, self.scene.n_frames - 1]
+
+            if animation_range[1] < animation_range[0]:
+                print("No frames rendered.")
+                return
+
+            # Compute duration of the animation at given playback speed
+            animation_frames = (animation_range[1] - animation_range[0]) + 1
+            duration = animation_frames / self.playback_fps
+
+            # Setup viewer for rendering the animation
+            self.run_animations = True
+            self.scene.current_frame_id = animation_range[0]
+            self._last_frame_rendered_at = 0
+        else:
+            self.run_animations = False
+            self.scene.current_frame_id = frame
+
+        # Compute exact number of frames if we have the same playback and output fps
+        if animation and abs(self.playback_fps - output_fps) < 0.1:
+            frames = (animation_range[1] - animation_range[0]) + 1
+            self.run_animations = False
+            exact_playback = True
+        else:
+            frames = int(np.ceil(duration * output_fps))
+            exact_playback = False
+
+        dt = 1 / output_fps
+        time = 0
+
+        # Compute camera speed.
+        az_delta = 2 * np.pi / seconds_per_rotation * (duration / frames)
+
+        # Initialize video writer.
+        if output_path is not None:
+            path_mp4, path_gif, is_gif = get_video_paths(output_path)
+            writer = skvideo.io.FFmpegWriter(
+                path_mp4,
+                inputdict = {
+                    '-framerate': str(output_fps),  # must be this early in the command, otherwise it is not applied.
+                },
+                outputdict = {
+                    '-c:v': 'libx264',
+                    '-preset': 'slow',
+                    '-profile:v': 'high',
+                    '-level:v': '4.0',
+                    '-pix_fmt': 'yuv420p',
+                    '-vf': 'pad=ceil(iw/2)*2:ceil(ih/2)*2',  # Avoid error when image res is not divisible by 2.
+                    '-r': str(output_fps),
+                })
+
+        for i in tqdm(range(frames), desc='Rendering frames'):
             if rotate_camera:
-                self.scene.camera = copy.deepcopy(self.scene.camera)
+                self.scene.camera.rotate_azimuth(az_delta)
 
-            # Remember viewer data.
-            saved_curr_frame = self.scene.current_frame_id
-            saved_run_animations = self.run_animations
+            self.render(time, time + dt, export=True)
+            img = self.get_current_frame_as_image()
 
-            if animation:
-                if animation_range is None:
-                    animation_range = [0, self.scene.n_frames - 1]
+            # Downscale image by the downscale factor.
+            if downscale_factor is not None and downscale_factor != 1.0:
+                w = int(img.width / downscale_factor)
+                h = int(img.height / downscale_factor)
+                img = img.resize((w, h), Image.LANCZOS)
 
-                if animation_range[1] < animation_range[0]:
-                    print("No frames rendered.")
-                    return
+            # Store the image to disk if a directory for frames was given.
+            if frame_dir is not None:
+                img_name = os.path.join(frame_dir, 'frame_{:0>6}.png'.format(i))
+                img.save(img_name)
 
-                # Compute duration of the animation at given playback speed
-                animation_frames = (animation_range[1] - animation_range[0]) + 1
-                duration = animation_frames / self.playback_fps
+            # Write the frame to the video writer.
+            if output_path is not None:
+                writer.writeFrame(np.array(img))
 
-                # Setup viewer for rendering the animation
-                self.run_animations = True
-                self.scene.current_frame_id = animation_range[0]
-                self._last_frame_rendered_at = 0
-            else:
-                self.run_animations = False
-                self.scene.current_frame_id = frame
+            if exact_playback:
+                self.scene.next_frame()
 
-            # Compute exact number of frames if we have the same playback and output fps
-            if animation and abs(self.playback_fps - output_fps) < 0.1:
-                frames = (animation_range[1] - animation_range[0]) + 1
-                self.run_animations = False
-                exact_playback = True
-            else:
-                frames = int(np.ceil(duration * output_fps))
-                exact_playback = False
+            time += dt
 
-            dt = 1 / output_fps
-            time = 0
+        # Save the video.
+        if output_path is not None:
+            writer.close()
 
-            # Compute camera speed.
-            az_delta = 2 * np.pi / seconds_per_rotation * (duration / frames)
-            for i in tqdm(range(frames), desc='Rendering frames'):
-                if rotate_camera:
-                    self.scene.camera.rotate_azimuth(az_delta)
+            # Convert to gif if required.
+            if is_gif:
+                video_to_gif(path_mp4, path_gif, remove=True)
 
-                self.render(time, time + dt, export=True)
-                self.save_current_frame_as_image(frame_dir, i, downscale_factor=downscale_factor)
+        # Reset viewer data.
+        self.scene.camera = saved_camera
+        self.scene.current_frame_id = saved_curr_frame
+        self.run_animations = saved_run_animations
+        self._last_frame_rendered_at = self.timer.time
 
-                if exact_playback:
-                    self.scene.next_frame()
-
-                time += dt
-
-            # Export to video.
-            images_to_video(frame_dir, output_path, input_fps=output_fps, output_fps=output_fps)
-
-            # Reset viewer data.
-            self.scene.camera = saved_camera
-            self.scene.current_frame_id = saved_curr_frame
-            self.run_animations = saved_run_animations
-            self._last_frame_rendered_at = self.timer.time
-
-            print("Done.")
+        print("Done.")
