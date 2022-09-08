@@ -27,7 +27,7 @@ class PointClouds(Node):
     Draw a point clouds man!
     """
 
-    def __init__(self, points, colors=None, point_size=5.0, color=(0.0, 0.0, 1.0, 1.0), **kwargs):
+    def __init__(self, points, colors=None, point_size=5.0, color=(0.0, 0.0, 1.0, 1.0), z_up=False, **kwargs):
         """
         A sequence of point clouds. Each point cloud can have a varying number of points.
         :param points: Sequence of points (F, P, 3)
@@ -47,6 +47,9 @@ class PointClouds(Node):
         self.max_n_points = max([p.shape[0] for p in self.points])
 
         self.vao = VAO("points", mode=moderngl.POINTS)
+        
+        if z_up:
+            self.rotation =  np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
     @property
     def points(self):

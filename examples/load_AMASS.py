@@ -38,7 +38,8 @@ if __name__ == '__main__':
     # illumination model on the point clouds).
     #
     # Move the point cloud a bit along the x-axis so it doesn't overlap with the mesh data.
-    ptc_amass = PointClouds(seq_amass.vertices, position=np.array([1.0, 0.0, 0.0]), color=c)
+    # Amass data need to be rotated to get the z axis up.
+    ptc_amass = PointClouds(seq_amass.vertices, position=np.array([1.0, 0.0, 0.0]), color=c, z_up=True)
 
     # Display in the viewer.
     v = Viewer()
