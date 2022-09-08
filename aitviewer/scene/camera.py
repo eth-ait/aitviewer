@@ -760,3 +760,7 @@ class ViewerCamera(CameraInterface):
     def gui(self, imgui):
         _, self.is_ortho = imgui.checkbox('Orthographic Camera', self.is_ortho)
         _, self.fov = imgui.slider_float('Camera FOV##fov', self.fov, 0.1, 180.0, '%.1f')
+        _, position = imgui.drag_float3('Position', *self.position)
+        _, target = imgui.drag_float3('Target', *self.target)
+        self.position = np.array(position)
+        self.target = np.array(target)
