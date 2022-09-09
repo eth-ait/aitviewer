@@ -21,8 +21,9 @@ import moderngl_window
 import numpy as np
 import os
 import struct
-import tempfile
 import trimesh
+from omegaconf.dictconfig import DictConfig
+from typing import Tuple, Union
 
 from array import array
 from aitviewer.configuration import CONFIG as C
@@ -55,13 +56,17 @@ class Viewer(moderngl_window.WindowConfig):
     samples = 4
     gl_version = (4, 0)
 
-    def __init__(self, title="AITViewer", size=None, **kwargs):
+    def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, **kwargs):
         """
         Initializer.
         :param title: Window title
         :param size: Window size as (width, height) tuple, if None uses the size from the configuration file
         :param kwargs: kwargs.
         """
+
+        # Update config with user parameter.
+        if config is not None:
+            C.update_conf(config)
 
         # Window Setup (Following `moderngl_window.run_window_config`).
         base_window_cls = get_local_window_cls(self.window_type)
