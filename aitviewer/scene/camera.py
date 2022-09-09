@@ -150,6 +150,7 @@ class Camera(Node, CameraInterface):
 
         self.frustum = None
         self.origin = None
+        self.path = None
 
         self.viewer = viewer
 
@@ -235,6 +236,37 @@ class Camera(Node, CameraInterface):
 
         self.current_frame_id = frame_id
 
+    def hide_path(self):
+        if self.path is not None:
+            self.parent.remove(self.path[0])
+            self.parent.remove(self.path[1])
+            self.path = None
+
+    def show_path(self):
+        # Remove previous path if it exists
+        self.hide_path()
+
+        # Compute position and orientation for each frame
+        all_points = np.zeros((self.n_frames, 3), dtype=np.float32)
+        all_oris = np.zeros((self.n_frames, 3, 3), dtype=np.float32)
+        frame_id = self.current_frame_id
+        for i in range(self.n_frames):
+            # Set the current frame id to use the position and rotation for this frame
+            self.current_frame_id = i
+
+            all_points[i] = self.position
+            # Flip the Z axis since we want to display the orientation with Z forward
+            all_oris[i] = self.rotation @ np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])
+
+        path_spheres = RigidBodies(all_points, all_oris, radius=0.019, color=(0.92, 0.68, 0.2, 1.0))
+        path_lines = Lines(all_points, color=(0, 0, 0, 1), mode='line_strip', cast_shadow=False)
+
+        # We add the the path to the parent node of the camera because we don't want the camera position and rotation to be applied to it.
+        self.parent.add(path_spheres, path_lines, show_in_hierarchy=False)
+        self.path = (path_spheres, path_lines)
+
+        self.current_frame_id = frame_id
+
     def render_outline(self, ctx, camera, prog):
         # Only render the mesh outline, this avoids outlining
         # the frustum and coordinate system visualization.
@@ -243,6 +275,7 @@ class Camera(Node, CameraInterface):
     def view_from_camera(self):
         """If the viewer is specified for this camera, change the current view to view from this camera"""
         if self.viewer:
+            self.hide_path()
             self.hide_frustum()
             self.viewer.set_temp_camera(self)
 
@@ -251,10 +284,24 @@ class Camera(Node, CameraInterface):
             if imgui.button("View from camera"):
                 self.view_from_camera()
 
+        u, show = imgui.checkbox("Show path", self.path is not None)
+        if u:
+            if show:
+                self.show_path()
+            else:
+                self.hide_path()
+
     def gui_context_menu(self, imgui):
         if self.viewer:
             if imgui.menu_item("View from camera", shortcut=None, selected=False, enabled=True)[1]:
                 self.view_from_camera()
+
+        u, show = imgui.checkbox("Show path", self.path is not None)
+        if u:
+            if show:
+                self.show_path()
+            else:
+                self.hide_path()
 
 
 class WeakPerspectiveCamera(Camera):
@@ -345,7 +392,7 @@ class WeakPerspectiveCamera(Camera):
 
     @hooked
     def gui_context_menu(self, imgui):
-        u, show = imgui.menu_item("Show frustum", shortcut=None, selected=self.frustum is not None, enabled=True)
+        u, show = imgui.checkbox("Show frustum", self.frustum is not None)
         if u:
             if show:
                 self.show_frustum(self.cols, self.rows, self.far)
@@ -358,57 +405,87 @@ class OpenCVCamera(Camera):
 
     def __init__(self, K, Rt, cols, rows, dist_coeffs=None, near=C.znear, far=C.zfar, viewer=None, **kwargs):
         """ Initializer.
-        :param K:  A np array of camera intrinsics in the format used by OpenCV (3, 3)
-        :param Rt: A np array of camera extrinsics in the format used by OpenCV (3, 4)
-        :param dist_coeffs: Lens distortion coefficients in the format used by OpenCV.
+        :param K:  A np array of camera intrinsics in the format used by OpenCV (3, 3) or (N, 3, 3), one for each frame
+        :param Rt: A np array of camera extrinsics in the format used by OpenCV (3, 4) or (N, 3, 4), one for each frame
+        :param dist_coeffs: Lens distortion coefficients in the format used by OpenCV (5)
         :param cols: Width  of the image in pixels, matching the size of the image expected by the intrinsics matrix
         :param rows: Height of the image in pixels, matching the size of the image expected by the intrinsics matrix
         :param near: Distance of the near plane from the camera
         :param far: Distance of the far plane from the camera
         :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
          """
-        rot = np.copy(Rt[:, 0:3].T)
-        pos = -rot @ Rt[:, 3]
+        self.K = K if len(K.shape) == 3 else K[np.newaxis]
+        self.Rt = Rt if len(Rt.shape) == 3 else Rt[np.newaxis]
 
-        rot[:, 1:] *= -1.0
+        assert len(self.Rt.shape) == 3
+        assert len(self.K.shape) == 3
 
-        super(OpenCVCamera, self).__init__(position=pos, rotation=rot, viewer=viewer, **kwargs)
+        assert self.K.shape[0] == 1 or self.Rt.shape[0] == 1 or self.K.shape[0] == self.Rt.shape[0], (
+            f"extrinsics and intrinsics array shape mismatch: {self._positions.shape} and {self._targets.shape}")
 
-        self.K = K
-        self.Rt = Rt
+        super(OpenCVCamera, self).__init__(viewer=viewer, n_frames=max(self.K.shape[0], self.Rt.shape[0]), **kwargs)
+        self.position = self.current_position
+        self.rotation = self.current_rotation
+
         self.dist_coeffs = dist_coeffs
-
         self.cols = cols
         self.rows = rows
 
         self.near = near
         self.far = far
 
+    def on_frame_update(self):
+        self.position = self.current_position
+        self.rotation = self.current_rotation
+
+    @property
+    def current_position(self):
+        Rt = self.current_Rt
+        pos = -Rt[:, 0:3].T @ Rt[:, 3]
+        return pos
+
+    @property
+    def current_rotation(self):
+        Rt = self.current_Rt
+        rot = np.copy(Rt[:, 0:3].T)
+        rot[:, 1:] *= -1.0
+        return rot
+
+    @property
+    def current_K(self):
+        K = self.K[0] if self.K.shape[0] == 1 else self.K[self.current_frame_id]
+        return K
+
+    @property
+    def current_Rt(self):
+        Rt = self.Rt[0] if self.Rt.shape[0] == 1 else self.Rt[self.current_frame_id]
+        return Rt
+
     @property
     def forward(self):
-        return self.Rt[2, :3]
+        return self.current_Rt[2, :3]
 
     @property
     def up(self):
-        return -self.Rt[1, :3]
+        return -self.current_Rt[1, :3]
 
     @property
     def right(self):
-        return self.Rt[0, :3]
+        return self.current_Rt[0, :3]
 
     def compute_opengl_view_projection(self, width, height):
         # Construct view and projection matrices which follow OpenGL conventions.
         # Adapted from https://amytabb.com/tips/tutorials/2019/06/28/OpenCV-to-OpenGL-tutorial-essentials/
 
         # Compute view matrix V
-        lookat = np.copy(self.Rt)
+        lookat = np.copy(self.current_Rt)
         # Invert Y -> flip image bottom to top
         # Invert Z -> OpenCV has positive Z forward, we use negative Z forward
         lookat[1:3, :] *= -1.0
         V = np.vstack((lookat, np.array([0, 0, 0, 1])))
 
         # Compute projection matrix P
-        K = self.K
+        K = self.current_K
         rows, cols = self.rows, self.cols
         near, far = self.near, self.far
 
@@ -458,7 +535,7 @@ class OpenCVCamera(Camera):
 
     @hooked
     def gui_context_menu(self, imgui):
-        u, show = imgui.menu_item("Show frustum", shortcut=None, selected=self.frustum is not None, enabled=True)
+        u, show = imgui.checkbox("Show frustum", self.frustum is not None)
         if u:
             if show:
                 self.show_frustum(self.cols, self.rows, self.far)
@@ -473,7 +550,8 @@ class PinholeCamera(Camera):
     def __init__(self, position, target, cols, rows, fov=45, near=C.znear, far=C.zfar, viewer=None, **kwargs):
         self._positions = position if len(position.shape) == 2 else position[np.newaxis]
         self._targets = target if len(target.shape) == 2 else target[np.newaxis]
-        assert self._positions.shape[0] == self._targets.shape[0], f"position and target array shape mismatch: {self._positions.shape} and {self._targets.shape}"
+        assert self._positions.shape[0] == 1 or self._targets.shape[0] == 1 or self._positions.shape[0] == self._targets.shape[0], (
+            f"position and target array shape mismatch: {self._positions.shape} and {self._targets.shape}")
 
         super(PinholeCamera, self).__init__(n_frames=self._positions.shape[0], viewer=viewer, **kwargs)
         self._world_up = np.array([0.0, 1.0, 0.0])
@@ -510,11 +588,11 @@ class PinholeCamera(Camera):
 
     @property
     def current_target(self):
-        return self._targets[self.current_frame_id]
+        return self._targets[0] if self._targets.shape[0] == 1 else self._targets[self.current_frame_id]
 
     @property
     def current_position(self):
-        return self._positions[self.current_frame_id]
+        return self._positions[0] if self._positions.shape[0] == 1 else self._positions[self.current_frame_id]
 
     @property
     def current_rotation(self):
@@ -543,7 +621,7 @@ class PinholeCamera(Camera):
 
     @hooked
     def gui_context_menu(self, imgui):
-        u, show = imgui.menu_item("Show frustum", shortcut=None, selected=self.frustum is not None, enabled=True)
+        u, show = imgui.checkbox("Show frustum", self.frustum is not None)
         if u:
             if show:
                 self.show_frustum(self.cols, self.rows, self.far)

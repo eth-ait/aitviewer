@@ -142,7 +142,7 @@ class Billboard(Node):
         if image_process_fn is None:
             if isinstance(camera, OpenCVCamera) and (camera.dist_coeffs is not None):
                 def undistort(img):
-                    return cv2.undistort(img, camera.K, camera.dist_coeffs)
+                    return cv2.undistort(img, camera.current_K, camera.dist_coeffs)
                 image_process_fn = undistort
 
         return cls(all_corners, texture_paths, image_process_fn)
