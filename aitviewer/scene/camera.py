@@ -258,8 +258,8 @@ class Camera(Node, CameraInterface):
             # Flip the Z axis since we want to display the orientation with Z forward
             all_oris[i] = self.rotation @ np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])
 
-        path_spheres = RigidBodies(all_points, all_oris, radius=0.019, color=(0.92, 0.68, 0.2, 1.0))
-        path_lines = Lines(all_points, color=(0, 0, 0, 1), mode='line_strip', cast_shadow=False)
+        path_spheres = RigidBodies(all_points, all_oris, radius=0.01, length=0.1, color=(0.92, 0.68, 0.2, 1.0))
+        path_lines = Lines(all_points, color=(0, 0, 0, 1), r_base=0.003, mode='line_strip', cast_shadow=False)
 
         # We add the the path to the parent node of the camera because we don't want the camera position and rotation to be applied to it.
         self.parent.add(path_spheres, path_lines, show_in_hierarchy=False)
