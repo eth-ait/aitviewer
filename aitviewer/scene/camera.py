@@ -421,7 +421,7 @@ class OpenCVCamera(Camera):
         assert len(self.K.shape) == 3
 
         assert self.K.shape[0] == 1 or self.Rt.shape[0] == 1 or self.K.shape[0] == self.Rt.shape[0], (
-            f"extrinsics and intrinsics array shape mismatch: {self._positions.shape} and {self._targets.shape}")
+            f"extrinsics and intrinsics array shape mismatch: {self.Rt.shape} and {self.K.shape}")
 
         super(OpenCVCamera, self).__init__(viewer=viewer, n_frames=max(self.K.shape[0], self.Rt.shape[0]), **kwargs)
         self.position = self.current_position
