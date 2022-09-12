@@ -43,7 +43,7 @@
         vs_out.vert = in_position;
 
 #if SMOOTH_SHADING
-        vs_out.norm = in_normal;
+        vs_out.norm = (mvp * vec4(in_normal, 0.0)).xyz;
 #endif
 
 #if TEXTURE

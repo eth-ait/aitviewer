@@ -156,7 +156,10 @@ class Node(object):
         val = np.array([
             [np.nanmin(points[:, :, 0]), np.nanmax(points[:, :, 0])],
             [np.nanmin(points[:, :, 1]), np.nanmax(points[:, :, 1])],
-            [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]]) * self.scale
+            [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]])
+
+        # Transform bounding box with the model matrix.
+        val = (self.model_matrix() @ np.vstack((val, np.array([1.0, 1.0]))))[:3]
 
         # If any of the elements is NaN return an empty bounding box.
         if np.isnan(val).any():
