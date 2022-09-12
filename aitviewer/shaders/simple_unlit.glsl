@@ -3,14 +3,15 @@
 #if defined VERTEX_SHADER
 
     in vec3 in_position;
-    uniform mat4 mvp;
+    uniform mat4 view_projection_matrix;
+    uniform mat4 model_matrix;
 
     in vec4 in_color;
     out vec4 v_color;
 
     void main() {
         v_color = in_color;
-        gl_Position = mvp * vec4(in_position, 1.0);
+        gl_Position = view_projection_matrix * model_matrix * vec4(in_position, 1.0);
     }
 
 #elif defined FRAGMENT_SHADER

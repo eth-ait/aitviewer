@@ -146,14 +146,14 @@ class SMPLSequence(Node):
             global_oris = c2c(global_oris.reshape((self.n_frames, -1, 3, 3)))
         else:
             global_oris = np.tile(np.eye(3), self.joints.shape[:-1])[np.newaxis]
-            
+
         if self._z_up:
-            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation) 
+            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
         self.rbs = RigidBodies(self.joints, global_oris, length=0.1, name='Joint Angles')
         self.rbs.position = self.position
         self.rbs.rotation = self.rotation
-        self._add_node(self.rbs, enabled=self._show_joint_angles)
+        self._add_node(self.rbs, enabled=self._show_joint_angles, gui_elements=['material'])
 
         kwargs = self._render_kwargs.copy()
         kwargs['name'] = 'Mesh'
@@ -486,6 +486,7 @@ class SMPLSequence(Node):
     def gui(self, imgui):
         super().gui_animation(imgui)
         super().gui_position(imgui)
+        super().gui_rotation(imgui)
 
         if imgui.radio_button("View mode", not self.edit_mode):
             self.edit_mode = False

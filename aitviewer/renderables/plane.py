@@ -200,6 +200,8 @@ class ChessboardPlane(Node):
 
     def gui(self, imgui):
         self.gui_position(imgui)
+        self.gui_rotation(imgui)
+        self.gui_scale(imgui)
 
         _, self.c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
         _, self.c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True)
@@ -315,6 +317,8 @@ class Chessboard(Node):
 
     def gui(self, imgui):
         self.gui_position(imgui)
+        self.gui_rotation(imgui)
+        self.gui_scale(imgui)
 
         u, c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
         if u:

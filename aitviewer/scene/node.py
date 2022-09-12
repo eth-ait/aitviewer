@@ -19,6 +19,7 @@ import numpy as np
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.scene.material import Material
+from aitviewer.utils.so3 import euler2rot_numpy, rot2euler_numpy
 from functools import lru_cache
 
 
@@ -230,7 +231,7 @@ class Node(object):
         if n is None:
             return
         n._has_gui = has_gui
-        n._gui_elements = gui_elements if gui_elements is not None else ['animation', 'position', 'material']
+        n._gui_elements = gui_elements if gui_elements is not None else ['animation', 'position', 'rotation', 'scale', 'material']
         n._show_in_hierarchy = show_in_hierarchy
         n._expanded = expanded
         n._enabled = enabled
@@ -292,6 +293,13 @@ class Node(object):
         if u:
             self.position = pos
 
+    def gui_rotation(self, imgui):
+        # Rotation controls
+        euler_angles = rot2euler_numpy(self.rotation[np.newaxis], degrees=True)[0]
+        u, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1, format='%.2f')
+        if u:
+            self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
+
     def gui_scale(self, imgui):
         # Scale controls
         u, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
@@ -332,11 +340,15 @@ class Node(object):
         if 'position' in self._gui_elements:
             self.gui_position(imgui)
 
-        if 'material' in self._gui_elements:
-            self.gui_material(imgui)
+        if 'rotation' in self._gui_elements:
+            self.gui_rotation(imgui)
 
         if 'scale' in self._gui_elements:
             self.gui_scale(imgui)
+
+        if 'material' in self._gui_elements:
+            self.gui_material(imgui)
+
 
     # Renderable
     @staticmethod
@@ -373,9 +385,9 @@ class Node(object):
 
     def set_camera_matrices(self, prog, camera, **kwargs):
         """Set the model view projection matrix in the given program."""
-        mvp = np.matmul(camera.get_view_projection_matrix(), self.model_matrix())
         # Transpose because np is row-major but OpenGL expects column-major.
-        prog['mvp'].write(mvp.T.astype('f4').tobytes())
+        prog['model_matrix'].write(self.model_matrix().T.astype('f4').tobytes())
+        prog['view_projection_matrix'].write(camera.get_view_projection_matrix().T.astype('f4').tobytes())
 
     def receive_shadow(self, program, **kwargs):
         """
@@ -403,8 +415,8 @@ class Node(object):
         if not self.cast_shadow:
             return
 
-        mvp = light_matrix @ self.model_matrix()
-        prog['mvp'].write(mvp.T.tobytes())
+        prog['model_matrix'].write(self.model_matrix().T.astype('f4').tobytes())
+        prog['view_projection_matrix'].write(light_matrix.T.astype('f4').tobytes())
 
         self.render_positions(prog)
 
@@ -442,9 +454,7 @@ class Node(object):
             return
 
         prog = kwargs['depth_prepass_prog']
-        mvp = camera.get_view_projection_matrix() @ self.model_matrix()
-        prog['mvp'].write(mvp.T.tobytes())
-
+        self.set_camera_matrices(prog, camera)
         self.render_positions(prog)
 
     def render_outline(self, ctx, camera, prog):

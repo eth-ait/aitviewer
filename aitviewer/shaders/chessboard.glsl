@@ -4,7 +4,8 @@
 
 #if defined VERTEX_SHADER
 
-    uniform mat4 mvp;
+    uniform mat4 view_projection_matrix;
+    uniform mat4 model_matrix;
 
     in vec3 in_position;
     in vec3 in_normal;
@@ -16,10 +17,13 @@
     out vec4 v_vert_light[NR_DIR_LIGHTS];
 
     void main() {
-        v_vert = in_position;
-        v_norm = in_normal;
+        v_norm = (model_matrix * vec4(in_normal, 0.0)).xyz;
         v_uv = in_uv;
-        gl_Position = mvp * vec4(in_position, 1.0);
+
+        vec3 world_position = (model_matrix * vec4(in_position, 1.0)).xyz;
+        v_vert = world_position;
+        gl_Position = view_projection_matrix * vec4(world_position, 1.0);
+
         for(int i = 0; i < NR_DIR_LIGHTS; i++) {
             v_vert_light[i] = dirLights[i].matrix * vec4(in_position, 1.0);
         }
