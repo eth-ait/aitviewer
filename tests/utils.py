@@ -2,7 +2,7 @@ import functools
 import pytest
 import os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageChops
 
 from aitviewer.headless import HeadlessRenderer
 from aitviewer.configuration import CONFIG as C
@@ -43,14 +43,18 @@ def viewer(refs):
     for ref, img in zip(refs, generate_images(headless, len(refs))):
         # Load and check the refernce image.
         ref_img = Image.open(ref)
-        if np.all(np.asarray(img) != np.asarray(ref_img)):
+        if np.any(np.asarray(img) != np.asarray(ref_img)):
             os.makedirs(FAILURE_DIR, exist_ok=True)
 
-            # Store the wrong result for debugging.
+            # Store the wrong result and diff for debugging.
             wrong = os.path.join(FAILURE_DIR, os.path.basename(ref))
             img.save(wrong)
+            base, ext = os.path.splitext(wrong)
+            diff = ImageChops.difference(img, ref_img)
+            diff.save(base + "_diff" + ext)
 
-            assert False, f"Image does not match reference {ref}, the wrong image has been saved to {wrong}"
+            relative_error = np.asarray(diff).sum() / np.full(np.asarray(img).shape, 255).sum()
+            assert False, f"Image does not match reference {ref}, the wrong image has been saved to {wrong} (Relative Error {relative_error:.4f})"
 
 
 def requires_smpl(func):
