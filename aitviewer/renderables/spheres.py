@@ -111,6 +111,7 @@ class Spheres(Node):
         self.mesh = Meshes(self.sphere_vertices, self.sphere_faces, self.sphere_normals, material=self.material,
                            cast_shadow=False, is_selectable=False)
         self.mesh.position = self.position
+        self.mesh.rotation = self.rotation
 
         self.add(self.mesh, show_in_hierarchy=False)
 

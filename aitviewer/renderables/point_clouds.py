@@ -19,9 +19,9 @@ import moderngl
 
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_simple_unlit_program
+from aitviewer.utils.decorators import hooked
 from moderngl_window.opengl.vao import VAO
 
-from aitviewer.utils.decorators import hooked
 
 class PointClouds(Node):
     """
@@ -50,7 +50,7 @@ class PointClouds(Node):
         self.vao = VAO("points", mode=moderngl.POINTS)
         
         if z_up:
-            self.rotation =  np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
+            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
     @property
     def points(self):
