@@ -7,7 +7,8 @@
 
 #if defined VERTEX_SHADER
 
-    uniform mat4 mvp;
+    uniform mat4 view_projection_matrix;
+    uniform mat4 model_matrix;
 
 
     in vec3 in_position;
@@ -40,10 +41,8 @@
 
 
     void main() {
-        vs_out.vert = in_position;
-
 #if SMOOTH_SHADING
-        vs_out.norm = in_normal;
+        vs_out.norm = (model_matrix * vec4(in_normal, 0.0)).xyz;
 #endif
 
 #if TEXTURE
@@ -52,7 +51,9 @@
         vs_out.color = in_color;
 #endif
 
-        gl_Position = mvp * vec4(in_position, 1.0);
+        vec3 world_position = (model_matrix * vec4(in_position, 1.0)).xyz;
+        vs_out.vert = world_position;
+        gl_Position = view_projection_matrix * vec4(world_position, 1.0);
 
         for(int i = 0; i < NR_DIR_LIGHTS; i++) {
             vs_out.vert_light[i] = dirLights[i].matrix * vec4(in_position, 1.0);

@@ -158,7 +158,7 @@ class Scene(Node):
         centers = []
         for r in rs:
             if r.bounds is not None:
-                center = np.matmul(r.rotation, r.bounds.mean(-1)) + r.position
+                center = r.bounds.mean(-1)
                 if center.sum() != 0.0:
                     centers.append(center)
 

@@ -147,10 +147,13 @@ class SMPLSequence(Node):
         else:
             global_oris = np.tile(np.eye(3), self.joints.shape[:-1])[np.newaxis]
 
+        if self._z_up:
+            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
+
         self.rbs = RigidBodies(self.joints, global_oris, length=0.1, name='Joint Angles')
         self.rbs.position = self.position
         self.rbs.rotation = self.rotation
-        self._add_node(self.rbs, enabled=self._show_joint_angles)
+        self._add_node(self.rbs, enabled=self._show_joint_angles, gui_elements=['material'])
 
         kwargs = self._render_kwargs.copy()
         kwargs['name'] = 'Mesh'
@@ -307,13 +310,7 @@ class SMPLSequence(Node):
                                         betas=betas,
                                         trans=trans)
 
-        # Transform output vertices and joints into our viewer's coordinate system (where Y is up).
-        # We do this on the joints and not on the root pose of SMPL because the SMPL root does not correspond
-        # to the SMPL origin as pointed out by: https://github.com/eth-ait/aitviewer/issues/5
-        if self._z_up:
-            to_y_up = torch.Tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]]).to(verts.device, dtype=verts.dtype)
-            verts = torch.matmul(to_y_up.unsqueeze(0), verts.unsqueeze(-1)).squeeze(-1)
-            joints = torch.matmul(to_y_up.unsqueeze(0), joints.unsqueeze(-1)).squeeze(-1)
+
 
         skeleton = self.smpl_layer.skeletons()['body'].T
         faces = self.smpl_layer.bm.faces.astype(np.int64)
@@ -489,6 +486,7 @@ class SMPLSequence(Node):
     def gui(self, imgui):
         super().gui_animation(imgui)
         super().gui_position(imgui)
+        super().gui_rotation(imgui)
 
         if imgui.radio_button("View mode", not self.edit_mode):
             self.edit_mode = False

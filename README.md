@@ -37,9 +37,10 @@ pip install -e .
 Note that this does not install the GPU-version of PyTorch automatically. If your environment already contains it, you should be good to go, otherwise install it manually.
 
 ## Configuration
-The viewer loads default configuration parameters from [`aitvconfig.yaml`](aitviewer/aitvconfig.yaml). There are two ways how to override these parameters:
+The viewer loads default configuration parameters from [`aitvconfig.yaml`](aitviewer/aitvconfig.yaml). There are three ways how to override these parameters:
   - Create a file named `aitvconfig.yaml` and have the environment variable `AITVRC` point to it. Alternatively, you can point `AITVRC` to the directory containing `aitvconfig.yaml`.
   - Create a file named `aitvconfig.yaml` in your current working directory, i.e. from where you launch your python program.
+  - Pass a `config` parameter to the `Viewer` constructor.
 
 Note that the configuration files are loaded in this order, i.e. the config file in your working directory overrides all previous parameters.
 

@@ -20,7 +20,7 @@ vec3 directionalLight(DirLight dirLight, vec3 color, vec3 fragPos, vec3 normal, 
     vec3 ambient = dirLight.intensity_ambient * dirLight.color * ambient_coeff;
 
     // Diffuse
-    vec3 lightDir = normalize(dirLight.pos - fragPos);
+    vec3 lightDir = normalize(dirLight.pos); // Here we assume that lights are always directed at the origin
     float diff = max(dot(normal, lightDir), 0.0);
     vec3 diffuse = diffuse_coeff * diff * dirLight.intensity_diffuse * dirLight.color;
 
