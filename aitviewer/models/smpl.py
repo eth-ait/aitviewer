@@ -119,8 +119,8 @@ class SMPLLayer(nn.Module, ABC):
         return {'all': parents, 'body': parents[:, :self.bm.NUM_BODY_JOINTS + 1],
                 'hands': parents[:, self.bm.NUM_BODY_JOINTS + 1:]}
 
-    def fk(self, poses_body, betas, poses_root=None, trans=None, normalize_root=False,
-           poses_left_hand=None, poses_right_hand=None,
+    def fk(self, poses_body, betas, poses_root=None, trans_root=None, trans=None,
+           normalize_root=False, poses_left_hand=None, poses_right_hand=None,
            poses_jaw=None, poses_leye=None, poses_reye=None, expression=None):
         """
         Convert body pose data (joint angles and shape parameters) to positional data (joint and mesh vertex positions).
@@ -130,7 +130,9 @@ class SMPLLayer(nn.Module, ABC):
         :param betas: A tensor of shape (N, N_BETAS) containing the betas/shape parameters, i.e. shape parameters can
           differ for every sample. If N_BETAS > self.num_betas, the excessive shape parameters will be ignored.
         :param poses_root: Orientation of the root or None. If specified expected shape is (N, 3).
-        :param trans: Translation of the root or None. If specified expected shape is (N, 3).
+        :param trans_root: Translation of the root or None. If specified expected shape is (N, 3).
+        :param trans: Translation that is applied to vertices and joints or None, this is the transl' parameter
+          of the SMPL Model. If specified expected shape is (N, 3). Must be None if trans_root is specified.
         :param normalize_root: If set, it will normalize the root such that its orientation is the identity in the
           first frame and its position starts at the origin.
         :param poses_left_hand: A tensor of shape (N, N_JOINTS_HANDS*3) or None. Only relevant if this body model
@@ -140,6 +142,7 @@ class SMPLLayer(nn.Module, ABC):
         :return: The resulting vertices and joints.
         """
         assert poses_body.shape[1] == self.bm.NUM_BODY_JOINTS*3
+        assert trans_root is None or trans is None
 
         has_hands = hasattr(self.bm, 'NUM_HAND_JOINTS')
         has_face = hasattr(self.bm, 'NUM_FACE_JOINTS')
@@ -193,10 +196,17 @@ class SMPLLayer(nn.Module, ABC):
             trans = torch.matmul(first_root_ori.unsqueeze(0), trans.unsqueeze(-1)).squeeze()
             trans = trans - trans[0:1]
 
-        bm_output = self.bm(body_pose=poses_body, betas=betas, global_orient=poses_root, transl=trans,
+        output = self.bm(body_pose=poses_body, betas=betas, global_orient=poses_root, transl=trans,
                             left_hand_pose=poses_left_hand, right_hand_pose=poses_right_hand,
                             jaw_pose=poses_jaw, leye_pose=poses_leye, reye_pose=poses_reye, expression=expression)
-        return bm_output['vertices'], bm_output['joints']
+
+        joints = output.joints[:, :24]
+        if trans_root is not None:
+            cur_root_trans = joints[:, [0], :]
+            output.vertices[:] = (output.vertices - cur_root_trans) + trans_root[:, None, :]
+            output.joints[:] = (output.joints - cur_root_trans) + trans_root[:, None, :]
+
+        return output.vertices, output.joints
 
     def forward(self, *args, **kwargs):
         """

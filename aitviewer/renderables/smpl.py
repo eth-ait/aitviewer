@@ -47,6 +47,7 @@ class SMPLSequence(Node):
                  poses_body,
                  smpl_layer,
                  poses_root=None,
+                 trans_root=None,
                  betas=None,
                  trans=None,
                  poses_left_hand=None,
@@ -65,8 +66,10 @@ class SMPLSequence(Node):
           body, i.e. without hands or face parameters.
         :param smpl_layer: The SMPL layer that maps parameters to joint positions and/or dense surfaces.
         :param poses_root: An array (numpy or pytorch) of shape (F, 3) containing the global root orientation.
+        :param trans_root: An array (numpy or pytorch) of shape (F, 3) containing the global root translation.
         :param betas: An array (numpy or pytorch) of shape (N_BETAS, ) containing the shape parameters.
-        :param trans: An array (numpy or pytorch) of shape (F, 3) containing the global root translation.
+        :param trans: An array (numpy or pytorch) of shape (F, 3) containing a global translation that is applied to
+          all joints and vertices, must be None if trans_root is specified.
         :param device: The pytorch device for computations.
         :param dtype: The pytorch data type.
         :param include_root: Whether or not to include root information. If False, no root translation and no root
@@ -89,7 +92,17 @@ class SMPLSequence(Node):
 
         poses_root = poses_root if poses_root is not None else torch.zeros([len(poses_body), 3])
         betas = betas if betas is not None else torch.zeros([1, self.smpl_layer.num_betas])
-        trans = trans if trans is not None else torch.zeros([len(poses_body), 3])
+
+        assert trans_root is None or trans is None
+        if trans_root is not None:
+            trans = trans_root
+            self.use_trans_root = True
+        elif trans is not None:
+            trans = trans
+            self.use_trans_root = False
+        else:
+            trans = torch.zeros([len(poses_body), 3])
+            self.use_trans_root = False
 
         self.poses_root = to_torch(poses_root, dtype=dtype, device=device)
         self.betas = to_torch(betas, dtype=dtype, device=device)
@@ -308,9 +321,8 @@ class SMPLSequence(Node):
                                         poses_left_hand=poses_left_hand,
                                         poses_right_hand=poses_right_hand,
                                         betas=betas,
-                                        trans=trans)
-
-
+                                        trans=None if self.use_trans_root else trans,
+                                        trans_root=trans if self.use_trans_root else None)
 
         skeleton = self.smpl_layer.skeletons()['body'].T
         faces = self.smpl_layer.bm.faces.astype(np.int64)
