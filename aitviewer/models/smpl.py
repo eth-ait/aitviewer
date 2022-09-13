@@ -131,7 +131,7 @@ class SMPLLayer(nn.Module, ABC):
           differ for every sample. If N_BETAS > self.num_betas, the excessive shape parameters will be ignored.
         :param poses_root: Orientation of the root or None. If specified expected shape is (N, 3).
         :param trans_root: Translation of the root or None. If specified expected shape is (N, 3).
-        :param trans: Translation that is applied to vertices and joints or None, this is the transl' parameter
+        :param trans: Translation that is applied to vertices and joints or None, this is the 'transl' parameter
           of the SMPL Model. If specified expected shape is (N, 3). Must be None if trans_root is specified.
         :param normalize_root: If set, it will normalize the root such that its orientation is the identity in the
           first frame and its position starts at the origin.
