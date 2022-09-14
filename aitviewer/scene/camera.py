@@ -262,6 +262,7 @@ class Camera(Node, CameraInterface):
         path_lines = Lines(all_points, color=(0, 0, 0, 1), r_base=0.003, mode='line_strip', cast_shadow=False)
 
         # We add the the path to the parent node of the camera because we don't want the camera position and rotation to be applied to it.
+        assert self.parent is not None, "Camera node must be added to the scene before showing the camera path."
         self.parent.add(path_spheres, path_lines, show_in_hierarchy=False)
         self.path = (path_spheres, path_lines)
 

@@ -47,7 +47,6 @@ class SMPLSequence(Node):
                  poses_body,
                  smpl_layer,
                  poses_root=None,
-                 trans_root=None,
                  betas=None,
                  trans=None,
                  poses_left_hand=None,
@@ -59,6 +58,7 @@ class SMPLSequence(Node):
                  is_rigged=True,
                  show_joint_angles=False,
                  z_up=False,
+                 post_fk_func=None,
                  **kwargs):
         """
         Initializer.
@@ -66,10 +66,9 @@ class SMPLSequence(Node):
           body, i.e. without hands or face parameters.
         :param smpl_layer: The SMPL layer that maps parameters to joint positions and/or dense surfaces.
         :param poses_root: An array (numpy or pytorch) of shape (F, 3) containing the global root orientation.
-        :param trans_root: An array (numpy or pytorch) of shape (F, 3) containing the global root translation.
         :param betas: An array (numpy or pytorch) of shape (N_BETAS, ) containing the shape parameters.
         :param trans: An array (numpy or pytorch) of shape (F, 3) containing a global translation that is applied to
-          all joints and vertices, must be None if trans_root is specified.
+          all joints and vertices.
         :param device: The pytorch device for computations.
         :param dtype: The pytorch data type.
         :param include_root: Whether or not to include root information. If False, no root translation and no root
@@ -79,12 +78,19 @@ class SMPLSequence(Node):
         :param is_rigged: Whether or not to display the joints as a skeleton.
         :param show_joint_angles: Whether or not the coordinate frames at the joints should be visualized.
         :param z_up: Whether or not the input data assumes Z is up. If so, the data will be rotated such that Y is up.
+        :param post_fk_func: User specified postprocessing function that is called after evaluating the SMPL model,
+          the function signature must is: def post_fk_func(self, vertices, joints, current_frame_only),
+          and it must return new values for vertices and joints with the same shapes.
+          Shapes are:
+            if current_frame_only is False: vertices (F, V, 3) and joints (F, N_JOINTS, 3)
+            if current_frame_only is True:  vertices (1, V, 3) and joints (1, N_JOINTS, 3)
         :param kwargs: Remaining arguments for rendering.
         """
         assert len(poses_body.shape) == 2
         super(SMPLSequence, self).__init__(n_frames=poses_body.shape[0], **kwargs)
 
         self.smpl_layer = smpl_layer
+        self.post_fk_func = post_fk_func
 
         self.poses_body = to_torch(poses_body, dtype=dtype, device=device)
         self.poses_left_hand = to_torch(poses_left_hand, dtype=dtype, device=device)
@@ -92,17 +98,7 @@ class SMPLSequence(Node):
 
         poses_root = poses_root if poses_root is not None else torch.zeros([len(poses_body), 3])
         betas = betas if betas is not None else torch.zeros([1, self.smpl_layer.num_betas])
-
-        assert trans_root is None or trans is None
-        if trans_root is not None:
-            trans = trans_root
-            self.use_trans_root = True
-        elif trans is not None:
-            trans = trans
-            self.use_trans_root = False
-        else:
-            trans = torch.zeros([len(poses_body), 3])
-            self.use_trans_root = False
+        trans = trans if trans is not None else torch.zeros([len(poses_body), 3])
 
         self.poses_root = to_torch(poses_root, dtype=dtype, device=device)
         self.betas = to_torch(betas, dtype=dtype, device=device)
@@ -321,8 +317,11 @@ class SMPLSequence(Node):
                                         poses_left_hand=poses_left_hand,
                                         poses_right_hand=poses_right_hand,
                                         betas=betas,
-                                        trans=None if self.use_trans_root else trans,
-                                        trans_root=trans if self.use_trans_root else None)
+                                        trans=trans)
+
+        # Apply post_fk_func if specified.
+        if self.post_fk_func:
+            verts, joints = self.post_fk_func(self, verts, joints, current_frame_only)
 
         skeleton = self.smpl_layer.skeletons()['body'].T
         faces = self.smpl_layer.bm.faces.astype(np.int64)

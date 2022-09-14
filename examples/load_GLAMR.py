@@ -1,11 +1,11 @@
 from aitviewer.viewer import Viewer
-from aitviewer.headless import HeadlessRenderer
-from aitviewer.scene.camera import OpenCVCamera, WeakPerspectiveCamera
+from aitviewer.scene.camera import OpenCVCamera
 from aitviewer.renderables.billboard import Billboard
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.configuration import CONFIG as C
 
+import torch
 import numpy as np
 import pickle
 import os
@@ -25,18 +25,30 @@ if __name__ == '__main__':
     trans = person['root_trans_world']
     ori = person['smpl_orient_world']
 
+
+    # Define a postprocess function for the SMPL sequence,
+    # we use this to apply the translation from the data to the root node.
+    def post_fk_func(self: SMPLSequence, vertices: torch.Tensor, joints: torch.Tensor, current_frame_only: bool):
+        # Select the translation of the current frame if current_frame_only is True, otherwise select all frames.
+        t = trans[[self.current_frame_id]] if current_frame_only else trans[:]
+
+        # Subtract the position of the root joint from all vertices and joint positions and add the root translation.
+        cur_root_trans = joints[:, [0], :]
+        vertices = vertices - cur_root_trans + t[:, None, :]
+        joints = joints - cur_root_trans + t[:, None, :]
+        return vertices, joints
+
     # Instantiate an SMPL sequence using the parameters from the data file.
     # We set z_up=True because GLAMR data is using z_up coordinates.
     smpl_layer = SMPLLayer(model_type='smpl', gender='neutral', device=C.device)
-    c = (149/255, 149/255, 149/255, 0.8)
     smpl_sequence = SMPLSequence(poses_body=pose,
                                  poses_root=ori,
-                                 trans_root=trans,
                                  betas=betas,
                                  is_rigged=False,
                                  smpl_layer=smpl_layer,
-                                 color=c,
-                                 z_up=True)
+                                 color=(149/255, 149/255, 149/255, 0.8),
+                                 z_up=True,
+                                 post_fk_func=post_fk_func)
 
     # Draw an outline around the SMPL mesh.
     smpl_sequence.mesh_seq.draw_outline = True
