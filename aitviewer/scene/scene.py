@@ -22,6 +22,7 @@ from aitviewer.renderables.plane import ChessboardPlane
 from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
 from aitviewer.renderables.lines import Lines
+from aitviewer.configuration import CONFIG as C
 
 
 class Scene(Node):
@@ -39,6 +40,7 @@ class Scene(Node):
         self.ctx = None
 
         self.backface_culling = True
+        self.fps = C.scene_fps
 
         # Default Setup
         # If you update the number of lights, make sure to change the respective `define` statement in
@@ -47,7 +49,7 @@ class Scene(Node):
         self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
         self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0),
                                  shadow_enabled=False))
-        self.add(*self.lights, show_in_hierarchy=False)
+        self.add(*self.lights)
 
         # Scene items
         self.origin = CoordinateSystem(name="Origin", length=0.1)
@@ -71,6 +73,9 @@ class Scene(Node):
         self.selected_object = None
         # Object shown in the property panel
         self._gui_selected_object = None
+
+        # The scene node in the GUI is expanded at the start.
+        self.expanded = True
 
     def render(self, **kwargs):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
@@ -236,13 +241,18 @@ class Scene(Node):
                 imgui.tree_pop()
 
     def gui(self, imgui):
+        imgui.text(f"FPS: {self.fps:.1f}")
+
+    def gui_editor(self, imgui):
         """GUI to control scene settings."""
+        # Also include the camera GUI in the scene node.
         self.gui_camera(imgui)
-        self.gui_lights(imgui)
-        self.gui_renderables(imgui, self.nodes)
+        self.gui_renderables(imgui, [self])
+
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
+
         self.gui_selected(imgui)
 
     def gui_camera(self, imgui):
@@ -310,12 +320,13 @@ class Scene(Node):
             imgui.pop_style_var()
             imgui.pop_font()
 
-            # Aligns checkbox to the right side of the window
-            # https://github.com/ocornut/imgui/issues/196
-            imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
-            eu, enabled = imgui.checkbox('##enabled_r_{}'.format(r.unique_name), r.enabled)
-            if eu:
-                r.enabled = enabled
+            if r != self:
+                # Aligns checkbox to the right side of the window
+                # https://github.com/ocornut/imgui/issues/196
+                imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
+                eu, enabled = imgui.checkbox('##enabled_r_{}'.format(r.unique_name), r.enabled)
+                if eu:
+                    r.enabled = enabled
 
             if r.expanded:
                 if r.has_gui:

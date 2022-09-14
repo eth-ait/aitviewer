@@ -81,6 +81,7 @@ if __name__ == '__main__':
 
     # Viewer settings
     viewer.scene.floor.enabled = False
+    viewer.scene.fps = 30.0
     viewer.playback_fps = 30.0
     viewer.shadows_enabled = False
     viewer.auto_set_camera_target = False

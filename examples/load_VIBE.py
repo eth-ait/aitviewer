@@ -74,8 +74,9 @@ if __name__ == '__main__':
     viewer.set_temp_camera(cameras)
 
     # Viewer settings.
-    viewer.playback_fps = 25
     viewer.auto_set_floor = False
+    viewer.playback_fps = 25
+    viewer.scene.fps = 25
     viewer.scene.floor.position[1] = -1.15
     viewer.scene.origin.enabled = False
     viewer.shadows_enabled = False

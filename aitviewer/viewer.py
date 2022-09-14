@@ -252,8 +252,8 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_as_gif = False
         self.export_rotate_camera = False
         self.export_seconds_per_rotation = 10
-        self.export_fps = 30
-        self.export_downscale_factor = 1.0
+        self.export_fps = self.playback_fps
+        self.export_scale_factor = 1.0
 
     def _init_scene(self):
         self.scene.make_renderable(self.ctx)
@@ -459,8 +459,8 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_scene(self):
         # Render scene GUI
-        imgui.begin(self.scene.name, True)
-        self.scene.gui(imgui)
+        imgui.begin("Editor", True)
+        self.scene.gui_editor(imgui)
         imgui.end()
 
     def gui_menu(self):
@@ -541,9 +541,10 @@ class Viewer(moderngl_window.WindowConfig):
 
         if clicked_export:
             imgui.open_popup("Export Video")
+            self.export_fps = self.playback_fps
             self.toggle_animation(False)
 
-        imgui.set_next_window_size(530,0)
+        imgui.set_next_window_size(570,0)
         if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
             if self.scene.n_frames == 1:
                 imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
@@ -556,6 +557,7 @@ class Viewer(moderngl_window.WindowConfig):
                 imgui.pop_style_var()
                 self.export_animation = False
 
+            imgui.same_line(spacing=15)
             if imgui.radio_button("360 shot", not self.export_animation):
                 self.export_animation = False
 
@@ -570,10 +572,14 @@ class Viewer(moderngl_window.WindowConfig):
 
                 _, self.playback_fps = imgui.drag_float('Playback fps', self.playback_fps, 0.1,
                                                          min_value=1.0, max_value=120.0, format='%.1f')
+                imgui.same_line(spacing=10)
+                speedup = self.playback_fps / self.scene.fps
+                imgui.text(f'({speedup:.2f}x speed)')
             else:
                 _, self.scene.current_frame_id = imgui.slider_int('Frame', self.scene.current_frame_id,
                                                                    min_value=0, max_value=self.scene.n_frames - 1)
                 _, self.export_duration = imgui.drag_float('Duration (s)', self.export_duration, min_value=0.1, max_value=10000.0, change_speed=0.05, format='%.1f')
+                duration = self.export_duration
 
             if self.export_animation:
                 if isinstance(self.scene.camera, ViewerCamera):
@@ -584,7 +590,7 @@ class Viewer(moderngl_window.WindowConfig):
                     imgui.pop_style_var(1)
 
             if not self.export_animation or self.export_rotate_camera:
-                _, self.export_seconds_per_rotation = imgui.drag_float('Rotation time (s)', self.export_seconds_per_rotation, min_value=0.1, max_value=10000.0, change_speed=0.05, format='%.1f')
+                _, self.export_seconds_per_rotation = imgui.drag_float('Rotation time (s)', self.export_seconds_per_rotation, min_value=0.1, max_value=10000.0, change_speed=0.01, format='%.2f')
                 imgui.same_line()
                 if imgui.button("Once"):
                     if self.export_animation:
@@ -599,40 +605,61 @@ class Viewer(moderngl_window.WindowConfig):
             # Output settings.
             imgui.text("Output")
             imgui.spacing()
+            imgui.text("Format:")
+            imgui.same_line()
             if imgui.radio_button("MP4", not self.export_as_gif):
                 self.export_as_gif = False
+            imgui.same_line(spacing=15)
             if imgui.radio_button("GIF", self.export_as_gif):
                 self.export_as_gif = True
 
             if self.export_as_gif:
                 max_output_fps = 30.0
             else:
-                max_output_fps = 60.0
+                max_output_fps = 120.0
             self.export_fps = min(self.export_fps, max_output_fps)
             _, self.export_fps = imgui.drag_float('fps', self.export_fps, 0.1,
                                                   min_value=1.0, max_value=max_output_fps, format='%.1f')
-
-            if self.export_animation:
-                imgui.same_line(spacing=23)
-                if imgui.button("Use playback fps"):
-                    self.export_fps = self.playback_fps
+            imgui.same_line(position=440)
+            if imgui.button("1x##fps", width=35):
+                self.export_fps = self.playback_fps
+            imgui.same_line()
+            if imgui.button("1/2x##fps", width=35):
+                self.export_fps = self.playback_fps / 2
+            imgui.same_line()
+            if imgui.button("1/4x##fps", width=35):
+                self.export_fps = self.playback_fps / 4
 
             imgui.spacing()
-            imgui.text(f"Output resolution: [{int(self.window_size[0] / self.export_downscale_factor)}]x[{int(self.window_size[1] / self.export_downscale_factor)}]")
-            _, self.export_downscale_factor = imgui.drag_float('Downscale', self.export_downscale_factor,
-                                                               min_value=1.0, max_value=100.0,
-                                                               change_speed=0.05, format='%.1f')
+            imgui.spacing()
+            imgui.text(f"Resolution: [{int(self.window_size[0] * self.export_scale_factor)}x{int(self.window_size[1] * self.export_scale_factor)}]")
+            _, self.export_scale_factor = imgui.drag_float('Scale', self.export_scale_factor,
+                                                               min_value=0.01, max_value=1.0,
+                                                               change_speed=0.005, format='%.2f')
 
-            imgui.same_line(spacing=20)
-            if imgui.button("1x"):
-                self.export_downscale_factor = 1.0
+            imgui.same_line(position=440)
+            if imgui.button("1x##scale", width=35):
+                self.export_scale_factor = 1.0
             imgui.same_line()
-            if imgui.button("2x"):
-                self.export_downscale_factor = 2.0
+            if imgui.button("1/2x##scale", width=35):
+                self.export_scale_factor = 0.5
             imgui.same_line()
-            if imgui.button("4x"):
-                self.export_downscale_factor = 4.0
+            if imgui.button("1/4x##scale", width=35):
+                self.export_scale_factor = 0.25
 
+            if self.export_animation:
+                duration =  (animation_range[1] - animation_range[0] + 1) / self.playback_fps
+                # Compute exact number of frames if playback fps is an exact multiple of export fps.
+                if np.fmod(self.playback_fps, self.export_fps) < 0.1:
+                    playback_count = int(np.round(self.playback_fps / self.export_fps))
+                    frames = (animation_range[1] - animation_range[0] + 1) // playback_count
+                else:
+                    frames = int(np.ceil(duration * self.export_fps))
+            else:
+                frames = int(np.ceil(duration * self.export_fps))
+
+            imgui.spacing()
+            imgui.text(f"Duration: {duration:.2f}s ({frames} frames @ {self.export_fps:.2f}fps)")
             imgui.spacing()
 
             # Draw a cancel and exit button on the same line using the available space
@@ -662,7 +689,7 @@ class Viewer(moderngl_window.WindowConfig):
                     output_fps=self.export_fps,
                     rotate_camera=not self.export_animation or self.export_rotate_camera,
                     seconds_per_rotation=self.export_seconds_per_rotation,
-                    downscale_factor=self.export_downscale_factor
+                    scale_factor=self.export_scale_factor
                 )
 
             imgui.end_popup()
@@ -685,8 +712,11 @@ class Viewer(moderngl_window.WindowConfig):
                          array('f', (1.0 / self._past_frametimes).tolist()),
                          scale_min=0, scale_max=100.0, graph_size=(100, 20))
 
-        _, self.playback_fps = imgui.drag_float('Target Playback fps##playback_fps', self.playback_fps, 0.1,
+        _, self.playback_fps = imgui.drag_float(f'Playback fps', self.playback_fps, 0.1,
                                                 min_value=1.0, max_value=120.0, format='%.1f')
+        imgui.same_line(spacing=10)
+        speedup = self.playback_fps / self.scene.fps
+        imgui.text(f'({speedup:.2f}x speed)')
 
         # Sequence Control
         # For simplicity, we allow the global sequence slider to only go as far as the shortest known sequence.
@@ -946,13 +976,13 @@ class Viewer(moderngl_window.WindowConfig):
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
 
-    def save_current_frame_as_image(self, frame_dir, frame_id, downscale_factor=None):
+    def save_current_frame_as_image(self, frame_dir, frame_id, scale_factor=None):
         """Saves the current frame as an image to disk."""
         image = self.get_current_frame_as_image()
         image_name = os.path.join(frame_dir, 'frame_{:0>6}.png'.format(frame_id))
-        if downscale_factor is not None and downscale_factor != 1.0:
-            w = int(image.width / downscale_factor)
-            h = int(image.height / downscale_factor)
+        if scale_factor is not None and scale_factor != 1.0:
+            w = int(image.width * scale_factor)
+            h = int(image.height * scale_factor)
             image = image.resize((w, h), Image.LANCZOS)
         image.save(image_name)
 
@@ -995,7 +1025,7 @@ class Viewer(moderngl_window.WindowConfig):
         output_fps=60.0,
         rotate_camera=False,
         seconds_per_rotation=10.0,
-        downscale_factor=None,
+        scale_factor=None,
         ):
         if rotate_camera and not isinstance(self.scene.camera, ViewerCamera):
             print("Cannot export a video with camera rotation while using a camera that is not a ViewerCamera")
@@ -1048,9 +1078,10 @@ class Viewer(moderngl_window.WindowConfig):
             self.run_animations = False
             self.scene.current_frame_id = frame
 
-        # Compute exact number of frames if we have the same playback and output fps
-        if animation and abs(self.playback_fps - output_fps) < 0.1:
-            frames = (animation_range[1] - animation_range[0]) + 1
+        # Compute exact number of frames if we have the playback fps is an exact multiple of the output fps
+        if animation and np.fmod(self.playback_fps, output_fps) < 0.1:
+            playback_count = int(np.round(self.playback_fps / output_fps))
+            frames = (animation_range[1] - animation_range[0] + 1) // playback_count
             self.run_animations = False
             exact_playback = True
         else:
@@ -1088,10 +1119,10 @@ class Viewer(moderngl_window.WindowConfig):
             self.render(time, time + dt, export=True)
             img = self.get_current_frame_as_image()
 
-            # Downscale image by the downscale factor.
-            if downscale_factor is not None and downscale_factor != 1.0:
-                w = int(img.width / downscale_factor)
-                h = int(img.height / downscale_factor)
+            # Scale image by the scale factor.
+            if scale_factor is not None and scale_factor != 1.0:
+                w = int(img.width * scale_factor)
+                h = int(img.height * scale_factor)
                 img = img.resize((w, h), Image.LANCZOS)
 
             # Store the image to disk if a directory for frames was given.
@@ -1104,7 +1135,7 @@ class Viewer(moderngl_window.WindowConfig):
                 writer.writeFrame(np.array(img))
 
             if exact_playback:
-                self.scene.next_frame()
+                self.scene.current_frame_id = self.scene.current_frame_id + playback_count
 
             time += dt
 
