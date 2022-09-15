@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import pickle as pkl
 import torch
+import os
+from typing import Union, IO
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
@@ -267,6 +269,31 @@ class SMPLSequence(Node):
 
         poses = np.zeros([frames, smpl_layer.bm.NUM_BODY_JOINTS * 3])  # including hands and global root
         return cls(poses, smpl_layer, betas=betas, **kwargs)
+
+    @classmethod
+    def from_npz(cls, file: Union[IO, str], smpl_layer: SMPLLayer=None, **kwargs):
+        """Creates a SMPL sequence from a .npz file exported through the 'export' function."""
+        if smpl_layer is None:
+            smpl_layer = SMPLLayer(model_type='smplh', gender='neutral')
+
+        data = np.load(file)
+
+        return cls(
+            smpl_layer=smpl_layer,
+            poses_body=data['poses_body'],
+            poses_root=data['poses_root'],
+            betas=data['betas'],
+            trans=data['trans'],
+            **kwargs,
+        )
+
+    def export(self, file: Union[IO, str]):
+        np.savez(file,
+            poses_body=self.poses_body,
+            poses_root=self.poses_root,
+            betas=self.betas,
+            trans=self.trans,
+        )
 
     @property
     def vertex_normals(self):
@@ -545,6 +572,13 @@ class SMPLSequence(Node):
                 self._edit_pose = self.poses[self.current_frame_id]
                 self._edit_pose_dirty = False
                 self.redraw(current_frame_only=True)
+
+        if imgui.button("Export"):
+            dir = os.path.join(C.export_dir, "SMPL")
+            os.makedirs(dir, exist_ok=True)
+            path = os.path.join(dir, self.name + ".npz")
+            self.export(path)
+            print(f'Exported SMPL to "{path}"')
 
     def gui_context_menu(self, imgui):
         if self.edit_mode and self._edit_joint is not None:
