@@ -19,6 +19,7 @@ import numpy as np
 
 from aitviewer.renderables.coordinate_system import CoordinateSystem
 from aitviewer.renderables.plane import ChessboardPlane
+from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
 from aitviewer.renderables.lines import Lines
@@ -263,7 +264,12 @@ class Scene(Node):
         flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
         if self.is_selected(self.camera):
             flags |= imgui.TREE_NODE_SELECTED
-        camera_expanded = imgui.tree_node(f"{self.camera.icon} {self.camera.name}##tree_node_r_camera", flags)
+
+        if isinstance(self.camera, ViewerCamera):
+            name = self.camera.name
+        else:
+            name = f"Camera: {self.camera.name}"
+        camera_expanded = imgui.tree_node(f"{self.camera.icon} {name}##tree_node_r_camera", flags)
         if imgui.is_item_clicked():
             self.select(self.camera)
 
