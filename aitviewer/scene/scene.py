@@ -42,6 +42,7 @@ class Scene(Node):
 
         self.backface_culling = True
         self.fps = C.scene_fps
+        self.background_color = C.background_color
 
         # Default Setup
         # If you update the number of lights, make sure to change the respective `define` statement in

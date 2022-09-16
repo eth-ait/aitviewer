@@ -393,7 +393,7 @@ class Viewer(moderngl_window.WindowConfig):
         if self.dark_mode:
             self.ctx.clear(0.1, 0.1, 0.1, 1.0)
         else:
-            self.ctx.clear(1.0, 1.0, 1.0, 1.0)
+            self.ctx.clear(*self.scene.background_color)
 
         self.ctx.enable_only(moderngl.DEPTH_TEST | moderngl.BLEND | moderngl.CULL_FACE)
         self.ctx.cull_face = 'back'
