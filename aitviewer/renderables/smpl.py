@@ -287,12 +287,12 @@ class SMPLSequence(Node):
             **kwargs,
         )
 
-    def export(self, file: Union[IO, str]):
+    def export_to_npz(self, file: Union[IO, str]):
         np.savez(file,
-            poses_body=self.poses_body,
-            poses_root=self.poses_root,
-            betas=self.betas,
-            trans=self.trans,
+            poses_body=c2c(self.poses_body),
+            poses_root=c2c(self.poses_root),
+            betas=c2c(self.betas),
+            trans=c2c(self.trans),
         )
 
     @property
@@ -573,12 +573,13 @@ class SMPLSequence(Node):
                 self._edit_pose_dirty = False
                 self.redraw(current_frame_only=True)
 
-        if imgui.button("Export"):
+        imgui.spacing()
+        if imgui.button("Export sequence to NPZ"):
             dir = os.path.join(C.export_dir, "SMPL")
             os.makedirs(dir, exist_ok=True)
             path = os.path.join(dir, self.name + ".npz")
-            self.export(path)
-            print(f'Exported SMPL to "{path}"')
+            self.export_to_npz(path)
+            print(f'Exported SMPL sequence to "{path}"')
 
     def gui_context_menu(self, imgui):
         if self.edit_mode and self._edit_joint is not None:
