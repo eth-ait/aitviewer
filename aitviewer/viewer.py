@@ -976,15 +976,14 @@ class Viewer(moderngl_window.WindowConfig):
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
 
-    def save_current_frame_as_image(self, frame_dir, frame_id, scale_factor=None):
+    def save_current_frame_as_image(self, path, scale_factor=None):
         """Saves the current frame as an image to disk."""
         image = self.get_current_frame_as_image()
-        image_name = os.path.join(frame_dir, 'frame_{:0>6}.png'.format(frame_id))
         if scale_factor is not None and scale_factor != 1.0:
             w = int(image.width * scale_factor)
             h = int(image.height * scale_factor)
             image = image.resize((w, h), Image.LANCZOS)
-        image.save(image_name)
+        image.save(path)
 
     def get_current_frame_as_image(self):
         """Return the FBO content as a PIL image."""
@@ -1004,15 +1003,30 @@ class Viewer(moderngl_window.WindowConfig):
             s.stop()
 
     def take_screenshot(self):
-        """Save the current framebuffer to an image."""
-        frame_dir = C.export_dir + '/screenshots/'
-        if not os.path.exists(frame_dir):
-            os.makedirs(frame_dir)
-        # We don't want to export GUI elements, so render the scene again.
-        self.render_shadowmap()
-        self.render_prepare()
-        self.render_scene()
-        self.save_current_frame_as_image(frame_dir, self.scene.current_frame_id)
+        """Save the current frame to an image in the screenshots directory inside the export directory"""
+        file_path = os.path.join(C.export_dir, 'screenshots', 'frame_{:0>6}.png'.format(self.scene.current_frame_id))
+        self.export_frame(file_path)
+        print(f"Saved screenshot to {file_path}")
+
+    def export_frame(self, file_path, scale_factor:float=None):
+        """Save the current frame to an image.
+        :param file_path: the path where the image is saved.
+        :param scale_factor: a scale factor used to scale the image. If None no scale factor is used and
+          the image will have the same size as the viewer.
+        """
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        # Store run_animation old value and set it to false.
+        run_animations = self.run_animations
+        self.run_animations = False
+
+        # Render and save frame.
+        self.render(0, 0, export=True)
+        self.save_current_frame_as_image(file_path, scale_factor)
+
+        # Restore run animation and update last frame rendered time.
+        self.run_animations = run_animations
+        self._last_frame_rendered_at = self.timer.time
 
     def export_video(
         self,

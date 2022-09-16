@@ -45,3 +45,13 @@ class HeadlessRenderer(Viewer):
             animation=True,
             output_fps=output_fps,
         )
+
+    def run_frame(self, file_path, scale_factor: float = None):
+        """
+        Run the headless viewer and render a single frame.
+        :param file_path: the path where the image is saved.
+        :param scale_factor: a scale factor used to scale the image. If None no scale factor is used and
+          the image will have the same size as the viewer.
+        """
+        self._init_scene()
+        self.export_frame(file_path, scale_factor)
