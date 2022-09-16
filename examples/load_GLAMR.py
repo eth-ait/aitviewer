@@ -41,12 +41,12 @@ if __name__ == '__main__':
     trans = person['root_trans_world']
     ori = person['smpl_orient_world']
 
-
     # Define a postprocess function for the SMPL sequence,
     # we use this to apply the translation from the data to the root node.
     def post_fk_func(self: SMPLSequence, vertices: torch.Tensor, joints: torch.Tensor, current_frame_only: bool):
         # Select the translation of the current frame if current_frame_only is True, otherwise select all frames.
         t = trans[[self.current_frame_id]] if current_frame_only else trans[:]
+        t = torch.from_numpy(t).to(dtype=joints.dtype, device=joints.device)
 
         # Subtract the position of the root joint from all vertices and joint positions and add the root translation.
         cur_root_trans = joints[:, [0], :]
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     smpl_sequence.mesh_seq.draw_outline = True
 
     # Transform y_up coordinates to z_up coordinates.
-    z_up_from_y_up =  np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]], np.float32).T
+    z_up_from_y_up = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]], np.float32).T
 
     # Camera extrinsics expect z up data, we transform each frame to expect y up data instead
     # since this is the coordinate system used by the viewer.
@@ -78,7 +78,6 @@ if __name__ == '__main__':
     for i in range(Rt.shape[0]):
         Rt[i] = Rt[i]  @ z_up_from_y_up
     K = person['cam_K']
-
 
     # Create a sequence of cameras from camera extrinsics and intrinsics.
     cols, rows = 3840, 2160
@@ -94,8 +93,8 @@ if __name__ == '__main__':
         return int(regex.search(name).group(0))
 
     # Create a billboard
-    billboard = Billboard.from_camera_and_distance(camera, 3.0, cols, rows,
-                    [os.path.join(images_path, f) for f in sorted(os.listdir(images_path), key=sort_key)])
+    billboard = Billboard.from_camera_and_distance(
+        camera, 3.0, cols, rows, [os.path.join(images_path, f) for f in sorted(os.listdir(images_path), key=sort_key)])
 
     # Add all objects to the scene.
     viewer.scene.add(smpl_sequence, billboard, camera)
