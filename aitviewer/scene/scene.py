@@ -244,6 +244,10 @@ class Scene(Node):
 
     def gui(self, imgui):
         imgui.text(f"FPS: {self.fps:.1f}")
+        # Background color
+        uc, color = imgui.color_edit4("Background", *self.background_color, show_alpha=True)
+        if uc:
+            self.background_color = color
 
     def gui_editor(self, imgui):
         """GUI to control scene settings."""
@@ -358,3 +362,7 @@ class Scene(Node):
         for n in ns:
             n_frames = max(n_frames, n.n_frames)
         return n_frames
+
+    def render_outline(self, ctx, camera, prog):
+        # No outline when the scene node is selected
+        return
