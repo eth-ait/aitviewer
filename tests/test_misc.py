@@ -65,7 +65,7 @@ def test_normals(viewer: Viewer):
 
 
 def add_cube(viewer: Viewer, pos):
-    cube = trimesh.load(os.path.join(RESOURCE_DIR, 'cube.obj'))
+    cube = trimesh.load(os.path.join(RESOURCE_DIR, 'cube.obj'), process=False)
     cube_mesh = Meshes(cube.vertices, cube.faces, name='Cube', position=pos, flat_shading=True)
     viewer.scene.add(cube_mesh)
 
@@ -98,7 +98,7 @@ def test_opencv_camera(viewer: Viewer):
 
 @reference()
 def test_vertex_face_colors(viewer: Viewer):
-    cube = trimesh.load(os.path.join(RESOURCE_DIR, "cube.obj"))
+    cube = trimesh.load(os.path.join(RESOURCE_DIR, "cube.obj"), process=False)
 
     face_colors = np.array([
         [1, 0, 0, 1], [1, 1, 0, 1],

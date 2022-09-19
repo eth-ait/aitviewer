@@ -46,16 +46,16 @@ def test_renderables(viewer: Viewer):
 
 @reference()
 def test_obj(viewer: Viewer):
-    cube = trimesh.load(os.path.join(RESOURCE_DIR, 'cube.obj'))
+    cube = trimesh.load(os.path.join(RESOURCE_DIR, 'cube.obj'), process=False)
     cube_mesh = Meshes(cube.vertices, cube.faces, name='Cube', position=[-7.0, 0.0, 0.0], flat_shading=True)
 
-    planet = trimesh.load(os.path.join(RESOURCE_DIR, 'planet/planet.obj'))
+    planet = trimesh.load(os.path.join(RESOURCE_DIR, 'planet/planet.obj'), process=False)
     texture_image = os.path.join(RESOURCE_DIR, 'planet/mars.png')
     planet_mesh = Meshes(planet.vertices, planet.faces, planet.vertex_normals,
                          uv_coords=planet.visual.uv, path_to_texture=texture_image,
                          position=[7.0, 0.0, 0.0])
 
-    drill = trimesh.load(os.path.join(RESOURCE_DIR, 'drill/drill.obj'))
+    drill = trimesh.load(os.path.join(RESOURCE_DIR, 'drill/drill.obj'), process=False)
     texture_image = os.path.join(RESOURCE_DIR, 'drill/drill_uv.png')
     drill_mesh = Meshes(drill.vertices, drill.faces, drill.vertex_normals,
                         uv_coords=drill.visual.uv, path_to_texture=texture_image, scale=50.0,
