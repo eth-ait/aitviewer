@@ -11,9 +11,9 @@ A set of tools to visualize and interact with sequences of 3D data with cross-pl
 * Manually editable SMPL sequences.
 * Render 3D data on top of images via weak-perspective or OpenCV camera models.
 * Built-in extensible GUI (based on Dear ImGui).
+* Export the scene to a video (mp4/gif) via the GUI or render videos/images in headless mode.
+* Animatable camera paths.
 * Prebuilt renderable primitives (cylinders, spheres, point clouds, etc).
-* Render videos of the currently loaded sequences.
-* Headless/Offscreen rendering.
 * Support live data feeds and rendering (e.g., webcam).
 * Modern OpenGL shader-based rendering pipeline for high performance (via ModernGL / ModernGL Window).
 
@@ -69,33 +69,33 @@ v.run()
 
 Check out the [examples](examples/) for a few examples how to use the viewer:
 
-**`camera_path.py`**: Example how to use camera paths.
+ * [`camera_path.py`](examples/camera_path.py): Example how to use camera paths.
 
-**`headless_rendering.py`**: Example how to render a video in headless mode.
+ * [`headless_rendering.py`](examples/headless_rendering.py): Example how to render a video in headless mode.
 
-**`load_3DPW.py`**: Loads an SMPL sequence from the 3DPW dataset and displays it in the viewer.
+ * [`load_3DPW.py`](examples/load_3DPW.py): Loads an SMPL sequence from the 3DPW dataset and displays it in the viewer.
 
-**`load_AMASS.py`**: Loads an SMPL sequence from the AMASS dataset and displays it in the viewer.
+ * [`load_AMASS.py`](examples/load_AMASS.py): Loads an SMPL sequence from the AMASS dataset and displays it in the viewer.
 
-**`load_DIP.py`**: Loads an SMPL and IMU sequence taken from the TotalCapture dataset as used by [DIP](https://github.com/eth-ait/dip18).
+ * [`load_DIP.py`](examples/load_DIP.py): Loads an SMPL and IMU sequence taken from the TotalCapture dataset as used by [DIP](https://github.com/eth-ait/dip18).
 
-**`load_GLAMR.py`**: Loads a result obtained from [GLAMR](https://github.com/NVlabs/GLAMR) and displays it in the viewer both for 3D and 2D inspection.
+ * [`load_GLAMR.py`](examples/load_GLAMR.py): Loads a result obtained from [GLAMR](https://github.com/NVlabs/GLAMR) and displays it in the viewer both for 3D and 2D inspection.
 
-**`load_obj.py`**: Loads meshes from OBJ files.
+ * [`load_obj.py`](examples/load_obj.py): Loads meshes from OBJ files.
 
-**`load_ROMP.py`**: Loads the result of [ROMP](https://github.com/Arthur151/ROMP) and overlays it on top of the input image using the OpenCV camera model.
+ * [`load_ROMP.py`](examples/load_ROMP.py): Loads the result of [ROMP](https://github.com/Arthur151/ROMP) and overlays it on top of the input image using the OpenCV camera model.
 
-**`load_template.py`**: Loads the template meshes of SMPL-H, MANO, and FLAME.
+ * [`load_template.py`](examples/load_template.py): Loads the template meshes of SMPL-H, MANO, and FLAME.
 
-**`load_VIBE.py`**: Loads the result of [VIBE](https://github.com/mkocabas/VIBE) and overlays it on top of the input image.
+ * [`load_VIBE.py`](examples/load_VIBE.py): Loads the result of [VIBE](https://github.com/mkocabas/VIBE) and overlays it on top of the input image.
 
-**`quickstart.py`**: The above quickstart example.
+ * [`quickstart.py`](examples/quickstart.py): The above quickstart example.
 
-**`render_primitives.py`**: Renders a bunch of spheres and lines.
+ * [`render_primitives.py`](examples/render_primitives.py): Renders a bunch of spheres and lines.
 
-**`stream.py`**: Streams your webcam into the viewer.
+ * [`stream.py`](examples/stream.py): Streams your webcam into the viewer.
 
-**`vertex_clicking.py`**: An example how to subclass the basic Viewer class for custom interaction.
+ * [`vertex_clicking.py`](examples/vertex_clicking.py): An example how to subclass the basic Viewer class for custom interaction.
 
 ## Projects using the AITViewer
 The following projects have used the AITViewer:
