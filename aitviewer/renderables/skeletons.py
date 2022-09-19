@@ -29,7 +29,6 @@ class Skeletons(Node):
     def __init__(self,
                  joint_positions,
                  joint_connections,
-                 joint_rotations=None,
                  radius=0.01,
                  color=(1.0, 177 / 255, 1 / 255, 1.0),
                  **kwargs):
@@ -38,7 +37,6 @@ class Skeletons(Node):
         :param joint_positions: A np array of shape (F, J, 3) containing J joint positions over F many time steps.
         :param joint_connections: The definition of the skeleton as a numpy array of shape (N_LINES, 2) where each row
           defines one connection between joints. The max entry in this array must be < J.
-        :param joint_rotations: Optional joint orientations as a np array of shape (F, J, 3, 3).
         :param radius: Radius of the sphere located at each joint's position.
         :param color: 4-tuple color, yellow by default.
         :param kwargs: Remaining render arguments.
@@ -46,10 +44,9 @@ class Skeletons(Node):
         if not isinstance(joint_connections, np.ndarray):
             joint_connections = np.array(joint_connections)
 
-        self.joint_positions = joint_positions
-        super(Skeletons, self).__init__(n_frames=self.joint_positions.shape[0], color=color, **kwargs)
+        super(Skeletons, self).__init__(n_frames=joint_positions.shape[0], color=color, **kwargs)
 
-        self.joint_rotations = joint_rotations
+        self._joint_positions = joint_positions
         self.joint_connections = joint_connections
 
         # Root nodes are not connected to any other joints, so ignore those.

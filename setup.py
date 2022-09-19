@@ -29,5 +29,7 @@ setup(name='aitviewer',
               'scipy>=1.5.2,<1.8',
               'omegaconf>=2.1.1',
               'roma>=1.2.3',
-              'joblib'
+              'joblib',
+              'scikit-video',
+              'Pillow'
           ])

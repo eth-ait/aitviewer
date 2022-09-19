@@ -29,14 +29,14 @@ class MultiViewSystem(Node):
 
     def __init__(self, camera_info_path, camera_images_path, cols, rows, viewer, **kwargs):
         """
-        Load a MultiViewSystem from a file with camera information for M cameras 
+        Load a MultiViewSystem from a file with camera information for M cameras
         and the path to a directory with M subdirectories, containing N images each.
 
         :param camera_info_path: path to a camera info .npz file with the following file entries
             'ids':         A np array of camera ids (M)
             'intrinsics':  A np array of camera intrinsics in the format used by OpenCV (M, 3, 3)
             'extrinsics':  A np array of camera extrinsics in the format used by OpenCV (M, 3, 4)
-            'dist_coeffs': A np array of camera distortion coefficients in the format used by OpenCV (M, 5) 
+            'dist_coeffs': A np array of camera distortion coefficients in the format used by OpenCV (M, 5)
         :param camera_images_path: path to a directory with M subdirectories, one for each camera
             with the camera id as name. Each directory contains N images for the respective camera
             with a filename ending with the frame number.
@@ -67,7 +67,7 @@ class MultiViewSystem(Node):
         # Compute position and orientation of each camera.
         positions = []
         self.cameras = []
-        for i in range(len(camera_info['ids'])): 
+        for i in range(len(camera_info['ids'])):
             intrinsics = camera_info['intrinsics'][i]
             extrinsics = camera_info['extrinsics'][i]
             dist_coeffs = camera_info['dist_coeffs'][i]
@@ -99,7 +99,7 @@ class MultiViewSystem(Node):
         self._cameras_enabled = True
 
         self.selected_camera_index = None
-    
+
     def _create_billboard_for_camera(self, camera_index):
         """Helper function to create a billboard for the camera at the given index."""
         # Look for images for the given camera.
@@ -127,9 +127,9 @@ class MultiViewSystem(Node):
         # Set the current frame index if we have an image for it.
         if self.current_frame_id < len(paths):
             billboard.current_frame_id = self.current_frame_id
-        
+
         return billboard
-            
+
     def activate_camera(self, index):
         """Activates the camera at the given index, showing its frustum and billboard if enabled."""
         if index not in self.active_cameras:
@@ -145,7 +145,7 @@ class MultiViewSystem(Node):
             # Show the camera furstum if frustums are enabled.
             if self._frustums_enabled:
                 camera.show_frustum(self.cols, self.rows, self.billboard_distance)
-    
+
     def deactivate_camera(self, index):
         """Deactivates the camera at the given index, hiding its frustum and billboard if enabled."""
         if index in self.active_cameras:
@@ -179,26 +179,26 @@ class MultiViewSystem(Node):
     def frustums_enabled(self):
         """Returns True if the frustums are enabled and False otherwise."""
         return self._frustums_enabled
-    
+
     @frustums_enabled.setter
     def frustums_enabled(self, enabled):
         """Setting this to True shows the frustums of active cameras."""
         if enabled == self._frustums_enabled:
             return
         self._frustums_enabled = enabled
-        
+
         # Update all frustums of all active cameras.
         for i in self.active_cameras.keys():
             if enabled:
                 self.cameras[i].show_frustum(self.cols, self.rows, self.billboard_distance)
             else:
                 self.cameras[i].hide_frustum()
-    
+
     @property
     def billboards_enabled(self):
         """Returns True if the billboards are enabled and False otherwise."""
         return self._billboards_enabled
-    
+
     @billboards_enabled.setter
     def billboards_enabled(self, enabled):
         """Setting this to True shows the billobards of active cameras."""
@@ -237,7 +237,7 @@ class MultiViewSystem(Node):
     def _gui_checkboxes(self, imgui):
         _, self.cameras_enabled = imgui.checkbox("Show cameras", self.cameras_enabled)
         _, self.billboards_enabled = imgui.checkbox("Show billboard", self.billboards_enabled)
-        _, self.frustums_enabled = imgui.checkbox("Show frustum", self.frustums_enabled)    
+        _, self.frustums_enabled = imgui.checkbox("Show frustum", self.frustums_enabled)
 
     def gui(self, imgui):
         self._gui_checkboxes(imgui)
@@ -258,21 +258,21 @@ class MultiViewSystem(Node):
             imgui.same_line(spacing=10)
             if imgui.button(f"x##{i}"):
                 self.deactivate_camera(i)
-    
+
     def gui_context_menu(self, imgui):
         if self.selected_camera_index is None:
             return
-        
+
         imgui.text(f"Camera {self.camera_info['ids'][self.selected_camera_index]}")
         imgui.separator()
-        
+
         u, s = imgui.menu_item(f"Activate camera", selected=self.selected_camera_index in self.active_cameras)
         if u:
             if s:
                 self.activate_camera(self.selected_camera_index)
             else:
                 self.deactivate_camera(self.selected_camera_index)
-                
+
         _, v = imgui.menu_item(f"View from camera")
         if v:
             self.view_from_camera(self.selected_camera_index)
@@ -281,9 +281,9 @@ class MultiViewSystem(Node):
         imgui.spacing()
         imgui.text(f"{self.name}")
         imgui.separator()
-        
+
         self._gui_checkboxes(imgui)
-        
+
     def on_selection(self, node, tri_id):
         # Find which camera is selected.
         for idx, c in enumerate(self.cameras):
@@ -291,7 +291,7 @@ class MultiViewSystem(Node):
             if node in c.nodes:
                 self.selected_camera_index = idx
                 break
-    
+
     def render_outline(self, ctx, camera, prog):
         # Render outline of the currently selected camera.
         if self.selected_camera_index is not None:

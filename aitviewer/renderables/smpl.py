@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import pickle as pkl
 import torch
+import os
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
@@ -36,6 +37,7 @@ from aitviewer.utils import interpolate_positions
 from aitviewer.utils import to_numpy as c2c
 from scipy.spatial.transform import Rotation
 from smplx.joint_names import JOINT_NAMES, SMPLH_JOINT_NAMES
+from typing import Union, IO
 
 
 class SMPLSequence(Node):
@@ -58,6 +60,7 @@ class SMPLSequence(Node):
                  is_rigged=True,
                  show_joint_angles=False,
                  z_up=False,
+                 post_fk_func=None,
                  **kwargs):
         """
         Initializer.
@@ -66,7 +69,8 @@ class SMPLSequence(Node):
         :param smpl_layer: The SMPL layer that maps parameters to joint positions and/or dense surfaces.
         :param poses_root: An array (numpy or pytorch) of shape (F, 3) containing the global root orientation.
         :param betas: An array (numpy or pytorch) of shape (N_BETAS, ) containing the shape parameters.
-        :param trans: An array (numpy or pytorch) of shape (F, 3) containing the global root translation.
+        :param trans: An array (numpy or pytorch) of shape (F, 3) containing a global translation that is applied to
+          all joints and vertices.
         :param device: The pytorch device for computations.
         :param dtype: The pytorch data type.
         :param include_root: Whether or not to include root information. If False, no root translation and no root
@@ -76,12 +80,19 @@ class SMPLSequence(Node):
         :param is_rigged: Whether or not to display the joints as a skeleton.
         :param show_joint_angles: Whether or not the coordinate frames at the joints should be visualized.
         :param z_up: Whether or not the input data assumes Z is up. If so, the data will be rotated such that Y is up.
+        :param post_fk_func: User specified postprocessing function that is called after evaluating the SMPL model,
+          the function signature must be: def post_fk_func(self, vertices, joints, current_frame_only),
+          and it must return new values for vertices and joints with the same shapes.
+          Shapes are:
+            if current_frame_only is False: vertices (F, V, 3) and joints (F, N_JOINTS, 3)
+            if current_frame_only is True:  vertices (1, V, 3) and joints (1, N_JOINTS, 3)
         :param kwargs: Remaining arguments for rendering.
         """
         assert len(poses_body.shape) == 2
         super(SMPLSequence, self).__init__(n_frames=poses_body.shape[0], **kwargs)
 
         self.smpl_layer = smpl_layer
+        self.post_fk_func = post_fk_func
 
         self.poses_body = to_torch(poses_body, dtype=dtype, device=device)
         self.poses_left_hand = to_torch(poses_left_hand, dtype=dtype, device=device)
@@ -146,14 +157,14 @@ class SMPLSequence(Node):
             global_oris = c2c(global_oris.reshape((self.n_frames, -1, 3, 3)))
         else:
             global_oris = np.tile(np.eye(3), self.joints.shape[:-1])[np.newaxis]
-            
+
         if self._z_up:
-            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation) 
+            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
         self.rbs = RigidBodies(self.joints, global_oris, length=0.1, name='Joint Angles')
         self.rbs.position = self.position
         self.rbs.rotation = self.rotation
-        self._add_node(self.rbs, enabled=self._show_joint_angles)
+        self._add_node(self.rbs, enabled=self._show_joint_angles, gui_elements=['material'])
 
         kwargs = self._render_kwargs.copy()
         kwargs['name'] = 'Mesh'
@@ -259,6 +270,31 @@ class SMPLSequence(Node):
         poses = np.zeros([frames, smpl_layer.bm.NUM_BODY_JOINTS * 3])  # including hands and global root
         return cls(poses, smpl_layer, betas=betas, **kwargs)
 
+    @classmethod
+    def from_npz(cls, file: Union[IO, str], smpl_layer: SMPLLayer=None, **kwargs):
+        """Creates a SMPL sequence from a .npz file exported through the 'export' function."""
+        if smpl_layer is None:
+            smpl_layer = SMPLLayer(model_type='smplh', gender='neutral')
+
+        data = np.load(file)
+
+        return cls(
+            smpl_layer=smpl_layer,
+            poses_body=data['poses_body'],
+            poses_root=data['poses_root'],
+            betas=data['betas'],
+            trans=data['trans'],
+            **kwargs,
+        )
+
+    def export_to_npz(self, file: Union[IO, str]):
+        np.savez(file,
+            poses_body=c2c(self.poses_body),
+            poses_root=c2c(self.poses_root),
+            betas=c2c(self.betas),
+            trans=c2c(self.trans),
+        )
+
     @property
     def vertex_normals(self):
         return self.mesh_seq.vertex_normals
@@ -310,7 +346,9 @@ class SMPLSequence(Node):
                                         betas=betas,
                                         trans=trans)
 
-
+        # Apply post_fk_func if specified.
+        if self.post_fk_func:
+            verts, joints = self.post_fk_func(self, verts, joints, current_frame_only)
 
         skeleton = self.smpl_layer.skeletons()['body'].T
         faces = self.smpl_layer.bm.faces.astype(np.int64)
@@ -350,15 +388,16 @@ class SMPLSequence(Node):
 
     @hooked
     def on_before_frame_update(self):
-        if self._edit_pose_dirty:
+        if self._edit_mode and self._edit_pose_dirty:
             self._edit_pose = self.poses[self.current_frame_id].clone()
             self.redraw(current_frame_only=True)
             self._edit_pose_dirty = False
 
     @hooked
     def on_frame_update(self):
-        self._edit_pose = self.poses[self.current_frame_id].clone()
-        self._edit_pose_dirty = False
+        if self.edit_mode:
+            self._edit_pose = self.poses[self.current_frame_id].clone()
+            self._edit_pose_dirty = False
 
     def redraw(self, **kwargs):
         current_frame_only = kwargs.get('current_frame_only', False)
@@ -485,6 +524,7 @@ class SMPLSequence(Node):
     def gui(self, imgui):
         super().gui_animation(imgui)
         super().gui_position(imgui)
+        super().gui_rotation(imgui)
 
         if imgui.radio_button("View mode", not self.edit_mode):
             self.edit_mode = False
@@ -532,6 +572,14 @@ class SMPLSequence(Node):
                 self._edit_pose = self.poses[self.current_frame_id]
                 self._edit_pose_dirty = False
                 self.redraw(current_frame_only=True)
+
+        imgui.spacing()
+        if imgui.button("Export sequence to NPZ"):
+            dir = os.path.join(C.export_dir, "SMPL")
+            os.makedirs(dir, exist_ok=True)
+            path = os.path.join(dir, self.name + ".npz")
+            self.export_to_npz(path)
+            print(f'Exported SMPL sequence to "{path}"')
 
     def gui_context_menu(self, imgui):
         if self.edit_mode and self._edit_joint is not None:

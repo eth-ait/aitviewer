@@ -37,9 +37,10 @@ pip install -e .
 Note that this does not install the GPU-version of PyTorch automatically. If your environment already contains it, you should be good to go, otherwise install it manually.
 
 ## Configuration
-The viewer loads default configuration parameters from [`aitvconfig.yaml`](aitviewer/aitvconfig.yaml). There are two ways how to override these parameters:
+The viewer loads default configuration parameters from [`aitvconfig.yaml`](aitviewer/aitvconfig.yaml). There are three ways how to override these parameters:
   - Create a file named `aitvconfig.yaml` and have the environment variable `AITVRC` point to it. Alternatively, you can point `AITVRC` to the directory containing `aitvconfig.yaml`.
   - Create a file named `aitvconfig.yaml` in your current working directory, i.e. from where you launch your python program.
+  - Pass a `config` parameter to the `Viewer` constructor.
 
 Note that the configuration files are loaded in this order, i.e. the config file in your working directory overrides all previous parameters.
 
@@ -68,21 +69,27 @@ v.run()
 
 Check out the [examples](examples/) for a few examples how to use the viewer:
 
+**`camera_path.py`**: Example how to use camera paths.
+
+**`headless_rendering.py`**: Example how to render a video in headless mode.
+
 **`load_3DPW.py`**: Loads an SMPL sequence from the 3DPW dataset and displays it in the viewer.
 
 **`load_AMASS.py`**: Loads an SMPL sequence from the AMASS dataset and displays it in the viewer.
 
 **`load_DIP.py`**: Loads an SMPL and IMU sequence taken from the TotalCapture dataset as used by [DIP](https://github.com/eth-ait/dip18).
 
+**`load_GLAMR.py`**: Loads a result obtained from [GLAMR](https://github.com/NVlabs/GLAMR) and displays it in the viewer both for 3D and 2D inspection.
+
 **`load_obj.py`**: Loads meshes from OBJ files.
 
-**`load_ROMP.py`**: Loads the result of [ROMP](https://github.com/Arthur151/ROMP) and overlays it on top of the input image with either a weak-perspective or an OpenCV camera.
+**`load_ROMP.py`**: Loads the result of [ROMP](https://github.com/Arthur151/ROMP) and overlays it on top of the input image using the OpenCV camera model.
 
 **`load_template.py`**: Loads the template meshes of SMPL-H, MANO, and FLAME.
 
 **`load_VIBE.py`**: Loads the result of [VIBE](https://github.com/mkocabas/VIBE) and overlays it on top of the input image.
 
-**`quick_start.py`**: The above quickstart example.
+**`quickstart.py`**: The above quickstart example.
 
 **`render_primitives.py`**: Renders a bunch of spheres and lines.
 

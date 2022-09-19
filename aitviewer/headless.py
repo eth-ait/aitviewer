@@ -31,6 +31,10 @@ class HeadlessRenderer(Viewer):
         super().__init__(**kwargs)
 
     def run(self, frame_dir=None, video_dir=None, output_fps=60):
+        """Same as self.save_video, kept for backward compatibility."""
+        return self.save_video(frame_dir, video_dir, output_fps)
+
+    def save_video(self, frame_dir=None, video_dir=None, output_fps=60):
         """
         Convenience method to run the headless rendering.
         :param frame_dir: Where to store the individual frames or None if you don't care.
@@ -38,17 +42,20 @@ class HeadlessRenderer(Viewer):
           be specified if `frame_dir` is None.
         :param output_fps: Fps of the output video, if None uses 60fps as default
         """
-        if frame_dir is None and video_dir is None:
-            raise ValueError("You should either specify a path where to render the images to or where to "
-                             "save the video to.")
-
-        if video_dir is not None:
-            assert video_dir.endswith(".mp4")
-
         self._init_scene()
         self.export_video(
-            output_path=video_dir, 
+            output_path=video_dir,
             frame_dir=frame_dir,
             animation=True,
             output_fps=output_fps,
         )
+
+    def save_frame(self, file_path, scale_factor: float = None):
+        """
+        Run the headless viewer and render a single frame.
+        :param file_path: the path where the image is saved.
+        :param scale_factor: a scale factor used to scale the image. If None no scale factor is used and
+          the image will have the same size as the viewer.
+        """
+        self._init_scene()
+        self.export_frame(file_path, scale_factor)

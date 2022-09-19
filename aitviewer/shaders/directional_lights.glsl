@@ -20,7 +20,7 @@ vec3 directionalLight(DirLight dirLight, vec3 color, vec3 fragPos, vec3 normal, 
     vec3 ambient = dirLight.intensity_ambient * dirLight.color * ambient_coeff;
 
     // Diffuse
-    vec3 lightDir = normalize(dirLight.pos - fragPos);
+    vec3 lightDir = normalize(dirLight.pos); // Here we assume that lights are always directed at the origin
     float diff = max(dot(normal, lightDir), 0.0);
     vec3 diffuse = diffuse_coeff * diff * dirLight.intensity_diffuse * dirLight.color;
 
@@ -37,13 +37,13 @@ vec3 directionalLight(DirLight dirLight, vec3 color, vec3 fragPos, vec3 normal, 
 float shadow_calculation(sampler2DShadow shadow_map, vec4 frag_pos_light_space, vec3 light_dir, vec3 normal) {
     // perform perspective divide (not needed for orthographic projection)
     vec3 projCoords = frag_pos_light_space.xyz / frag_pos_light_space.w;
-    
+
     // transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
-    
+
     // get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
     // float closestDepth = texture(shadow_map, projCoords.xy).r;
-    
+
     // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
 

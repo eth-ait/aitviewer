@@ -24,15 +24,17 @@ window_width: 1600
 window_height: 900
 fullscreen: False
 resizable: True
-vsync: True 
+vsync: True
 export_dir: "../export"
 playback_fps: 60
+scene_fps: 60
 run_animations: False
 dark_mode: False
 shadows_enabled: True
 auto_set_floor: True
 auto_set_camera_target: True
 backface_culling: True
+background_color: [1.0, 1.0, 1.0, 1.0]
 
 
 

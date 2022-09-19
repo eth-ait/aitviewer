@@ -19,9 +19,11 @@ import numpy as np
 
 from aitviewer.renderables.coordinate_system import CoordinateSystem
 from aitviewer.renderables.plane import ChessboardPlane
+from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
 from aitviewer.renderables.lines import Lines
+from aitviewer.configuration import CONFIG as C
 
 
 class Scene(Node):
@@ -39,6 +41,8 @@ class Scene(Node):
         self.ctx = None
 
         self.backface_culling = True
+        self.fps = C.scene_fps
+        self.background_color = C.background_color
 
         # Default Setup
         # If you update the number of lights, make sure to change the respective `define` statement in
@@ -47,12 +51,12 @@ class Scene(Node):
         self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
         self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0),
                                  shadow_enabled=False))
-        self.add(*self.lights, show_in_hierarchy=False)
+        self.add(*self.lights)
 
         # Scene items
         self.origin = CoordinateSystem(name="Origin", length=0.1)
         self.add(self.origin, has_gui=False)
-        
+
         self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0),  (0.82, 0.82, 0.82, 1.0), name="Floor")
         self.floor.material.diffuse = 0.1
         self.add(self.floor)
@@ -71,7 +75,10 @@ class Scene(Node):
         self.selected_object = None
         # Object shown in the property panel
         self._gui_selected_object = None
-        
+
+        # The scene node in the GUI is expanded at the start.
+        self.expanded = True
+
     def render(self, **kwargs):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
 
@@ -99,12 +106,12 @@ class Scene(Node):
             else:
                 # Otherwise append to transparent list
                 transparent.append(r)
-        
+
         # Draw back to front by sorting transparent objects based on distance to camera.
-        # As an approximation we only sort using the origin of the object 
-        # which may be incorrect for large objects or objects significantly 
+        # As an approximation we only sort using the origin of the object
+        # which may be incorrect for large objects or objects significantly
         # offset from their origin, but works in many cases.
-        for r in sorted(transparent, key=lambda r: np.linalg.norm(r.position - self.camera.position), reverse=True):
+        for r in sorted(transparent, key=lambda x: np.linalg.norm(x.position - self.camera.position), reverse=True):
             # Render to depth buffer only
             self.ctx.depth_func = '<'
             self.safe_render_depth_prepass(r, **kwargs)
@@ -124,7 +131,7 @@ class Scene(Node):
 
         # Restore the default depth comparison function
         self.ctx.depth_func = '<'
-    
+
     def safe_render_depth_prepass(self, r, **kwargs):
         if not r.is_renderable:
             r.make_renderable(self.ctx)
@@ -158,7 +165,7 @@ class Scene(Node):
         centers = []
         for r in rs:
             if r.bounds is not None:
-                center = np.matmul(r.rotation, r.bounds.mean(-1)) + r.position
+                center = r.bounds.mean(-1)
                 if center.sum() != 0.0:
                     centers.append(center)
 
@@ -178,11 +185,11 @@ class Scene(Node):
 
         # Use head recursion in order to collect the most deep nodes first
         # These are likely to be nodes which should be rendered first (i.e. transparent parent nodes should be last)
-        def rec_collect_nodes(n):
-            if (not req_enabled or n.enabled):
-                if isinstance(n, obj_type):
-                    nodes.append(n)
-                for n_child in n.nodes:
+        def rec_collect_nodes(nn):
+            if not req_enabled or nn.enabled:
+                if isinstance(nn, obj_type):
+                    nodes.append(nn)
+                for n_child in nn.nodes:
                     rec_collect_nodes(n_child)
 
         for n in self.nodes:
@@ -203,7 +210,7 @@ class Scene(Node):
             if n.uid == uid:
                 return n
         return None
-    
+
     def select(self, obj, selected_node=None, selected_tri_id=None):
         """Set 'obj' as the selected object"""
         self.selected_object = obj
@@ -216,7 +223,7 @@ class Scene(Node):
     def is_selected(self, obj):
         """Returns true if obj is currently selected"""
         return obj == self.selected_object
-    
+
     def gui_selected(self, imgui):
         """GUI to edit the selected node"""
         if self._gui_selected_object:
@@ -236,27 +243,41 @@ class Scene(Node):
                 imgui.tree_pop()
 
     def gui(self, imgui):
+        imgui.text(f"FPS: {self.fps:.1f}")
+        # Background color
+        uc, color = imgui.color_edit4("Background", *self.background_color, show_alpha=True)
+        if uc:
+            self.background_color = color
+
+    def gui_editor(self, imgui):
         """GUI to control scene settings."""
+        # Also include the camera GUI in the scene node.
         self.gui_camera(imgui)
-        self.gui_lights(imgui)
-        self.gui_renderables(imgui, self.nodes)
+        self.gui_renderables(imgui, [self])
+
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
+
         self.gui_selected(imgui)
-        
+
     def gui_camera(self, imgui):
         # Camera GUI
         imgui.push_font(self.custom_font)
         imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
 
-        flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
+        flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
         if self.is_selected(self.camera):
             flags |= imgui.TREE_NODE_SELECTED
-        camera_expanded = imgui.tree_node(f"{self.camera.icon} {self.camera.name}##tree_node_r_camera", flags)
+
+        if isinstance(self.camera, ViewerCamera):
+            name = self.camera.name
+        else:
+            name = f"Camera: {self.camera.name}"
+        camera_expanded = imgui.tree_node(f"{self.camera.icon} {name}##tree_node_r_camera", flags)
         if imgui.is_item_clicked():
             self.select(self.camera)
-            
+
         imgui.pop_style_var()
         imgui.pop_font()
         if camera_expanded:
@@ -268,7 +289,7 @@ class Scene(Node):
             imgui.push_font(self.custom_font)
             imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
 
-            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING 
+            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
             if self.is_selected(light):
                 flags |= imgui.TREE_NODE_SELECTED
             light_expanded = imgui.tree_node(f"{light.icon} {light.name}##tree_node_r", flags)
@@ -294,11 +315,11 @@ class Scene(Node):
 
             # Title
             imgui.push_font(self.custom_font)
-            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))               
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
 
-            flags = imgui.TREE_NODE_OPEN_ON_ARROW | imgui.TREE_NODE_FRAME_PADDING 
+            flags = imgui.TREE_NODE_OPEN_ON_ARROW | imgui.TREE_NODE_FRAME_PADDING
             if r.expanded:
-                flags |= imgui.TREE_NODE_DEFAULT_OPEN 
+                flags |= imgui.TREE_NODE_DEFAULT_OPEN
             if self.is_selected(r):
                 flags |= imgui.TREE_NODE_SELECTED
             if not any(c.show_in_hierarchy for c in r.nodes) or not r.has_gui:
@@ -310,12 +331,13 @@ class Scene(Node):
             imgui.pop_style_var()
             imgui.pop_font()
 
-            # Aligns checkbox to the right side of the window
-            # https://github.com/ocornut/imgui/issues/196
-            imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
-            eu, enabled = imgui.checkbox('##enabled_r_{}'.format(r.unique_name), r.enabled)
-            if eu:
-                r.enabled = enabled
+            if r != self:
+                # Aligns checkbox to the right side of the window
+                # https://github.com/ocornut/imgui/issues/196
+                imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
+                eu, enabled = imgui.checkbox('##enabled_r_{}'.format(r.unique_name), r.enabled)
+                if eu:
+                    r.enabled = enabled
 
             if r.expanded:
                 if r.has_gui:
@@ -340,3 +362,7 @@ class Scene(Node):
         for n in ns:
             n_frames = max(n_frames, n.n_frames)
         return n_frames
+
+    def render_outline(self, ctx, camera, prog):
+        # No outline when the scene node is selected
+        return

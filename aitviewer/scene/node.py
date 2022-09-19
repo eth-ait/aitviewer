@@ -19,6 +19,7 @@ import numpy as np
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.scene.material import Material
+from aitviewer.utils.so3 import euler2rot_numpy, rot2euler_numpy
 from functools import lru_cache
 
 
@@ -81,7 +82,7 @@ class Node(object):
         self._gui_elements = []
         self._show_in_hierarchy = True
         self.is_selectable = is_selectable
-        
+
         self.nodes = []
         self.parent = None
 
@@ -124,14 +125,14 @@ class Node(object):
         trans[:3, 3] = np.array(pos)
 
         scale = np.diag([scale, scale, scale, 1])
-        
+
         return (trans @ rotation @ scale).astype('f4')
 
     def model_matrix(self):
         """Construct model matrix from this node's orientation and position."""
         return self._compute_model_matrix(
-               tuple(self.position), 
-               tuple(map(tuple, self.rotation)), 
+               tuple(self.position),
+               tuple(map(tuple, self.rotation)),
                self.scale)
 
     @property
@@ -156,7 +157,10 @@ class Node(object):
         val = np.array([
             [np.nanmin(points[:, :, 0]), np.nanmax(points[:, :, 0])],
             [np.nanmin(points[:, :, 1]), np.nanmax(points[:, :, 1])],
-            [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]]) * self.scale
+            [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]])
+
+        # Transform bounding box with the model matrix.
+        val = (self.model_matrix() @ np.vstack((val, np.array([1.0, 1.0]))))[:3]
 
         # If any of the elements is NaN return an empty bounding box.
         if np.isnan(val).any():
@@ -227,7 +231,7 @@ class Node(object):
         if n is None:
             return
         n._has_gui = has_gui
-        n._gui_elements = gui_elements if gui_elements is not None else ['animation', 'position', 'material']
+        n._gui_elements = gui_elements if gui_elements is not None else ['animation', 'position', 'rotation', 'scale', 'material']
         n._show_in_hierarchy = show_in_hierarchy
         n._expanded = expanded
         n._enabled = enabled
@@ -269,7 +273,7 @@ class Node(object):
         self._expanded = expanded
 
     def is_transparent(self):
-        """ 
+        """
         Returns true if the object is transparent and should thus be sorted when rendering.
         Subclasses should implement this method to be rendered correctly when transparent.
         """
@@ -288,6 +292,13 @@ class Node(object):
         u, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
         if u:
             self.position = pos
+
+    def gui_rotation(self, imgui):
+        # Rotation controls
+        euler_angles = rot2euler_numpy(self.rotation[np.newaxis], degrees=True)[0]
+        u, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1, format='%.2f')
+        if u:
+            self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
 
     def gui_scale(self, imgui):
         # Scale controls
@@ -329,11 +340,14 @@ class Node(object):
         if 'position' in self._gui_elements:
             self.gui_position(imgui)
 
-        if 'material' in self._gui_elements:
-            self.gui_material(imgui)
+        if 'rotation' in self._gui_elements:
+            self.gui_rotation(imgui)
 
         if 'scale' in self._gui_elements:
             self.gui_scale(imgui)
+
+        if 'material' in self._gui_elements:
+            self.gui_material(imgui)
 
     # Renderable
     @staticmethod
@@ -370,9 +384,9 @@ class Node(object):
 
     def set_camera_matrices(self, prog, camera, **kwargs):
         """Set the model view projection matrix in the given program."""
-        mvp = np.matmul(camera.get_view_projection_matrix(), self.model_matrix())
         # Transpose because np is row-major but OpenGL expects column-major.
-        prog['mvp'].write(mvp.T.astype('f4').tobytes())
+        prog['model_matrix'].write(self.model_matrix().T.astype('f4').tobytes())
+        prog['view_projection_matrix'].write(camera.get_view_projection_matrix().T.astype('f4').tobytes())
 
     def receive_shadow(self, program, **kwargs):
         """
@@ -391,7 +405,7 @@ class Node(object):
                     # Bind shadowmap to slot i + 1, we reserve slot 0 for the mesh texture
                     # and use slots 1 to (#lights + 1) for shadow maps
                     light.shadow_map.use(location=i + 1)
-            
+
             # Set sampler uniforms
             uniform = program[f'shadow_maps']
             uniform.value = 1 if uniform.array_length == 1 else [*range(1, len(lights) + 1)]
@@ -400,8 +414,8 @@ class Node(object):
         if not self.cast_shadow:
             return
 
-        mvp = light_matrix @ self.model_matrix()
-        prog['mvp'].write(mvp.T.tobytes())
+        prog['model_matrix'].write(self.model_matrix().T.astype('f4').tobytes())
+        prog['view_projection_matrix'].write(light_matrix.T.astype('f4').tobytes())
 
         self.render_positions(prog)
 
@@ -427,7 +441,7 @@ class Node(object):
         # If backface_fragmap is enabled for this node only render backfaces
         if self.backface_fragmap:
             ctx.cull_face = 'front'
-            
+
         self.render_positions(prog)
 
         # Restore cull face to back
@@ -439,11 +453,9 @@ class Node(object):
             return
 
         prog = kwargs['depth_prepass_prog']
-        mvp = camera.get_view_projection_matrix() @ self.model_matrix()
-        prog['mvp'].write(mvp.T.tobytes())
+        self.set_camera_matrices(prog, camera)
+        self.render_positions(prog)
 
-        self.render_positions(prog)  
-    
     def render_outline(self, ctx, camera, prog):
         if self.outline:
             mvp = camera.get_view_projection_matrix() @ self.model_matrix()
@@ -454,26 +466,25 @@ class Node(object):
             else:
                 ctx.disable(moderngl.CULL_FACE)
             self.render_positions(prog)
-        
+
         # Render children node recursively.
         for n in self.nodes:
             n.render_outline(ctx, camera, prog)
 
     def release(self):
         """
-        Release all OpenGL resources used by this node and any of its children. 
-        Subclasses that instantiate OpenGL objects should 
-        implement this method with '@hooked' to avoid leaking resources.
+        Release all OpenGL resources used by this node and any of its children. Subclasses that instantiate OpenGL
+        objects should implement this method with '@hooked' to avoid leaking resources.
         """
         for n in self.nodes:
             n.release()
-    
+
     def on_selection(self, node, tri_id):
         """
         Called when the node is selected
 
         :param node:  the node which was clicked (can be None if the selection wasn't a mouse event)
-        :param tri_id: the id of the triangle that was clicked from the 'node' mesh 
+        :param tri_id: the id of the triangle that was clicked from the 'node' mesh
                        (can be None if the selection wasn't a mouse event)
         """
         pass

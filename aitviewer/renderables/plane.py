@@ -22,6 +22,7 @@ from aitviewer.scene.node import Node
 from aitviewer.shaders import get_smooth_lit_with_edges_program, get_chessboard_program
 from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
+from aitviewer.utils.decorators import hooked
 
 
 class Plane(Node):
@@ -96,6 +97,14 @@ class Plane(Node):
         self.receive_shadow(self.prog, **kwargs)
         self.vao.render(moderngl.TRIANGLE_STRIP)
 
+    @hooked
+    def release(self):
+        if self.is_renderable:
+            self.vbo_vertices.release()
+            self.vbo_normals.release()
+            self.vbo_colors.release()
+            self.vao.release()
+
 
 class ChessboardPlane(Node):
     """A plane that is textured like a chessboard."""
@@ -134,7 +143,8 @@ class ChessboardPlane(Node):
         elif plane == "xy":
             v1 = np.array([1, 0, 0], dtype=np.float32)
             v2 = np.array([0, 1, 0], dtype=np.float32)
-        elif plane == "yz":
+        else:
+            # plane == "yz"
             v1 = np.array([0, 1, 0], dtype=np.float32)
             v2 = np.array([0, 0, 1], dtype=np.float32)
 
@@ -150,9 +160,9 @@ class ChessboardPlane(Node):
         normals = np.tile(np.cross(v2, v1), (4, 1))
 
         uvs = np.array([
-            0, 0, 
-            0, 1, 
-            1, 0, 
+            0, 0,
+            0, 1,
+            1, 0,
             1, 1
         ], dtype=np.float32)
 
@@ -184,13 +194,15 @@ class ChessboardPlane(Node):
         set_material_properties(self.prog, self.material)
 
         self.vao.render(moderngl.TRIANGLE_STRIP)
-    
+
     @property
     def bounds(self):
         return self.get_bounds(self.vertices)
 
     def gui(self, imgui):
         self.gui_position(imgui)
+        self.gui_rotation(imgui)
+        self.gui_scale(imgui)
 
         _, self.c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
         _, self.c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True)
@@ -306,6 +318,8 @@ class Chessboard(Node):
 
     def gui(self, imgui):
         self.gui_position(imgui)
+        self.gui_rotation(imgui)
+        self.gui_scale(imgui)
 
         u, c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
         if u:

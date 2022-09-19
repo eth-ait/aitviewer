@@ -245,6 +245,7 @@ class Lines(Node):
         material = kwargs.get('material', Material(color=color, ambient=0.2))
         self.mesh = Meshes(vs, fs, ns, color=color, material=material, cast_shadow=cast_shadow, is_selectable=False)
         self.mesh.position = self.position
+        self.mesh.rotation = self.rotation
         self.add(self.mesh, has_gui=True, show_in_hierarchy=False)
 
     @property
@@ -254,11 +255,11 @@ class Lines(Node):
     @lines.setter
     def lines(self, value):
         self._lines = value if len(value.shape) == 3 else value[np.newaxis]
-    
+
     @property
     def current_lines(self):
         return self._lines[self.current_frame_id]
-    
+
     @current_lines.setter
     def current_lines(self, lines):
         assert len(lines.shape) == 2

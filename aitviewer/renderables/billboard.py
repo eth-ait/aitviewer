@@ -43,7 +43,7 @@ class Billboard(Node):
         :param texture_paths: A list of length N containing paths to the textures as image files.
         """
         super(Billboard, self).__init__(n_frames=len(texture_paths), **kwargs)
-        
+
         if len(vertices.shape) == 2:
             vertices = vertices[np.newaxis]
         else:
@@ -112,22 +112,22 @@ class Billboard(Node):
             P = camera.get_projection_matrix()
             ndc_from_world = P @ V
 
-            # Comput z coordinate of a point at the given distance
+            # Compute z coordinate of a point at the given distance.
             world_p = camera.position + camera.forward * distance
             ndc_p = ndc_from_world @ np.append(world_p, 1.0)
 
-            # Perspective division
+            # Perspective division.
             z = ndc_p[2] / ndc_p[3]
 
-            # NDC of corners at the computed distance
+            # NDC of corners at the computed distance.
             corners = np.array([
-                [ 1,  1, z], 
-                [ 1, -1, z], 
-                [-1,  1, z], 
+                [ 1,  1, z],
+                [ 1, -1, z],
+                [-1,  1, z],
                 [-1, -1, z],
             ])
 
-            # Transform ndc coordinates to world coordinates
+            # Transform ndc coordinates to world coordinates.
             world_from_ndc = np.linalg.inv(ndc_from_world)
             def transform(x):
                 v = world_from_ndc @ np.append(x, 1.0)
@@ -142,7 +142,7 @@ class Billboard(Node):
         if image_process_fn is None:
             if isinstance(camera, OpenCVCamera) and (camera.dist_coeffs is not None):
                 def undistort(img):
-                    return cv2.undistort(img, camera.K, camera.dist_coeffs)
+                    return cv2.undistort(img, camera.current_K, camera.dist_coeffs)
                 image_process_fn = undistort
 
         return cls(all_corners, texture_paths, image_process_fn)
@@ -166,7 +166,7 @@ class Billboard(Node):
         if self.current_frame_id != self._current_texture_id:
             if self.texture:
                 self.texture.release()
-                
+
             path = self.texture_paths[self.current_frame_id]
             if path.endswith((".pickle", "pkl")):
                 img = pickle.load(open(path, "rb"))
@@ -180,8 +180,9 @@ class Billboard(Node):
         self.prog['texture0'].value = 0
         self.texture.use(0)
 
-        self.set_camera_matrices(self.prog, camera, **kwargs)
-        
+        mvp = camera.get_view_projection_matrix() @ self.model_matrix()
+        self.prog['mvp'].write(mvp.T.astype("f4").tobytes())
+
         # Compute the index of the first vertex to use if we have a sequence of vertices of length > 1
         first = 4 * self.current_frame_id if self.vertices.shape[0] > 1 else 0
         self.vao.render(moderngl.TRIANGLE_STRIP, vertices=4, first=first)
@@ -199,17 +200,17 @@ class Billboard(Node):
 
             self.vbo_vertices.release()
             self.vbo_uvs.release()
-            
+
             if self.texture:
                 self.texture.release()
-    
+
     def is_transparent(self):
         return self.texture_alpha < 1.0
-    
+
     def closest_vertex_in_triangle(self, tri_id, point):
         vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
         return np.linalg.norm((vertices - point), axis=-1).argmin()
-        
+
     def get_bc_coords_from_points(self, tri_id, points):
         vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
         indices = np.array([ [0, 1, 2], [1, 2, 3] ])

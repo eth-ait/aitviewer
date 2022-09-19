@@ -38,13 +38,7 @@ def to_numpy(x):
     return x.detach().cpu().numpy()
 
 
-def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_fps=60, output_fps=60,
-                    start_frame=0):
-    """Convert the rendered images into a video. The video path format determines whether this will be rendered as
-    a GIF or an MP4 (default)."""
-    if not os.path.exists(frame_dir):
-        raise ValueError(f"Could not find directory containing frames {frame_dir}")
-
+def get_video_paths(video_path):
     is_mp4 = video_path.endswith('.mp4')
     is_gif = video_path.endswith('.gif')
     if not (is_mp4 or is_gif):
@@ -64,14 +58,39 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
         counter += 1
         video_path_candidate = video_path.replace(suffix, f'_{counter}{suffix}')
 
-    print("Rendering to video {}".format(os.path.abspath(video_path_candidate)))
 
     if is_mp4:
-        video_path_mp4 = video_path_candidate
+        return video_path_candidate, None, is_gif
     else:
-        # If GIF we first create a temporary mp4 and then convert that to GIF to reduce palette artifacts.
         video_path_mp4 = video_path_candidate.replace(suffix, f'_temp.mp4')
-    
+        return video_path_mp4, video_path_candidate, is_gif
+
+
+def video_to_gif(path_mp4, path_gif, remove=False):
+    command = ['ffmpeg',
+                '-i', path_mp4,
+                '-y',
+                '-filter_complex', f"[0:v] split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
+                path_gif]
+
+    with open(os.devnull, 'w') as FNULL:
+        subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
+
+    if remove:
+        os.remove(path_mp4)
+
+
+def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_fps=60, output_fps=60,
+                    start_frame=0):
+    """Convert the rendered images into a video. The video path format determines whether this will be rendered as
+    a GIF or an MP4 (default)."""
+    if not os.path.exists(frame_dir):
+        raise ValueError(f"Could not find directory containing frames {frame_dir}")
+
+    path_mp4, path_gif, is_gif = get_video_paths(video_path)
+
+    print("Rendering to video {}".format(os.path.abspath(path_mp4)))
+
     # Create mp4 from frames.
     command = ['ffmpeg',
                '-framerate', str(input_fps),  # must be this early in the command, otherwise it is not applied.
@@ -85,21 +104,14 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
                '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',  # Avoid error when image res is not divisible by 2.
                '-r', str(output_fps),
                '-y',
-               video_path_mp4]
+               path_mp4]
 
     with open(os.devnull, 'w') as FNULL:
         subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
-    
-    # Convert mp4 to GIF.
+
+    # If GIF we first create a temporary mp4 and then convert that to GIF to reduce palette artifacts.
     if is_gif:
-        command = ['ffmpeg',
-                   '-i', video_path_mp4,
-                   '-y',
-                   '-filter_complex', f"[0:v] split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
-                   video_path_candidate]
-                   
-        with open(os.devnull, 'w') as FNULL:
-            subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
+        video_to_gif(path_mp4, path_gif)
 
 
 def interpolate_positions(positions, ts_in, ts_out):

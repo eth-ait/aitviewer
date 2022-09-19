@@ -69,7 +69,7 @@ class Arrows(Node):
     @property
     def current_origins(self):
         return self.origins[self.current_frame_id]
-    
+
     @current_origins.setter
     def current_origins(self, origins):
         self.origins[self.current_frame_id] = origins
@@ -77,11 +77,11 @@ class Arrows(Node):
     @property
     def current_tips(self):
         return self.tips[self.current_frame_id]
-    
+
     @current_tips.setter
     def current_tips(self, tips):
         self.tips[self.current_frame_id] = tips
-    
+
     @property
     def mid_points(self):
         return self.origins + (self.tips - self.origins) * (1 - self.p)
@@ -91,20 +91,20 @@ class Arrows(Node):
         c[:, 0::2] = starts
         c[:, 1::2] = ends
         return c
-    
+
     def get_index_from_node_and_triangle(self, node, tri_id):
         idx = self.bases_r.get_index_from_node_and_triangle(node, tri_id)
         if idx is not None:
             return idx
-        
+
         return self.arrows_r.get_index_from_node_and_triangle(node, tri_id)
-    
+
     def redraw(self, **kwargs):
         self.bases_r.lines = self.get_line_coords(self.origins, self.mid_points)
         self.bases_r.redraw(**kwargs)
         self.arrows_r.lines = self.get_line_coords(self.mid_points, self.tips)
         self.arrows_r.redraw(**kwargs)
-    
+
     @Node.color.setter
     def color(self, color):
         self.material.color = color

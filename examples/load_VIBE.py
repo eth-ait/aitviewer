@@ -26,6 +26,7 @@ from aitviewer.utils.so3 import aa2rot_numpy
 import os
 import joblib
 import numpy as np
+import re
 
 # Set to True for rendering in headless mode, no window will be created and
 # a video will be exported to 'headless/test.mp4' in the export directory
@@ -61,26 +62,35 @@ if __name__ == '__main__':
     # Create a sequence of weak perspective cameras.
     cameras = WeakPerspectiveCamera(camera_info[:, :2], camera_info[:, 2:], cols, rows, far=3, viewer=viewer)
 
-    # Load the reference images and create a Billboard.
+    # Path to the directory containing the video frames.
     images_path = "resources/vibe/frames"
-    pc = Billboard.from_camera_and_distance(cameras, cameras.far - 1e-6, cols, rows,
-                                            [os.path.join(images_path, f) for f in os.listdir(images_path)])
+
+    # Sort images by frame number in the filename.
+    regex = re.compile(r"(\d*)$")
+    def sort_key(x):
+        name = os.path.splitext(x)[0]
+        return int(regex.search(name).group(0))
+
+    # Create a billboard.
+    billboard = Billboard.from_camera_and_distance(cameras, cameras.far - 1e-6, cols, rows,
+                    [os.path.join(images_path, f) for f in sorted(os.listdir(images_path), key=sort_key)])
 
     # Add all the objects to the scene.
-    viewer.scene.add(pc, smpl_sequence, cameras)
+    viewer.scene.add(smpl_sequence, billboard, cameras)
 
     # Set the weak perspective cameras as the current camera used by the viewer.
     # This is a temporary setting, moving the camera will result in switching back to the default (pinhole) camera.
     viewer.set_temp_camera(cameras)
 
     # Viewer settings.
-    viewer.playback_fps = 25
     viewer.auto_set_floor = False
+    viewer.playback_fps = 25
+    viewer.scene.fps = 25
     viewer.scene.floor.position[1] = -1.15
     viewer.scene.origin.enabled = False
     viewer.shadows_enabled = False
 
     if HEADLESS:
-        viewer.run(video_dir=os.path.join(C.export_dir, 'headless/test.mp4'), output_fps=25)
+        viewer.save_video(video_dir=os.path.join(C.export_dir, 'headless/vibe.mp4'), output_fps=25)
     else:
         viewer.run()

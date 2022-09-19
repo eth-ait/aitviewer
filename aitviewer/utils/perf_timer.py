@@ -1,11 +1,30 @@
-from moderngl_window.timers.base import BaseTimer
+"""
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
 import time
+
+from moderngl_window.timers.base import BaseTimer
 from typing import Tuple
 
 """
 Timer class adapted from moderngl_window.timers.clock.Timer.
 Uses time.perf_counter() instead of time.time() for higher resolution timestamps.
 """
+
+
 class PerfTimer(BaseTimer):
     """Timer based on python ``time``."""
 

@@ -56,7 +56,7 @@ class Configuration(object):
             if isinstance(conf_obj, str):
                 conf_obj = OmegaConf.load(conf_obj)
             else:
-                assert isinstance(conf_obj, DictConfig)
+                assert isinstance(conf_obj, DictConfig) or isinstance(conf_obj, dict)
             self._conf.merge_with(conf_obj)
 
         def __getattr__(self, item):

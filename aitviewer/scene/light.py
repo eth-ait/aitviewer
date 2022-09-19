@@ -27,32 +27,33 @@ class Light(Node):
     """Simple point light."""
 
     def __init__(self, intensity_diffuse=1.0, intensity_ambient=1.0, shadow_enabled=True, **kwargs):
-        super(Light, self).__init__(icon='\u0085',**kwargs)
+        super(Light, self).__init__(icon='\u0085', **kwargs)
 
         self.intensity_ambient = intensity_ambient
         self.intensity_diffuse = intensity_diffuse
 
         self.shadow_enabled = shadow_enabled
         self.shadow_map = None
+        self.shadow_map_framebuffer = None
 
         self.shadow_map_size = 15.0
         self.shadow_map_near = 5.0
         self.shadow_map_far = 50.0
-        
+
         self._debug_lines = None
         self._show_debug_lines = False
 
     def create_shadowmap(self, ctx):
         if self.shadow_map is None:
             shadow_map_size = 8192, 8192
-            
+
             # Setup shadow mapping
             self.shadow_map = ctx.depth_texture(shadow_map_size)
             self.shadow_map.compare_func = '>'
             self.shadow_map.repeat_x = False
             self.shadow_map.repeat_y = False
             self.shadow_map_framebuffer = ctx.framebuffer(depth_attachment=self.shadow_map)
-    
+
     def use(self, ctx):
         if not self.shadow_map:
             self.create_shadowmap(ctx)
@@ -70,19 +71,19 @@ class Light(Node):
     def mvp(self):
         """Return a model-view-projection matrix to project vertices into the view of the light."""
         return self._compute_light_matrix(tuple(self.position), self.shadow_map_size, self.shadow_map_near, self.shadow_map_far)
-    
+
     def _update_debug_lines(self):
         lines = np.array([
             [-1, -1, -1], [-1,  1, -1],
             [-1, -1,  1], [-1,  1,  1],
             [ 1, -1, -1], [ 1,  1, -1],
             [ 1, -1,  1], [ 1,  1,  1],
-            
+
             [-1, -1, -1], [-1, -1, 1],
             [-1,  1, -1], [-1,  1, 1],
             [ 1, -1, -1], [ 1, -1, 1],
             [ 1,  1, -1], [ 1,  1, 1],
-            
+
             [-1, -1, -1], [ 1, -1, -1],
             [-1, -1,  1], [ 1, -1,  1],
             [-1,  1, -1], [ 1,  1, -1],
@@ -119,7 +120,7 @@ class Light(Node):
                                            format='%.2f')
         _, self.intensity_diffuse = imgui.drag_float('Diffuse##diffuse', self.intensity_diffuse, 0.01, min_value=0.0, max_value=1.0,
                                            format='%.2f')
-                          
+
         _, self.shadow_enabled = imgui.checkbox('Enable Shadows', self.shadow_enabled)
 
         u_size, self.shadow_map_size = imgui.drag_float('Shadow Map Size', self.shadow_map_size, 0.1, format='%.2f', min_value=0.01, max_value=100.0)
@@ -137,5 +138,4 @@ class Light(Node):
         else:
             if self._debug_lines:
                 self._debug_lines.enabled = False
-        
-        
+

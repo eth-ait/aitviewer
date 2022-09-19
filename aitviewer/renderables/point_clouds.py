@@ -19,6 +19,7 @@ import moderngl
 
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_simple_unlit_program
+from aitviewer.utils.decorators import hooked
 from moderngl_window.opengl.vao import VAO
 
 
@@ -49,7 +50,7 @@ class PointClouds(Node):
         self.vao = VAO("points", mode=moderngl.POINTS)
         
         if z_up:
-            self.rotation =  np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
+            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
     @property
     def points(self):
@@ -150,3 +151,8 @@ class PointClouds(Node):
         self.set_camera_matrices(self.prog, camera, **kwargs)
         # Draw only as many points as we have set in the buffer.
         self.vao.render(self.prog, vertices=len(self.current_points))
+
+    @hooked
+    def release(self):
+        if self.is_renderable:
+            self.vao.release()

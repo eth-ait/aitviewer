@@ -64,6 +64,7 @@ class RigidBodies(Node):
             axs = Arrows(self.rb_pos, self.rb_pos + line, r_base=r_base, r_head=r_head, color=tuple(color),
                          is_selectable=False)
             axs.position = self.position
+            axs.rotation = self.rotation
             self._add_node(axs, has_gui=False, show_in_hierarchy=False)
             self.coords.append(axs)
 
@@ -75,23 +76,23 @@ class RigidBodies(Node):
     @property
     def current_rb_pos(self):
         return self.rb_pos[self.current_frame_id]
-    
+
     @current_rb_pos.setter
     def current_rb_pos(self, pos):
         self.rb_pos[self.current_frame_id] = pos
-    
+
     @property
     def current_rb_ori(self):
         return self.rb_ori[self.current_frame_id]
-    
+
     @current_rb_ori.setter
     def current_rb_ori(self, ori):
         self.rb_ori[self.current_frame_id] = ori
-    
+
     def redraw(self, **kwargs):
         if kwargs.get('current_frame_only', False):
             self.spheres.current_sphere_positions = self.current_rb_pos
-            
+
             for i in range(3):
                 line = self.rb_ori[..., :, i][self.current_frame_id]
                 line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
@@ -109,19 +110,19 @@ class RigidBodies(Node):
                 axs.position = self.position
                 axs.origins = self.rb_pos
                 axs.tips = self.rb_pos + line
-        
+
         super().redraw(**kwargs)
 
     def get_index_from_node_and_triangle(self, node, tri_id):
         idx = self.spheres.get_index_from_node_and_triangle(node, tri_id)
         if idx is not None:
             return idx
-        
+
         for a in self.coords:
             idx = a.get_index_from_node_and_triangle(node, tri_id)
             if idx is not None:
                 return idx
-    
+
     def color_one(self, index, color):
         col = np.full((1, self.spheres.n_vertices * self.spheres.n_spheres, 4), self.color)
         col[:, self.spheres.n_vertices * index: self.spheres.n_vertices * (index + 1)] = np.array(color)

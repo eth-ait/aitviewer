@@ -7,3 +7,4 @@ imgui.ini
 export/
 data/
 .vscode/
+tests/failure/
