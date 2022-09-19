@@ -91,6 +91,6 @@ if __name__ == '__main__':
     viewer.shadows_enabled = False
 
     if HEADLESS:
-        viewer.run(video_dir=os.path.join(C.export_dir, 'headless/vibe.mp4'), output_fps=25)
+        viewer.save_video(video_dir=os.path.join(C.export_dir, 'headless/vibe.mp4'), output_fps=25)
     else:
         viewer.run()

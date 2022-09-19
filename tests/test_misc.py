@@ -5,6 +5,7 @@ from aitviewer.renderables.spheres import Spheres
 from aitviewer.renderables.smpl import SMPLSequence, SMPLLayer
 from aitviewer.scene.camera import OpenCVCamera, WeakPerspectiveCamera
 from aitviewer.viewer import Viewer
+from aitviewer.headless import HeadlessRenderer
 from aitviewer.configuration import CONFIG as C
 
 import trimesh
@@ -14,7 +15,7 @@ from tempfile import TemporaryDirectory
 
 
 @noreference
-def test_headless(viewer: Viewer):
+def test_headless(viewer: HeadlessRenderer):
     sphere_positions = np.array([
         [[0.0, 0, 0]],
         [[0.1, 0, 0]],
@@ -31,17 +32,17 @@ def test_headless(viewer: Viewer):
         gif_path = os.path.join(temp, 'video.gif')
         frame_path = os.path.join(temp, 'frames')
 
-        viewer.run(frame_dir=frame_path, video_dir=mp4_path, output_fps=30)
+        viewer.save_video(frame_dir=frame_path, video_dir=mp4_path, output_fps=30)
         assert os.path.exists(os.path.join(temp, 'video_0.mp4')), "MP4 file not found"
         frames = os.path.join(frame_path, "0000")
         assert os.path.exists(frames) and len(os.listdir(frames)) == sphere_positions.shape[0]
 
-        viewer.run(frame_dir=frame_path, video_dir=gif_path, output_fps=30)
+        viewer.save_video(frame_dir=frame_path, video_dir=gif_path, output_fps=30)
         assert os.path.exists(os.path.join(temp, 'video_0.gif')), "GIF file not found"
         frames = os.path.join(frame_path, "0001")
         assert os.path.exists(frames) and len(os.listdir(frames)) == sphere_positions.shape[0]
 
-        viewer.run(video_dir=mp4_path)
+        viewer.save_video(video_dir=mp4_path)
         assert os.path.exists(os.path.join(temp, 'video_1.mp4')), "MP4 file not found"
         frames = os.path.join(frame_path, "0002")
         assert not os.path.exists(frames)

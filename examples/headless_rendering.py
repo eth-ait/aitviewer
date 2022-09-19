@@ -31,4 +31,4 @@ if __name__ == '__main__':
     v = HeadlessRenderer()
     v.scene.add(smpl_seq)
     v.scene.camera.position = np.array([0.0, 0.5, 4.0])
-    v.run(video_dir=os.path.join(C.export_dir, 'headless/test.mp4'))
+    v.save_video(video_dir=os.path.join(C.export_dir, 'headless/test.mp4'))
