@@ -18,7 +18,6 @@ import numpy as np
 import pickle as pkl
 import torch
 import os
-from typing import Union, IO
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
@@ -38,6 +37,7 @@ from aitviewer.utils import interpolate_positions
 from aitviewer.utils import to_numpy as c2c
 from scipy.spatial.transform import Rotation
 from smplx.joint_names import JOINT_NAMES, SMPLH_JOINT_NAMES
+from typing import Union, IO
 
 
 class SMPLSequence(Node):
@@ -81,7 +81,7 @@ class SMPLSequence(Node):
         :param show_joint_angles: Whether or not the coordinate frames at the joints should be visualized.
         :param z_up: Whether or not the input data assumes Z is up. If so, the data will be rotated such that Y is up.
         :param post_fk_func: User specified postprocessing function that is called after evaluating the SMPL model,
-          the function signature must is: def post_fk_func(self, vertices, joints, current_frame_only),
+          the function signature must be: def post_fk_func(self, vertices, joints, current_frame_only),
           and it must return new values for vertices and joints with the same shapes.
           Shapes are:
             if current_frame_only is False: vertices (F, V, 3) and joints (F, N_JOINTS, 3)

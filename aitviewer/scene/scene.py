@@ -111,7 +111,7 @@ class Scene(Node):
         # As an approximation we only sort using the origin of the object
         # which may be incorrect for large objects or objects significantly
         # offset from their origin, but works in many cases.
-        for r in sorted(transparent, key=lambda r: np.linalg.norm(r.position - self.camera.position), reverse=True):
+        for r in sorted(transparent, key=lambda x: np.linalg.norm(x.position - self.camera.position), reverse=True):
             # Render to depth buffer only
             self.ctx.depth_func = '<'
             self.safe_render_depth_prepass(r, **kwargs)
@@ -185,11 +185,11 @@ class Scene(Node):
 
         # Use head recursion in order to collect the most deep nodes first
         # These are likely to be nodes which should be rendered first (i.e. transparent parent nodes should be last)
-        def rec_collect_nodes(n):
-            if (not req_enabled or n.enabled):
-                if isinstance(n, obj_type):
-                    nodes.append(n)
-                for n_child in n.nodes:
+        def rec_collect_nodes(nn):
+            if not req_enabled or nn.enabled:
+                if isinstance(nn, obj_type):
+                    nodes.append(nn)
+                for n_child in nn.nodes:
                     rec_collect_nodes(n_child)
 
         for n in self.nodes:

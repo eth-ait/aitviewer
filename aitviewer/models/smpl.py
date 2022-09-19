@@ -138,6 +138,11 @@ class SMPLLayer(nn.Module, ABC):
           supports hands.
         :param poses_right_hand: A tensor of shape (N, N_JOINTS_HANDS*3) or None. Only relevant if this body model
           supports hands.
+        :param poses_jaw: A tensor of shape (N, 3) or None. Only relevant if this body model supports faces.
+        :param poses_leye: A tensor of shape (N, 3) or None. Only relevant if this body model supports faces.
+        :param poses_reye: A tensor of shape (N, 3) or None. Only relevant if this body model supports faces.
+        :param expression: A tensor of shape (N, N_EXPRESSIONS) or None. Only relevant if this body model supports
+          facial expressions.
         :return: The resulting vertices and joints.
         """
         assert poses_body.shape[1] == self.bm.NUM_BODY_JOINTS*3
@@ -195,8 +200,8 @@ class SMPLLayer(nn.Module, ABC):
             trans = trans - trans[0:1]
 
         output = self.bm(body_pose=poses_body, betas=betas, global_orient=poses_root, transl=trans,
-                            left_hand_pose=poses_left_hand, right_hand_pose=poses_right_hand,
-                            jaw_pose=poses_jaw, leye_pose=poses_leye, reye_pose=poses_reye, expression=expression)
+                         left_hand_pose=poses_left_hand, right_hand_pose=poses_right_hand,
+                         jaw_pose=poses_jaw, leye_pose=poses_leye, reye_pose=poses_reye, expression=expression)
 
         return output.vertices, output.joints
 

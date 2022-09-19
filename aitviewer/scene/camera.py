@@ -61,6 +61,10 @@ class CameraInterface(ABC):
             raise ValueError("update_matrices() must be called before to update the view-projection matrix")
         return self.view_projection_matrix
 
+    @abstractmethod
+    def update_matrices(self, width, height):
+        pass
+
     @property
     @abstractmethod
     def position(self):

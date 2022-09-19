@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
 
+
 def line(start, end, num):
     """
     Returns an array of positions on a straight line (num, 3).
@@ -25,6 +26,7 @@ def line(start, end, num):
     :param num: number of positions in the returned array.
     """
     return np.linspace(np.array(start), np.array(end), num=num)
+
 
 def circle(center, radius, num, start_angle=0.0, end_angle=360.0):
     """

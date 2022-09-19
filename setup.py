@@ -30,5 +30,6 @@ setup(name='aitviewer',
               'omegaconf>=2.1.1',
               'roma>=1.2.3',
               'joblib',
-              'scikit-video'
+              'scikit-video',
+              'Pillow'
           ])

@@ -20,10 +20,9 @@ import moderngl
 import moderngl_window
 import numpy as np
 import os
+import skvideo.io
 import struct
 import trimesh
-from omegaconf.dictconfig import DictConfig
-from typing import Tuple, Union
 
 from array import array
 from aitviewer.configuration import CONFIG as C
@@ -40,10 +39,11 @@ from moderngl_window import geometry
 from moderngl_window import get_local_window_cls
 from moderngl_window.integrations.imgui import ModernglWindowRenderer
 from moderngl_window.opengl.vao import VAO
+from omegaconf.dictconfig import DictConfig
 from pathlib import Path
 from PIL import Image
 from tqdm import tqdm
-import skvideo.io
+from typing import Tuple, Union
 
 
 MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')

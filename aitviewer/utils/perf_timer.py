@@ -14,14 +14,17 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from moderngl_window.timers.base import BaseTimer
 import time
+
+from moderngl_window.timers.base import BaseTimer
 from typing import Tuple
 
 """
 Timer class adapted from moderngl_window.timers.clock.Timer.
 Uses time.perf_counter() instead of time.time() for higher resolution timestamps.
 """
+
+
 class PerfTimer(BaseTimer):
     """Timer based on python ``time``."""
 

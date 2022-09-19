@@ -14,6 +14,8 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+import numpy as np
+
 from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.renderables.smpl import SMPLSequence
@@ -21,15 +23,14 @@ from aitviewer.scene.camera import PinholeCamera
 from aitviewer.viewer import Viewer
 from aitviewer.utils import path
 
-import numpy as np
 
 if __name__ == '__main__':
     # Create a neutral SMPL T Pose.
     smpl_template = SMPLSequence.t_pose(SMPLLayer(model_type='smpl', gender='neutral', device=C.device), name='SMPL')
 
-    d = 10 # distance from the object at start and end.
-    r = 3  # radius of the circle around the object.
-    h = 2  # height of the circle.
+    d = 10  # Distance from the object at start and end.
+    r = 3  # Radius of the circle around the object.
+    h = 2  # Height of the circle.
 
     # Create a path with a line followed by a circle followed by another line.
     first = path.line(start=(r, h, d), end=(r, h, 0), num=100)

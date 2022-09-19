@@ -349,7 +349,6 @@ class Node(object):
         if 'material' in self._gui_elements:
             self.gui_material(imgui)
 
-
     # Renderable
     @staticmethod
     def once(func):
@@ -474,9 +473,8 @@ class Node(object):
 
     def release(self):
         """
-        Release all OpenGL resources used by this node and any of its children.
-        Subclasses that instantiate OpenGL objects should
-        implement this method with '@hooked' to avoid leaking resources.
+        Release all OpenGL resources used by this node and any of its children. Subclasses that instantiate OpenGL
+        objects should implement this method with '@hooked' to avoid leaking resources.
         """
         for n in self.nodes:
             n.release()
