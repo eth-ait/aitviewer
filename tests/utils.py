@@ -43,7 +43,12 @@ def viewer(refs):
     for ref, img in zip(refs, generate_images(headless, len(refs))):
         # Load and check the refernce image.
         ref_img = Image.open(ref)
-        if np.any(np.asarray(img) != np.asarray(ref_img)):
+
+        diff = ImageChops.difference(img, ref_img)
+        relative_error = np.asarray(diff).sum() / np.full(np.asarray(img).shape, 255).sum()
+        
+        # If the relative error is higher than this threshold report a failure.
+        if relative_error > 1e-5:
             os.makedirs(FAILURE_DIR, exist_ok=True)
 
             # Store the wrong result and diff for debugging.
@@ -53,8 +58,7 @@ def viewer(refs):
             diff = ImageChops.difference(img, ref_img)
             diff.save(base + "_diff" + ext)
 
-            relative_error = np.asarray(diff).sum() / np.full(np.asarray(img).shape, 255).sum()
-            assert False, f"Image does not match reference {ref}, the wrong image has been saved to {wrong} (Relative Error {relative_error:.4f})"
+            assert False, f"Image does not match reference {ref}, the wrong image has been saved to {wrong} (Relative Error {relative_error:.4})"
 
 
 def requires_smpl(func):
