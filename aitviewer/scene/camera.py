@@ -171,6 +171,19 @@ class Camera(Node, CameraInterface):
         else:
             self.mesh.color = self.inactive_color
 
+    @Node.enabled.setter
+    def enabled(self, enabled):
+        # Call setter of the parent (Node) class.
+        super(Camera, self.__class__).enabled.fset(self, enabled)
+
+        # Also set the enabled property of the path if it exists.
+        # We must do this here because the path is not a child of the camera node, 
+        # since it's position/rotation should not be updated together with the camera.
+        if self.path:
+            self.path[0].enabled = enabled
+            if self.path[1] is not None:
+                self.path[1].enabled = enabled
+
     def hide_frustum(self):
         if self.frustum:
             self.remove(self.frustum)
@@ -273,9 +286,9 @@ class Camera(Node, CameraInterface):
 
         # We add the the path to the parent node of the camera because we don't want the camera position and rotation to be applied to it.
         assert self.parent is not None, "Camera node must be added to the scene before showing the camera path."
-        self.parent.add(path_spheres, show_in_hierarchy=False)
+        self.parent.add(path_spheres, show_in_hierarchy=False, enabled=self.enabled)
         if path_lines is not None:
-            self.parent.add(path_lines, show_in_hierarchy=False)
+            self.parent.add(path_lines, show_in_hierarchy=False, enabled=self.enabled)
 
         self.path = (path_spheres, path_lines)
         self.current_frame_id = frame_id
