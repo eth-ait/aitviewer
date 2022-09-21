@@ -72,11 +72,7 @@ def test_smplh(viewer: Viewer):
                                                position=np.array((-1, 0.0, 0.0)))
     smplh_female = SMPLSequence.t_pose(SMPLLayer(model_type='smplh', gender='female', device=C.device), name='SMPL',
                                                  position=np.array((1, 0.0, 0.0)))
-    mano = SMPLSequence.t_pose(SMPLLayer(model_type='mano', gender='neutral', device=C.device),
-                                         position=np.array((-1.5, 0.0, 0.0)), name='MANO')
-    flame = SMPLSequence.t_pose(SMPLLayer(model_type='flame', gender='neutral', device=C.device),
-                                          position=np.array((1.5, 0.0, 0.0)), name='FLAME')
-    viewer.scene.add(smplh_male, smplh_female, mano, flame)
+    viewer.scene.add(smplh_male, smplh_female)
 
 
 @reference()

@@ -171,6 +171,19 @@ class Camera(Node, CameraInterface):
         else:
             self.mesh.color = self.inactive_color
 
+    @Node.enabled.setter
+    def enabled(self, enabled):
+        # Call setter of the parent (Node) class.
+        super(Camera, self.__class__).enabled.fset(self, enabled)
+
+        # Also set the enabled property of the path if it exists.
+        # We must do this here because the path is not a child of the camera node, 
+        # since it's position/rotation should not be updated together with the camera.
+        if self.path:
+            self.path[0].enabled = enabled
+            if self.path[1] is not None:
+                self.path[1].enabled = enabled
+
     def hide_frustum(self):
         if self.frustum:
             self.remove(self.frustum)
@@ -243,7 +256,9 @@ class Camera(Node, CameraInterface):
     def hide_path(self):
         if self.path is not None:
             self.parent.remove(self.path[0])
-            self.parent.remove(self.path[1])
+            # The Lines part of the path may be None if the path is a single point.
+            if self.path[1] is not None:
+                self.parent.remove(self.path[1])
             self.path = None
 
     def show_path(self):
@@ -263,13 +278,19 @@ class Camera(Node, CameraInterface):
             all_oris[i] = self.rotation @ np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])
 
         path_spheres = RigidBodies(all_points, all_oris, radius=0.01, length=0.1, color=(0.92, 0.68, 0.2, 1.0))
-        path_lines = Lines(all_points, color=(0, 0, 0, 1), r_base=0.003, mode='line_strip', cast_shadow=False)
+        # Create lines only if there is more than one frame in the sequence.
+        if self.n_frames > 1:
+            path_lines = Lines(all_points, color=(0, 0, 0, 1), r_base=0.003, mode='line_strip', cast_shadow=False)
+        else:
+            path_lines = None
 
         # We add the the path to the parent node of the camera because we don't want the camera position and rotation to be applied to it.
         assert self.parent is not None, "Camera node must be added to the scene before showing the camera path."
-        self.parent.add(path_spheres, path_lines, show_in_hierarchy=False)
-        self.path = (path_spheres, path_lines)
+        self.parent.add(path_spheres, show_in_hierarchy=False, enabled=self.enabled)
+        if path_lines is not None:
+            self.parent.add(path_lines, show_in_hierarchy=False, enabled=self.enabled)
 
+        self.path = (path_spheres, path_lines)
         self.current_frame_id = frame_id
 
     def render_outline(self, ctx, camera, prog):

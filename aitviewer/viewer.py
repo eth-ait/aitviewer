@@ -1061,7 +1061,6 @@ class Viewer(moderngl_window.WindowConfig):
 
             # The frame dir does not yet exist (we've made sure of it).
             os.makedirs(frame_dir)
-            print("Saving frames to {}".format(frame_dir))
 
         # Store the current camera and create a copy of it if required.
         saved_camera = self.scene.camera
@@ -1156,10 +1155,15 @@ class Viewer(moderngl_window.WindowConfig):
         # Save the video.
         if output_path is not None:
             writer.close()
-
-            # Convert to gif if required.
             if is_gif:
+                # Convert to gif.
                 video_to_gif(path_mp4, path_gif, remove=True)
+
+                print(f"GIF saved to {os.path.abspath(path_gif)}")
+            else:
+                print(f"Video saved to {os.path.abspath(output_path)}")
+        else:
+            print(f"Frames saved to {os.path.abspath(frame_dir)}")
 
         # Reset viewer data.
         self.scene.camera = saved_camera
@@ -1167,4 +1171,3 @@ class Viewer(moderngl_window.WindowConfig):
         self.run_animations = saved_run_animations
         self._last_frame_rendered_at = self.timer.time
 
-        print("Done.")
