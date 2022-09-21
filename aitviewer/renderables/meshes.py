@@ -799,9 +799,11 @@ class VariableTopologyMeshes(Node):
             if self.preload:
                 for m in self._all_meshes:
                     m.color = color
+                    m.texture_alpha = color[-1]
             # Otherwise only update the current mesh and enable color override for other meshes
             else:
                 self.current_mesh.color = color
+                self.current_mesh.texture_alpha = color[-1]
                 self._override_color = True
 
         _, self.show_texture  = imgui.checkbox('Render Texture', self.show_texture)
