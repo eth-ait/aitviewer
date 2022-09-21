@@ -49,7 +49,6 @@ class Meshes(Node):
                  face_colors=None,
                  uv_coords=None,
                  path_to_texture=None,
-                 texture_alpha=1.0,
                  cast_shadow=True,
                  pickable=True,
                  flat_shading=False,
@@ -68,7 +67,6 @@ class Meshes(Node):
         :param face_colors: A np array of shape (N, F, 4) overriding the uniform or vertex colors.
         :param uv_coords: A np array of shape (V, 2) if the mesh is to be textured.
         :param path_to_texture: Path to an image file that serves as the texture.
-        :param texture_alpha: Set transparency for texture.
         """
         if len(vertices.shape) == 2 and vertices.shape[-1] == 3:
             vertices = vertices[np.newaxis]
@@ -99,7 +97,6 @@ class Meshes(Node):
                 self.texture_image = Image.open(path_to_texture).transpose(method=Image.FLIP_TOP_BOTTOM).convert("RGB")
         else:
             self.texture_image = None
-        self.texture_alpha = texture_alpha
 
         # Enable rendering passes
         self.cast_shadow = cast_shadow
@@ -289,10 +286,7 @@ class Meshes(Node):
         return self.get_bounds(self.vertices)
 
     def is_transparent(self):
-        if self.has_texture and self.show_texture:
-            return self.texture_alpha < 1.0
-        else:
-            return self.color[3] < 1.0
+        return self.color[3] < 1.0
 
     def on_frame_update(self):
         """Called whenever a new frame must be displayed."""
@@ -381,6 +375,7 @@ class Meshes(Node):
             self.texture_vao = ctx.vertex_array(self.texture_prog,
                                                 [(self.vbo_vertices, '3f4 /v', 'in_position'),
                                                  (self.vbo_normals, '3f4 /v', 'in_normal'),
+                                                 (self.vbo_colors, '4f4 /v', 'in_color'),
                                                  (self.vbo_uvs, '2f4 /v', 'in_uv')],
                                                 self.vbo_indices)
 
@@ -404,8 +399,6 @@ class Meshes(Node):
 
     def render(self, camera, **kwargs):
         # Check if flat shading changed, in which case we need to update the VBOs.
-        if self.has_texture:
-            self.texture_prog['texture_alpha'].value = self.texture_alpha
         vao = self._prepare_vao(camera, **kwargs)
         vao.render(moderngl.TRIANGLES)
 
@@ -425,9 +418,9 @@ class Meshes(Node):
         else:
             prog, vao = (self.flat_prog, self.flat_vao) if self.flat_shading else (self.smooth_prog, self.smooth_vao)
             prog['norm_coloring'].value = self.norm_coloring
-            prog['use_uniform_color'] = self._use_uniform_color
-            prog['uniform_color'] = self.material.color
 
+        prog['use_uniform_color'] = self._use_uniform_color
+        prog['uniform_color'] = self.material.color
         prog['draw_edges'].value = 1.0 if self.draw_edges else 0.0
         prog['win_size'].value = kwargs['window_size']
 
@@ -461,9 +454,6 @@ class Meshes(Node):
     def gui(self, imgui):
         super(Meshes, self).gui(imgui)
 
-        if self.has_texture:
-            _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name),
-                                                       self.texture_alpha, 0.0, 1.0, '%.2f')
         _, self.show_texture = imgui.checkbox('Render Texture##render_texture{}'.format(self.unique_name),
                                               self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
@@ -799,11 +789,9 @@ class VariableTopologyMeshes(Node):
             if self.preload:
                 for m in self._all_meshes:
                     m.color = color
-                    m.texture_alpha = color[-1]
             # Otherwise only update the current mesh and enable color override for other meshes
             else:
                 self.current_mesh.color = color
-                self.current_mesh.texture_alpha = color[-1]
                 self._override_color = True
 
         _, self.show_texture  = imgui.checkbox('Render Texture', self.show_texture)

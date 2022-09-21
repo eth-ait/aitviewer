@@ -38,7 +38,7 @@ if __name__ == '__main__':
     texture_image = 'resources/drill/drill_uv.png'
     drill_mesh = Meshes(drill.vertices, drill.faces, drill.vertex_normals,
                         uv_coords=drill.visual.uv, path_to_texture=texture_image, scale=50.0,
-                        texture_alpha=0.5)
+                        color=(1, 1, 1, 0.5))
 
     # Display in viewer.
     v = Viewer()

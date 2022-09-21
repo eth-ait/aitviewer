@@ -19,9 +19,8 @@
 
 #if TEXTURE
     in vec2 in_uv;
-#else
-    in vec4 in_color;
 #endif
+    in vec4 in_color;
 
     out VS_OUT {
         vec3 vert;
@@ -32,10 +31,8 @@
 
 #if TEXTURE
         vec2 uv;
-#else
-        vec4 color;
 #endif
-
+        vec4 color;
         vec4 vert_light[NR_DIR_LIGHTS];
     } vs_out;
 
@@ -47,9 +44,8 @@
 
 #if TEXTURE
         vs_out.uv = in_uv;
-#else
-        vs_out.color = in_color;
 #endif
+        vs_out.color = in_color;
 
         vec3 world_position = (model_matrix * vec4(in_position, 1.0)).xyz;
         vs_out.vert = world_position;
@@ -80,10 +76,8 @@
 
 #if TEXTURE
         vec2 uv;
-#else
-        vec4 color;
 #endif
-
+        vec4 color;
         vec4 vert_light[NR_DIR_LIGHTS];
     } gs_in[];
 
@@ -91,10 +85,9 @@
 
 #if TEXTURE
     out vec2 g_uv;
-#else
-    out vec4 g_color;
 #endif
 
+    out vec4 g_color;
     out vec3 g_vert;
     out vec4 g_vert_light[NR_DIR_LIGHTS];
 
@@ -139,9 +132,8 @@
 
 #if TEXTURE
             g_uv = gs_in[i].uv;
-#else
-            g_color = gs_in[i].color;
 #endif
+            g_color = gs_in[i].color;
 
             for(int j = 0; j < NR_DIR_LIGHTS; j++) {
                 g_vert_light[j] = gs_in[i].vert_light[j];
@@ -156,7 +148,6 @@
 
 #if TEXTURE
     uniform sampler2D diffuse_texture;
-    uniform float texture_alpha = 1.0;
 #else
     uniform bool norm_coloring;
 #endif
@@ -172,9 +163,8 @@
 
 #if TEXTURE
     in vec2 g_uv;
-#else
-    in vec4 g_color;
 #endif
+    in vec4 g_color;
 
     in vec4 g_vert_light[NR_DIR_LIGHTS];
     noperspective in vec3 dist;
@@ -189,14 +179,14 @@
 
         vec3 normal = normalize(g_norm);
 
-#if TEXTURE
-        // Texture lookup.
-        vec4 base_color = vec4(texture(diffuse_texture, g_uv).rgb, texture_alpha);
-#else
         vec4 base_color = g_color;
         if(use_uniform_color) {
             base_color = uniform_color;
         }
+        
+#if TEXTURE
+        // Texture lookup.
+        base_color.xyz = texture(diffuse_texture, g_uv).rgb;
 #endif
 
         vec3 color = compute_lighting(base_color.rgb, g_vert, normal, g_vert_light);

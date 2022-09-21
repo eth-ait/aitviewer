@@ -59,7 +59,7 @@ def test_obj(viewer: Viewer):
     texture_image = os.path.join(RESOURCE_DIR, 'drill/drill_uv.png')
     drill_mesh = Meshes(drill.vertices, drill.faces, drill.vertex_normals,
                         uv_coords=drill.visual.uv, path_to_texture=texture_image, scale=50.0,
-                        texture_alpha=0.5)
+                        color=(1, 1, 1, 0.5))
 
     viewer.scene.camera.dolly_zoom(-100.0)
     viewer.scene.add(planet_mesh, drill_mesh, cube_mesh)

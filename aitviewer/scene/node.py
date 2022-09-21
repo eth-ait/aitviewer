@@ -411,7 +411,7 @@ class Node(object):
             uniform.value = 1 if uniform.array_length == 1 else [*range(1, len(lights) + 1)]
 
     def render_shadowmap(self, light_matrix, prog):
-        if not self.cast_shadow:
+        if not self.cast_shadow or self.color[3] == 0.0:
             return
 
         prog['model_matrix'].write(self.model_matrix().T.astype('f4').tobytes())
