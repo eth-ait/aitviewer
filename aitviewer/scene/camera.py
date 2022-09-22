@@ -550,6 +550,31 @@ class OpenCVCamera(Camera):
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
 
+    def to_pinhole_camera(self, target_distance=5, **kwargs):
+        # Save current frame id.
+        current_frame_id = self.current_frame_id
+
+        # Compute position and target for each frame.
+        # Pinhole camera currently does not support custom up direction.
+        positions = np.zeros((self.n_frames, 3))
+        targets = np.zeros((self.n_frames, 3))
+        for i in range(self.n_frames):
+            self.current_frame_id = i
+            positions[i] = self.position
+            targets[i] = self.position + self.forward * target_distance
+
+        # Restore current frame id.
+        self.current_frame_id = current_frame_id
+
+        # Compute intrinsics, the Pinhole camera does not currently support
+        # skew and offset from the center, so we throw away this information.
+        # Also we use the fov from the first intrinsic matrix if there is more than one
+        # because the PiholeCamera does not support sequences of fov values.
+        fov = np.rad2deg(2 * np.arctan(self.K[0, 1, 2] / self.K[0, 1, 1]))
+
+        return PinholeCamera(positions, targets, self.cols, self.rows, fov=fov,
+                             near=self.near, far=self.far, viewer=self.viewer, **kwargs)
+
     @hooked
     def gui(self, imgui):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
@@ -635,6 +660,31 @@ class PinholeCamera(Camera):
         self.projection_matrix = P.astype('f4')
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
+
+    def to_opencv_camera(self, **kwargs):
+        # Save current frame id.
+        current_frame_id = self.current_frame_id
+
+        cols, rows = self.cols, self.rows
+        # Compute extrinsics for each frame.
+        Rts = np.zeros((self.n_frames, 3, 4))
+        for i in range(self.n_frames):
+            self.current_frame_id = i
+            self.update_matrices(cols, rows)
+            Rts[i] = self.get_view_matrix()[:3]
+
+        # Restore current frame id.
+        self.current_frame_id = current_frame_id
+
+        # Invert Y and Z to meet OpenCV conventions.
+        Rts[:, 1:3, :] *= -1.0
+
+        # Compute intrinsics.
+        f = 1. / np.tan(np.radians(self.fov / 2))
+        c0 = np.array([cols / 2.0, rows / 2.0])
+        K = np.array([[f * 0.5 * rows, 0., c0[0]], [0., f * 0.5 * rows, c0[1]], [0., 0., 1.]])
+
+        return OpenCVCamera(K, Rts, cols, rows, near=self.near, far=self.far, viewer=self.viewer, **kwargs)
 
     @hooked
     def gui(self, imgui):
