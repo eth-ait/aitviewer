@@ -8,6 +8,7 @@ datasets:
     smplx:
       "../data/3dpw_smplx_neutral_pkl"
 smplx_models: "../data/smplx_models"
+star_models: "../data/star_models"
 
 # Pytorch configuration.
 device: "cuda:0"
