@@ -70,6 +70,7 @@ class Scene(Node):
         self.add(self.camera_target, show_in_hierarchy=False)
 
         self.custom_font = None
+        self.properties_icon ="\u0094"
 
         # Currently selected object, None if no object is selected
         self.selected_object = None
@@ -230,17 +231,19 @@ class Scene(Node):
             s = self._gui_selected_object
 
             # Draw object icon and name
+            imgui.indent(15)
             imgui.push_font(self.custom_font)
-            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
-            e = imgui.tree_node(f"{s.icon} {s.name}##gui_selected", imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING)
-            imgui.pop_style_var()
+            imgui.text(f"{self.properties_icon} {s.icon} {s.name}")
             imgui.pop_font()
+            imgui.unindent()
+            imgui.spacing()
+            imgui.spacing()
 
             # Draw gui
+            imgui.indent(42)
             s.gui(imgui)
+            imgui.unindent()
 
-            if e:
-                imgui.tree_pop()
 
     def gui(self, imgui):
         imgui.text(f"FPS: {self.fps:.1f}")
@@ -252,13 +255,15 @@ class Scene(Node):
     def gui_editor(self, imgui):
         """GUI to control scene settings."""
         # Also include the camera GUI in the scene node.
-        self.gui_camera(imgui)
-        self.gui_renderables(imgui, [self])
 
+        self.gui_camera(imgui)
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-
+        self.gui_renderables(imgui, [self])
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
         self.gui_selected(imgui)
 
     def gui_camera(self, imgui):

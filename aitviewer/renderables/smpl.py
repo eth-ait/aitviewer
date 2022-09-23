@@ -61,6 +61,7 @@ class SMPLSequence(Node):
                  show_joint_angles=False,
                  z_up=False,
                  post_fk_func=None,
+                 icon="\u0093",
                  **kwargs):
         """
         Initializer.
@@ -89,7 +90,14 @@ class SMPLSequence(Node):
         :param kwargs: Remaining arguments for rendering.
         """
         assert len(poses_body.shape) == 2
-        super(SMPLSequence, self).__init__(n_frames=poses_body.shape[0], **kwargs)
+
+        # Set model icon
+        if smpl_layer.model_type == 'mano':
+            icon = "\u0092"
+        elif smpl_layer.model_type == 'flame':
+            icon = "\u0091"
+
+        super(SMPLSequence, self).__init__(n_frames=poses_body.shape[0], icon=icon, **kwargs)
 
         self.smpl_layer = smpl_layer
         self.post_fk_func = post_fk_func

@@ -54,6 +54,7 @@ class Meshes(Node):
                  flat_shading=False,
                  draw_edges=False,
                  draw_outline=False,
+                 icon="\u008d",
                  **kwargs):
         """
         Initializer.
@@ -72,7 +73,7 @@ class Meshes(Node):
             vertices = vertices[np.newaxis]
         assert len(vertices.shape) == 3
         assert len(faces.shape) == 2
-        super(Meshes, self).__init__(n_frames=vertices.shape[0], **kwargs)
+        super(Meshes, self).__init__(n_frames=vertices.shape[0], icon=icon, **kwargs)
 
         self._vertices = vertices
         self.faces = faces.astype(np.int32)

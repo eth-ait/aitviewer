@@ -35,6 +35,7 @@ class Plane(Node):
                  v2,
                  size=10.0,
                  color=(0.5, 0.5, 0.5, 1.0),
+                 icon="\u008b",
                  **kwargs):
         """
         Initializer.
@@ -44,7 +45,7 @@ class Plane(Node):
         :param size: Size of the plane.
         :param color: Color of the plane.
         """
-        super(Plane, self).__init__(color=color, **kwargs)
+        super(Plane, self).__init__(color=color, icon=icon, **kwargs)
         if np.dot(v1, v2) > 0.00001:
             raise ValueError('v1 and v2 are not orthogonal.')
 
@@ -116,6 +117,7 @@ class ChessboardPlane(Node):
                  plane='xz',
                  height=0.0,
                  tiling=True,
+                 icon="\u008b",
                  **kwargs):
         """
         Initializer.
@@ -128,7 +130,7 @@ class ChessboardPlane(Node):
         :param kwargs: Remaining kwargs.
         """
         assert plane in ['xz', 'xy', 'yz']
-        super(ChessboardPlane, self).__init__(**kwargs)
+        super(ChessboardPlane, self).__init__(icon=icon, **kwargs)
         self.side_length = side_length
         self.n_tiles = n_tiles
         self.c1 = np.array(color1)

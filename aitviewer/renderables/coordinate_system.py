@@ -27,7 +27,7 @@ class CoordinateSystem(Node):
 
     def __init__(self,
                  length=1.0,
-                 icon="\u0086",
+                 icon="\u008a",
                  **kwargs):
         super(CoordinateSystem, self).__init__(icon=icon, **kwargs)
 

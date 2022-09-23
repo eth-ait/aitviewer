@@ -31,6 +31,7 @@ class Skeletons(Node):
                  joint_connections,
                  radius=0.01,
                  color=(1.0, 177 / 255, 1 / 255, 1.0),
+                 icon="\u0089",
                  **kwargs):
         """
         Initializer.
@@ -44,7 +45,7 @@ class Skeletons(Node):
         if not isinstance(joint_connections, np.ndarray):
             joint_connections = np.array(joint_connections)
 
-        super(Skeletons, self).__init__(n_frames=joint_positions.shape[0], color=color, **kwargs)
+        super(Skeletons, self).__init__(n_frames=joint_positions.shape[0], color=color, icon=icon, **kwargs)
 
         self._joint_positions = joint_positions
         self.joint_connections = joint_connections

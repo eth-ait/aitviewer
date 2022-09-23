@@ -35,6 +35,7 @@ class Billboard(Node):
                  vertices,
                  texture_paths,
                  img_process_fn=None,
+                 icon="\u0096",
                  **kwargs):
         """ Initializer.
         :param vertices:
@@ -42,7 +43,7 @@ class Billboard(Node):
             or an array of shape (N, 4, 3) containing 4 vertices for each frame of the sequence
         :param texture_paths: A list of length N containing paths to the textures as image files.
         """
-        super(Billboard, self).__init__(n_frames=len(texture_paths), **kwargs)
+        super(Billboard, self).__init__(n_frames=len(texture_paths), icon=icon, **kwargs)
 
         if len(vertices.shape) == 2:
             vertices = vertices[np.newaxis]
