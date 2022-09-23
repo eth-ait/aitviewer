@@ -179,10 +179,20 @@ class SMPLSequence(Node):
         self._view_mode_joint_angles = self._show_joint_angles
 
     @classmethod
-    def from_amass(cls, npz_data_path, start_frame=None, end_frame=None, log=True, fps_out=None, z_up=True, **kwargs):
+    def from_amass(cls,
+                   npz_data_path,
+                   smpl_layer=None,
+                   start_frame=None,
+                   end_frame=None,
+                   log=True,
+                   fps_out=None,
+                   z_up=True,
+                   **kwargs):
         """Load a sequence downloaded from the AMASS website."""
+
         body_data = np.load(npz_data_path)
-        smpl_layer = SMPLLayer(model_type='smplh', gender=body_data['gender'].item(), device=C.device)
+        if smpl_layer is None:
+            smpl_layer = SMPLLayer(model_type='smplh', gender=body_data['gender'].item(), device=C.device)
 
         if log:
             print('Data keys available: {}'.format(list(body_data.keys())))
@@ -556,14 +566,14 @@ class SMPLSequence(Node):
                 self.redraw(current_frame_only=True)
             imgui.same_line()
             if imgui.button("Apply to all"):
-                edit_rots = Rotation.from_rotvec(np.reshape(self._edit_pose, (-1, 3)))
-                base_rots = Rotation.from_rotvec(np.reshape(self.poses[self.current_frame_id], (-1, 3)))
+                edit_rots = Rotation.from_rotvec(np.reshape(self._edit_pose.cpu().numpy(), (-1, 3)))
+                base_rots = Rotation.from_rotvec(np.reshape(self.poses[self.current_frame_id].cpu().numpy(), (-1, 3)))
                 relative = edit_rots * base_rots.inv()
                 for i in range(self.n_frames):
-                    root = Rotation.from_rotvec(np.reshape(self.poses_root[i], (-1, 3)))
+                    root = Rotation.from_rotvec(np.reshape(self.poses_root[i].cpu().numpy(), (-1, 3)))
                     self.poses_root[i] = torch.from_numpy((relative[0] * root).as_rotvec().flatten())
 
-                    body = Rotation.from_rotvec(np.reshape(self.poses_body[i], (-1, 3)))
+                    body = Rotation.from_rotvec(np.reshape(self.poses_body[i].cpu().numpy(), (-1, 3)))
                     self.poses_body[i] = torch.from_numpy((relative[1:] * body).as_rotvec().flatten())
                 self._edit_pose_dirty = False
                 self.redraw()
