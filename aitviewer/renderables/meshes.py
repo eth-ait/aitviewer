@@ -113,7 +113,7 @@ class Meshes(Node):
         self.norm_coloring = False
         self.normals_r = None
         self.need_upload = True
-        self._use_uniform_color = self.vertex_colors is None
+        self._use_uniform_color = self._vertex_colors is None
 
     @property
     def vertices(self):
