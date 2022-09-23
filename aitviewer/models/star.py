@@ -15,12 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from abc import ABC
 import collections
-import numpy as np
 import os
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from star.pytorch.star import STAR
@@ -32,13 +29,14 @@ from aitviewer.utils.so3 import rot2aa_torch as rot2aa
 
 
 class STARLayer(STAR):
-    """Wraps the publically availably STAR model to match SMPLX model interface"""
+    """Wraps the publicly available STAR model to match SMPLX model interface"""
 
     def __init__(self, gender='male', num_betas=300, device=C.device, dtype=C.f_precision):
         """
         Initializer.
         :param gender: Which gender to load.
-        :param num_betas: Number of shape components.
+        :param num_betas: Number of shape components. Keep in mind STAR and SMPL shape components are not the same
+        (i.e. the first 10 components of STAR cannot simply be assigned from the first 10 components of SMPL)
         :param device: CPU or GPU.
         :param dtype: The pytorch floating point data type.
         """
@@ -51,8 +49,8 @@ class STARLayer(STAR):
 
         super(STARLayer, self).__init__(gender=gender, num_betas=num_betas)
 
+        self.device = device
         self.model_type = 'star'
-
         self._parents = None
         self._children = None
 
@@ -80,7 +78,7 @@ class STARLayer(STAR):
         joint skeleton[1, i]."""
         kintree_table = self.kintree_table
         kintree_table[:, 0] = -1
-        return kintree_table
+        return {'all': kintree_table, 'body': kintree_table[:, :self.n_joints_body + 1]}
 
     @property
     def n_joints_body(self):
@@ -101,24 +99,22 @@ class STARLayer(STAR):
         :return: Deformed surface vertices, transformed joints
         '''
 
-        poses, betas, trans, batch_size, device = self.preprocess(poses_body, betas, poses_root, trans, normalize_root)
+        poses, betas, trans = self.preprocess(poses_body, betas, poses_root, trans, normalize_root)
 
         v = super().forward(pose=poses, betas=betas, trans=trans)
-        v_posed = v.v_posed
         J = v.J_transformed
         return v, J
 
 
     def preprocess(self, poses_body, betas=None, poses_root=None, trans=None, normalize_root=False):
         batch_size = poses_body.shape[0]
-        device = poses_body.device
 
         if poses_root is None:
-            poses_root = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
+            poses_root = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=self.device)
         if trans is None:
             # If we don't supply the root translation explicitly, it falls back to using self.bm.trans
             # which might not be zero since it is a trainable param that can get updated.
-            trans = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
+            trans = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=self.device)
 
         if normalize_root:
             # Make everything relative to the first root orientation.
@@ -132,7 +128,7 @@ class STARLayer(STAR):
         poses = torch.cat((poses_root, poses_body), dim=1)
 
         if betas is None:
-            betas = torch.zeros([batch_size, self.num_betas]).to(dtype=poses_body.dtype, device=device)
+            betas = torch.zeros([batch_size, self.num_betas]).to(dtype=poses_body.dtype, device=self.device)
 
         # Batch shapes if they don't match batch dimension.
         if betas.shape[0] != batch_size:
@@ -145,4 +141,4 @@ class STARLayer(STAR):
         # Upper bound betas
         betas = betas[:, :self.num_betas]
 
-        return poses, betas, trans, batch_size, device
+        return poses, betas, trans

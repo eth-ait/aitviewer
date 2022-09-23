@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from aitviewer.models.star import STARLayer
 
+
 class STARSequence(SMPLSequence):
     """
     Represents a temporal sequence of SMPL poses using the STAR model.
@@ -20,58 +21,93 @@ class STARSequence(SMPLSequence):
                  include_root=True,
                  normalize_root=False,
                  is_rigged=True,
-                 in_canonical=False,
                  show_joint_angles=False,
                  z_up=False,
                  post_fk_func=None,
                  **kwargs):
 
-
         super(STARSequence, self).__init__(poses_body, smpl_layer, poses_root, betas, trans, device=device,
                                            include_root=include_root, normalize_root=normalize_root,
                                            is_rigged=is_rigged, show_joint_angles=show_joint_angles, z_up=z_up,
-                                           post_fk_func=post_fk_func,
-                                            **kwargs)
-
+                                           post_fk_func=post_fk_func, **kwargs)
 
     def fk(self, current_frame_only=False):
-        """Get joints and/or vertices from the poses_body."""
-        poses_root = self.poses_root if self._include_root else None
-        trans = self.trans if self._include_root else None
+        """Get joints and/or vertices from the poses."""
+        if current_frame_only:
+            # Use current frame data.
+            if self._edit_mode:
+                poses_root = self._edit_pose[:3][None, :]
+                poses_body = self._edit_pose[3:][None, :]
+            else:
+                poses_body = self.poses_body[self.current_frame_id][None, :]
+                poses_root = self.poses_root[self.current_frame_id][None, :]
+
+            trans = self.trans[self.current_frame_id][None, :]
+
+            if self.betas.shape[0] == self.n_frames:
+                betas = self.betas[self.current_frame_id][None, :]
+            else:
+                betas = self.betas
+        else:
+            # Use the whole sequence.
+            if self._edit_mode:
+                poses_root = self.poses_root.clone()
+                poses_body = self.poses_body.clone()
+                poses_root[self.current_frame_id] = self._edit_pose[:3]
+                poses_body[self.current_frame_id] = self._edit_pose[3:]
+            else:
+                poses_body = self.poses_body
+                poses_root = self.poses_root
+            trans = self.trans
+            betas = self.betas
+
         verts, joints = self.smpl_layer(poses_root=poses_root,
-                                        poses_body=self.poses_body,
-                                        betas=self.betas,
+                                        poses_body=poses_body,
+                                        betas=betas,
                                         trans=trans,
                                         normalize_root=self._normalize_root
                                         )
-        if self._z_up:
-            to_y_up = torch.Tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]]).to(device=self.betas.device, dtype=self.betas.dtype)
-            verts = torch.matmul(to_y_up.unsqueeze(0), verts.unsqueeze(-1)).squeeze(-1)
-            joints = torch.matmul(to_y_up.unsqueeze(0), joints.unsqueeze(-1)).squeeze(-1)
 
-        skeleton = self.smpl_layer.skeletons().T
+        skeleton = self.smpl_layer.skeletons()['body'].T
         faces = self.smpl_layer.faces
+        joints = joints[:, :skeleton.shape[0]]
 
         if current_frame_only:
             return c2c(verts)[0], c2c(joints)[0], c2c(faces), c2c(skeleton)
         else:
             return c2c(verts), c2c(joints), c2c(faces), c2c(skeleton)
 
-
     @classmethod
-    def from_amass(cls, npz_data_path, start_frame=None, end_frame=None, sub_frames=None, log=True, fps_out=None, load_betas=True, z_up=True, rest_in_a=False, **kwargs):
-        seq = SMPLSequence.from_amass(npz_data_path, start_frame, end_frame, log, fps_out, **kwargs)
+    def from_amass(cls,
+                   npz_data_path,
+                   start_frame=None,
+                   end_frame=None,
+                   sub_frames=None,
+                   log=True,
+                   fps_out=None,
+                   load_betas=False,
+                   z_up=True,
+                   **kwargs):
+        """Load a sequence downloaded from the AMASS website."""
+
+        # User SMPL sequence loader and re-parse data
+        seq = super().from_amass(npz_data_path, start_frame=start_frame, end_frame=end_frame, log=log, fps_out=fps_out, **kwargs)
 
         # STAR has no hands, but includes wrists
         poses_body = torch.cat((seq.poses_body, seq.poses_left_hand[:, :3], seq.poses_right_hand[:, :3]), dim=-1)
         poses_root = seq.poses_root
         trans = seq.trans
-        betas = seq.betas if load_betas else None
+        betas = None
+
+        if load_betas:
+            print("WARNING: Loading betas from AMASS into STAR requires an optimization procedure. " +
+                  "See https://github.com/ahmedosman/STAR/tree/master/convertors")
+            betas = seq.betas
 
         if sub_frames is not None:
             poses_root = poses_root[sub_frames]
             poses_body = poses_body[sub_frames]
-            trans = trans [sub_frames]
+            trans = trans[sub_frames]
 
         return cls(poses_body=poses_body,
                    smpl_layer=STARLayer(device=C.device),
@@ -98,5 +134,3 @@ class STARSequence(SMPLSequence):
         poses_body = np.zeros([frames, model.n_joints_body * 3])
         poses_root = np.zeros([frames, 3])
         return cls(poses_body=poses_body, smpl_layer=model, poses_root=poses_root, betas=betas, **kwargs)
-
-
