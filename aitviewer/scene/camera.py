@@ -112,7 +112,12 @@ class Camera(Node, CameraInterface):
             [ 1, -1, 1],
             [ 1,  1, 1],
 
-            # Triangle
+            # Triangle front
+            [ 0.5,  1.1, 1],
+            [-0.5,  1.1, 1],
+            [   0,    2, 1],
+
+            # Triangle back
             [ 0.5,  1.1, 1],
             [-0.5,  1.1, 1],
             [   0,    2, 1],
@@ -140,7 +145,7 @@ class Camera(Node, CameraInterface):
             [ 1, 3, 2],
             [ 4, 2, 3],
             [ 5, 6, 7],
-            [ 5, 7, 6],
+            [ 8, 10, 9],
         ])
 
         self._active = False
@@ -177,7 +182,7 @@ class Camera(Node, CameraInterface):
         super(Camera, self.__class__).enabled.fset(self, enabled)
 
         # Also set the enabled property of the path if it exists.
-        # We must do this here because the path is not a child of the camera node, 
+        # We must do this here because the path is not a child of the camera node,
         # since it's position/rotation should not be updated together with the camera.
         if self.path:
             self.path[0].enabled = enabled
