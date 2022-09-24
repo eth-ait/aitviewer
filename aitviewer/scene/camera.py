@@ -555,7 +555,16 @@ class OpenCVCamera(Camera):
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
 
-    def to_pinhole_camera(self, target_distance=5, **kwargs):
+    def to_pinhole_camera(self, target_distance=5, **kwargs) -> 'PinholeCamera':
+        """
+        Returns a PinholeCamera object with positions and targets computed from this camera.
+        :param target_distance: distance from the camera at which the target of the PinholeCamera is placed.
+
+        Remarks:
+         The Pinhole camera does not currently support skew, offset from the center and non vertical up vectors.
+         Also the fov from the first intrinsic matrix is used for all frames because the PiholeCamera does not
+         support sequences of fov values.
+        """
         # Save current frame id.
         current_frame_id = self.current_frame_id
 
@@ -666,7 +675,10 @@ class PinholeCamera(Camera):
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
 
-    def to_opencv_camera(self, **kwargs):
+    def to_opencv_camera(self, **kwargs) -> OpenCVCamera:
+        """
+        Returns a OpenCVCamera object with extrinsics and intrinsics computed from this camera.
+        """
         # Save current frame id.
         current_frame_id = self.current_frame_id
 
