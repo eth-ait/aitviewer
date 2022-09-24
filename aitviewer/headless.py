@@ -16,6 +16,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from aitviewer.viewer import Viewer
 
+from PIL.Image import Image
+import os
 
 class HeadlessRenderer(Viewer):
     gl_version = (4, 0)
@@ -59,3 +61,59 @@ class HeadlessRenderer(Viewer):
         """
         self._init_scene()
         self.export_frame(file_path, scale_factor)
+
+    def save_depth(self, file_path):
+        """
+        Render and save the depth buffer, see 'get_depth()' for more information
+        about the depth format.
+        :param file_path: the path where the image is saved. The file is used by PIL to choose
+        the file format, make sure that you use a format that supports 'F' mode PIL Images (e.g. tiff).
+        """
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        self.get_depth().save(file_path)
+
+    def save_mask(self, file_path):
+        """
+        Render and save a color mask as a 'RGB' PIL image.
+        :param file_path: the path where the image is saved.
+        """
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        self.get_mask().save(file_path)
+
+    def _render_frame(self):
+        self._init_scene()
+
+        # Store run_animation old value and set it to false.
+        run_animations = self.run_animations
+        self.run_animations = False
+
+        # Render frame.
+        self.render(0, 0, export=True)
+
+        # Restore run animation and update last frame rendered time.
+        self.run_animations = run_animations
+
+    def get_frame(self) -> Image:
+        """Render and return a single frame as a 'RGB' PIL image"""
+        self._render_frame()
+        return self.get_current_frame_as_image()
+
+    def get_depth(self) -> Image:
+        """
+        Render and return the depth buffer as a 'F' PIL image.
+        Depth is stored as the z coordinate in eye (view) space.
+        Therefore values in the depth image represent the distance from the pixel to
+        the plane passing through the camera and orthogonal to the view direction.
+        Values are between the near and far plane distances of the camera used for rendering,
+        everything outside this range is clipped by OpenGL.
+        """
+        self._render_frame()
+        return self.get_current_depth_image()
+
+    def get_mask(self) -> Image:
+        """
+        Render and return a color mask as a 'RGB' PIL image. Each object in the mask
+        has a uniform color computed as an hash of the Node uid.
+        """
+        self._render_frame()
+        return self.get_current_mask_image()

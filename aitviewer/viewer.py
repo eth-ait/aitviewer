@@ -306,8 +306,8 @@ class Viewer(moderngl_window.WindowConfig):
 
         if not export:
             self.streamable_capture()
-            self.render_fragmap()
 
+        self.render_fragmap()
         self.render_shadowmap()
         self.render_prepare()
         self.render_scene()
@@ -991,8 +991,67 @@ class Viewer(moderngl_window.WindowConfig):
                                 (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
                                  self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
                                 self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1))
-        image = image.transpose(Image.FLIP_TOP_BOTTOM)
-        return image
+        return image.transpose(Image.FLIP_TOP_BOTTOM)
+
+    def get_current_depth_image(self):
+        """
+        Return the depth buffer as a 'F' PIL image.
+        Depth is stored as the z coordinate in eye (view) space.
+        Therefore values in the depth image represent the distance from the pixel to
+        the plane passing through the camera and orthogonal to the view direction.
+        Values are between the near and far plane distances of the camera used for rendering,
+        everything outside this range is clipped by OpenGL.
+        """
+        # Get depth image from depth buffer.
+        depth = Image.frombytes('F',
+                                (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
+                                 self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
+                                self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype='f4'))
+
+        # Convert from [0, 1] range to [-1, 1] range.
+        # This is necessary because our projection matrix computes NDC
+        # from [-1, 1], but depth is then stored normalized from 0 to 1.
+        depth = np.array(depth) * 2.0 - 1.0
+
+        # Extract projection matrix parameters used for mapping Z coordinates.
+        P = self.scene.camera.get_projection_matrix()
+        a, b = P[2, 2], P[2, 3]
+
+        # Linearize depth values. This converts from [-1, 1] range to the
+        # view space Z coordinate value, with positive z in front of the camera.
+        z = b / (a + depth)
+        return Image.fromarray(z, mode='F').transpose(Image.FLIP_TOP_BOTTOM)
+
+
+    def get_current_mask_image(self):
+        """
+        Render and return a color mask as a 'RGB' PIL image. Each object in the mask
+        has a uniform color computed as an hash of the Node uid.
+        """
+        # Get object ids as floating point numbers from the first channel of
+        # the first attachment of the picking framebuffer.
+        id = Image.frombytes('F',
+                             (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
+                              self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
+                             self.offscreen_p.read(viewport=self.wnd.fbo.viewport, alignment=1, components=1, attachment=1, dtype='f4'))
+
+        # Convert the id to integer values.
+        id_int = np.asarray(id).astype(dtype=np.int32)
+
+        print(np.max(id_int))
+        # Hash the ids.
+        def hash(h):
+            h ^= h >> 16
+            h *= 0x85ebca6b
+            h ^= h >> 13
+            h *= 0xc2b2ae35
+            h ^= h >> 16
+            return h
+        hashed = hash(id_int.copy())
+
+        # Convert the hashed ids to an RGBA image and then throw away the alpha channel.
+        img = Image.frombytes('RGBA', id.size, hashed.tobytes()).convert('RGB')
+        return img.transpose(Image.FLIP_TOP_BOTTOM)
 
     def on_close(self):
         """
@@ -1006,7 +1065,7 @@ class Viewer(moderngl_window.WindowConfig):
         """Save the current frame to an image in the screenshots directory inside the export directory"""
         file_path = os.path.join(C.export_dir, 'screenshots', 'frame_{:0>6}.png'.format(self.scene.current_frame_id))
         self.export_frame(file_path)
-        print(f"Saved screenshot to {file_path}")
+        print(f"Screenshot saved to {file_path}")
 
     def export_frame(self, file_path, scale_factor:float=None):
         """Save the current frame to an image.
