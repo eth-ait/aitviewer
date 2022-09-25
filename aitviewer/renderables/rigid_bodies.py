@@ -51,7 +51,7 @@ class RigidBodies(Node):
         self.length = length
 
         self.spheres = Spheres(rb_pos, radius=radius, color=color, position=self.position, is_selectable=False)
-        self._add_node(self.spheres, has_gui=False, show_in_hierarchy=False)
+        self._add_node(self.spheres, show_in_hierarchy=False)
 
         self.coords = []
         r_base = radius_cylinder or length / 50
@@ -66,7 +66,7 @@ class RigidBodies(Node):
                          is_selectable=False)
             axs.position = self.position
             axs.rotation = self.rotation
-            self._add_node(axs, has_gui=False, show_in_hierarchy=False)
+            self._add_node(axs, show_in_hierarchy=False)
             self.coords.append(axs)
 
     @Node.color.setter

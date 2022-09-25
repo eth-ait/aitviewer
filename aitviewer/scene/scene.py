@@ -48,14 +48,14 @@ class Scene(Node):
         # If you update the number of lights, make sure to change the respective `define` statement in
         # directional_lights.glsl as well!
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
-        self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
-        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0),
-                                 shadow_enabled=False))
+        self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0), gui_elements=['affine', 'material']))
+        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0), gui_elements=['affine', 'material'], shadow_enabled=False))
+
         self.add(*self.lights)
 
         # Scene items
-        self.origin = CoordinateSystem(name="Origin", length=0.1)
-        self.add(self.origin, has_gui=False)
+        self.origin = CoordinateSystem(name="Origin", length=0.1, gui_elements=[])
+        self.add(self.origin)
 
         self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0),  (0.82, 0.82, 0.82, 1.0), name="Floor")
         self.floor.material.diffuse = 0.1
@@ -230,19 +230,52 @@ class Scene(Node):
         if self._gui_selected_object:
             s = self._gui_selected_object
 
-            # Draw object icon and name
-            imgui.indent(15)
+            # Custom GUI Elements
+            imgui.indent(22)
             imgui.push_font(self.custom_font)
-            imgui.text(f"{self.properties_icon} {s.icon} {s.name}")
+            imgui.text(f"{s.icon} {s.name}")
             imgui.pop_font()
-            imgui.unindent()
-            imgui.spacing()
-            imgui.spacing()
 
-            # Draw gui
-            imgui.indent(42)
+            # Modes
+            num_modes = hasattr(s, 'gui_modes') and len(s.gui_modes) > 1
+            if num_modes > 1:
+                imgui.push_font(self.custom_font)
+                imgui.spacing()
+                for i, (gm_key, gm_val) in enumerate(s.gui_modes.items()):
+                    if s.selected_mode == gm_key:
+                        imgui.push_style_color(imgui.COLOR_BUTTON, 0.26, 0.59, 0.98, 1.0)
+                    mode_clicked = imgui.button(f" {gm_val['icon']}{gm_val['title']} ")
+                    if s.selected_mode == gm_key:
+                        imgui.pop_style_color()
+                    if mode_clicked:
+                        s.selected_mode = gm_key
+                    if i != num_modes-1:
+                        imgui.same_line()
+                imgui.pop_font()
+
+                # Mode specific GUI
+                imgui.spacing()
+                s.gui_modes[s.selected_mode]['fn'](imgui)
+
+            # Custom GUI (i.e. Camera specific params)
             s.gui(imgui)
             imgui.unindent()
+
+            # General GUI elements
+            if hasattr(s, 'gui_elements'):
+                imgui.spacing(); imgui.spacing(); imgui.spacing()
+
+                for ge in s.gui_elements:
+                    imgui.begin_group()
+                    imgui.push_font(self.custom_font)
+                    imgui.text(f"{s.gui_controls[ge]['icon']}")
+                    imgui.pop_font()
+                    imgui.end_group()
+                    imgui.same_line(spacing=8)
+                    imgui.begin_group()
+                    s.gui_controls[ge]['fn'](imgui)
+                    imgui.end_group()
+                    imgui.spacing(); imgui.spacing(); imgui.spacing()
 
 
     def gui(self, imgui):
@@ -260,9 +293,10 @@ class Scene(Node):
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-        self.gui_renderables(imgui, [self])
+        self.gui_hierarchy(imgui, [self])
         imgui.spacing()
         imgui.separator()
+        imgui.spacing()
         imgui.spacing()
         self.gui_selected(imgui)
 
@@ -306,7 +340,7 @@ class Scene(Node):
             if light_expanded:
                 imgui.tree_pop()
 
-    def gui_renderables(self, imgui, rs):
+    def gui_hierarchy(self, imgui, rs):
         # Nodes GUI
         for r in rs:
             # Skip nodes that shouldn't appear in the hierarchy.
@@ -327,7 +361,7 @@ class Scene(Node):
                 flags |= imgui.TREE_NODE_DEFAULT_OPEN
             if self.is_selected(r):
                 flags |= imgui.TREE_NODE_SELECTED
-            if not any(c.show_in_hierarchy for c in r.nodes) or not r.has_gui:
+            if not any(c.show_in_hierarchy for c in r.nodes):
                 flags |= imgui.TREE_NODE_LEAF
             r.expanded = imgui.tree_node("{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name), flags)
             if imgui.is_item_clicked():
@@ -345,9 +379,8 @@ class Scene(Node):
                     r.enabled = enabled
 
             if r.expanded:
-                if r.has_gui:
-                    # Recursively render children nodes
-                    self.gui_renderables(imgui, r.nodes)
+                # Recursively render children nodes
+                self.gui_hierarchy(imgui, r.nodes)
                 imgui.tree_pop()
 
             if not curr_enabled:

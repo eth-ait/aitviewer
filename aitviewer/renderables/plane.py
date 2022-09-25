@@ -202,10 +202,6 @@ class ChessboardPlane(Node):
         return self.get_bounds(self.vertices)
 
     def gui(self, imgui):
-        self.gui_position(imgui)
-        self.gui_rotation(imgui)
-        self.gui_scale(imgui)
-
         _, self.c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
         _, self.c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True)
         _, self.tiling = imgui.checkbox('Toggle Tiling', self.tiling)
@@ -250,7 +246,7 @@ class Chessboard(Node):
         self.mesh = Meshes(vs, fs, face_colors=fc)
         self.mesh.position = self.position
         self.mesh.backface_culling = False
-        self.add(self.mesh, has_gui=False, show_in_hierarchy=False)
+        self.add(self.mesh, show_in_hierarchy=False)
 
     # noinspection PyAttributeOutsideInit
     def _construct_board(self):
@@ -319,10 +315,6 @@ class Chessboard(Node):
         self.mesh.face_colors = self.fcs_tiled
 
     def gui(self, imgui):
-        self.gui_position(imgui)
-        self.gui_rotation(imgui)
-        self.gui_scale(imgui)
-
         u, c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
         if u:
             self.c1 = c1

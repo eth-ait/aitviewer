@@ -112,10 +112,7 @@ class Light(Node):
             self._debug_lines.redraw(**kwargs)
 
     def gui(self, imgui):
-        self.gui_position(imgui)
-        self.gui_material(imgui, show_advanced=False)
-
-        # Light controls
+        # Custom Light controls
         _, self.intensity_ambient = imgui.drag_float('Ambient##ambient', self.intensity_ambient, 0.01, min_value=0.0, max_value=1.0,
                                            format='%.2f')
         _, self.intensity_diffuse = imgui.drag_float('Diffuse##diffuse', self.intensity_diffuse, 0.01, min_value=0.0, max_value=1.0,

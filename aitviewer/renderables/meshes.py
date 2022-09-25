@@ -466,11 +466,6 @@ class Meshes(Node):
         _, self.draw_outline = imgui.checkbox('Draw outline##draw_outline{}'.format(self.unique_name),
                                                self.draw_outline)
 
-        # TODO: Add  export workflow for all nodes
-        if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
-            mesh = trimesh.Trimesh(vertices=self.current_vertices, faces=self.faces, process=False)
-            mesh.export('../export/' + self.name + '.obj')
-
         if self.normals_r is None:
             if imgui.button('Show Normals ##show_normals{}'.format(self.unique_name)):
                 self._show_normals()
@@ -480,6 +475,10 @@ class Meshes(Node):
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
+    def gui_io(self, imgui):
+        if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
+            mesh = trimesh.Trimesh(vertices=self.current_vertices, faces=self.faces, process=False)
+            mesh.export('../export/' + self.name + '.obj')
 
 class VariableTopologyMeshes(Node):
     """

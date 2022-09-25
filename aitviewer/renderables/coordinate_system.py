@@ -34,5 +34,5 @@ class CoordinateSystem(Node):
         r = length / 50
         l = length
 
-        self.rb = RigidBodies(np.array([[[0.0, 0.0, 0.0]]]), np.eye(3)[np.newaxis, np.newaxis], radius=r, length=l)
+        self.rb = RigidBodies(np.array([[[0.0, 0.0, 0.0]]]), np.eye(3)[np.newaxis, np.newaxis], radius=r, length=l, gui_elements=['affine', 'material', 'animation'])
         self.add(self.rb)

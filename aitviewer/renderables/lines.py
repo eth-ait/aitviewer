@@ -246,7 +246,7 @@ class Lines(Node):
         self.mesh = Meshes(vs, fs, ns, color=color, material=material, cast_shadow=cast_shadow, is_selectable=False)
         self.mesh.position = self.position
         self.mesh.rotation = self.rotation
-        self.add(self.mesh, has_gui=True, show_in_hierarchy=False)
+        self.add(self.mesh, show_in_hierarchy=False)
 
     @property
     def lines(self):

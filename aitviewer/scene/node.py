@@ -36,6 +36,7 @@ class Node(object):
                  material=None,
                  render_priority=1,
                  is_selectable=True,
+                 gui_elements=None,
                  n_frames=1):
         """
         :param name: Name of the node
@@ -78,13 +79,31 @@ class Node(object):
         self.icon = icon if icon is not None else '\u0082'
         self._enabled = True
         self._expanded = False
-        self._has_gui = True
-        self._gui_elements = []
+        self.gui_elements = ['affine', 'material', 'animation', 'io'] if gui_elements is None else gui_elements
+        self.gui_controls = {
+            'affine': {'fn': self.gui_affine, 'icon': '\u009b'},
+            'material': {'fn': self.gui_material, 'icon': '\u0088'},
+            'animation': {'fn': self.gui_animation, 'icon': '\u0098'},
+            'io': {'fn': self.gui_io, 'icon': '\u009a'}
+        }
+        self.gui_modes = {
+            'view': {'title': ' View', 'fn': self.gui_mode_view, 'icon': '\u0099'}
+        }
+        self._selected_mode = 'view'
         self._show_in_hierarchy = True
         self.is_selectable = is_selectable
 
         self.nodes = []
         self.parent = None
+
+    # Selected Mode
+    @property
+    def selected_mode(self):
+        return self._selected_mode
+
+    @selected_mode.setter
+    def selected_mode(self, selected_mode):
+        self._selected_mode = selected_mode
 
     # Transform
     @property
@@ -216,22 +235,17 @@ class Node(object):
 
     def _add_node(self,
                   n,
-                  has_gui=True,
-                  gui_elements=None,
                   show_in_hierarchy=True,
                   expanded=False,
                   enabled=True):
         """
         Add a single node
-        :param has_gui: Whether the node has a GUI.
         :param gui_elements: Which elements of the GUI are displayed by default.
         :param show_in_hierarchy: Whether to show the node in the scene hierarchy.
         :param expanded: Whether the node is initially expanded in the GUI.
         """
         if n is None:
             return
-        n._has_gui = has_gui
-        n._gui_elements = gui_elements if gui_elements is not None else ['animation', 'position', 'rotation', 'scale', 'material']
         n._show_in_hierarchy = show_in_hierarchy
         n._expanded = expanded
         n._enabled = enabled
@@ -247,10 +261,6 @@ class Node(object):
         for n in nodes:
             n.release()
             self.nodes.remove(n)
-
-    @property
-    def has_gui(self):
-        return self._has_gui
 
     @property
     def show_in_hierarchy(self):
@@ -279,75 +289,74 @@ class Node(object):
         """
         return False
 
+    def gui(self, imgui):
+        """
+        Render GUI for custom node properties and controls. Implementation optional.
+        Elements rendered here will show up in the scene hierarchy
+        :param imgui: imgui context.
+        See https://pyimgui.readthedocs.io/en/latest/reference/imgui.core.html for available elements to render
+        """
+        pass
+
+    def gui_modes(self, imgui):
+        """ Render GUI with toolbar (tools) for this particular node"""
+
     def gui_animation(self, imgui):
-        # Animation Control
-        if self.n_frames > 1 and 'animation' in self._gui_elements:
+        """ Render GUI for animation related settings"""
+
+        if self.n_frames > 1:
             u, fid = imgui.drag_int('Frame##r_{}'.format(self.unique_name),
                                     self.current_frame_id, min_value=0, max_value=self.n_frames - 1)
             if u:
                 self.current_frame_id = fid
+        else:
+            imgui.text("No animation")
 
-    def gui_position(self, imgui):
+    def gui_affine(self, imgui):
+        """ Render GUI for affine transformations"""
+
         # Position controls
         u, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
         if u:
             self.position = pos
 
-    def gui_rotation(self, imgui):
         # Rotation controls
         euler_angles = rot2euler_numpy(self.rotation[np.newaxis], degrees=True)[0]
         u, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1, format='%.2f')
         if u:
             self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
 
-    def gui_scale(self, imgui):
         # Scale controls
         u, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
                                     max_value=10.0, format='%.3f')
         if u:
             self.scale = scale
 
-    def gui_material(self, imgui, show_advanced=True):
+    def gui_material(self, imgui):
+        """ Render GUI with material properties """
+
         # Color Control
         uc, color = imgui.color_edit4("Color##color{}'".format(self.unique_name), *self.material.color, show_alpha=True)
         if uc:
             self.color = color
 
-        if show_advanced:
-            if imgui.tree_node("Advanced material##advanced_material{}'".format(self.unique_name)):
-                # Diffuse
-                ud, diffuse = imgui.slider_float('Diffuse##diffuse{}'.format(self.unique_name), self.material.diffuse,  0.0, 1.0, '%.2f')
-                if ud:
-                    self.material.diffuse = diffuse
+        # Diffuse
+        ud, diffuse = imgui.slider_float('Diffuse##diffuse{}'.format(self.unique_name), self.material.diffuse,  0.0, 1.0, '%.2f')
+        if ud:
+            self.material.diffuse = diffuse
 
-                # Ambient
-                ua, ambient = imgui.slider_float('Ambient##ambient{}'.format(self.unique_name), self.material.ambient,  0.0, 1.0, '%.2f')
-                if ua:
-                    self.material.ambient = ambient
+        # Ambient
+        ua, ambient = imgui.slider_float('Ambient##ambient{}'.format(self.unique_name), self.material.ambient,  0.0, 1.0, '%.2f')
+        if ua:
+            self.material.ambient = ambient
 
-                imgui.tree_pop()
+    def gui_io(self, imgui):
+        """ Render GUI for import/export """
 
-    def gui(self, imgui):
-        """
-        Render the GUI that gets displayed in the scene window. Implementation optional.
-        Elements rendered here will show up in the scene hierarchy
-        :param imgui: imgui context.
-        See https://pyimgui.readthedocs.io/en/latest/reference/imgui.core.html for available elements to render
-        """
-        if 'animation' in self._gui_elements:
-            self.gui_animation(imgui)
+    def gui_mode_view(self, imgui):
+        """ Render custom GUI for view mode """
+        pass
 
-        if 'position' in self._gui_elements:
-            self.gui_position(imgui)
-
-        if 'rotation' in self._gui_elements:
-            self.gui_rotation(imgui)
-
-        if 'scale' in self._gui_elements:
-            self.gui_scale(imgui)
-
-        if 'material' in self._gui_elements:
-            self.gui_material(imgui)
 
     # Renderable
     @staticmethod

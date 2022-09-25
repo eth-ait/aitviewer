@@ -138,7 +138,8 @@ class SMPLSequence(Node):
             self.trans = trans - trans[0:1]
 
         # Edit mode
-        self._edit_mode = False
+        self.gui_modes.update({'edit': {'title': ' Edit', 'fn': self.gui_mode_edit, 'icon': '\u0081'}})
+
         self._edit_joint = None
         self._edit_pose = None
         self._edit_pose_dirty = False
@@ -152,11 +153,11 @@ class SMPLSequence(Node):
             kwargs = self._render_kwargs.copy()
             kwargs['color'] = (1.0, 177 / 255, 1 / 255, 1.0)
             kwargs['name'] = 'Skeleton'
-            self.skeleton_seq = Skeletons(self.joints, self.skeleton, **kwargs)
+            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_elements=['material'], **kwargs)
             self.skeleton_seq.position = self.position
             self.skeleton_seq.rotation = self.rotation
 
-            self._add_node(self.skeleton_seq, gui_elements=['material'])
+            self._add_node(self.skeleton_seq)
 
         # First convert the relative joint angles to global joint angles in rotation matrix form.
         if self.smpl_layer.model_type != "flame":
@@ -169,18 +170,18 @@ class SMPLSequence(Node):
         if self._z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
-        self.rbs = RigidBodies(self.joints, global_oris, length=0.1, name='Joint Angles')
+        self.rbs = RigidBodies(self.joints, global_oris, length=0.1, gui_elements=['material'], name='Joint Angles')
         self.rbs.position = self.position
         self.rbs.rotation = self.rotation
-        self._add_node(self.rbs, enabled=self._show_joint_angles, gui_elements=['material'])
+        self._add_node(self.rbs, enabled=self._show_joint_angles)
 
         kwargs = self._render_kwargs.copy()
         kwargs['name'] = 'Mesh'
         kwargs['color'] = kwargs.get('color', (160 / 255, 160 / 255, 160 / 255, 1.0))
-        self.mesh_seq = Meshes(self.vertices, self.faces, is_selectable=False, **kwargs)
+        self.mesh_seq = Meshes(self.vertices, self.faces, is_selectable=False, gui_elements=['material'], **kwargs)
         self.mesh_seq.position = self.position
         self.mesh_seq.rotation = self.rotation
-        self._add_node(self.mesh_seq, gui_elements=['material'])
+        self._add_node(self.mesh_seq)
 
         # Save view mode state to restore when exiting edit mode.
         self._view_mode_color = self.mesh_seq.color
@@ -320,6 +321,10 @@ class SMPLSequence(Node):
     @property
     def poses(self):
         return torch.cat((self.poses_root, self.poses_body), dim=-1)
+
+    @property
+    def _edit_mode(self):
+        return self.selected_mode == 'edit'
 
     def fk(self, current_frame_only=False):
         """Get joints and/or vertices from the poses."""
@@ -482,22 +487,15 @@ class SMPLSequence(Node):
     def edit_mode(self):
         return self._edit_mode
 
-    @edit_mode.setter
-    def edit_mode(self, enabled):
-        if enabled == self._edit_mode:
-            return
+    @property
+    def selected_mode(self):
+        return self._selected_mode
 
-        if not enabled:
-            self._edit_mode = False
+    @selected_mode.setter
+    def selected_mode(self, selected_mode):
+        self._selected_mode = selected_mode
 
-            self.mesh_seq.backface_fragmap = False
-            self.mesh_seq.color = self._view_mode_color
-
-            self.rbs.color = (0, 1, 0.5, 1.0)
-            self.rbs.enabled = self._view_mode_joint_angles
-            self.rbs.is_selectable = True
-        else:
-            self._edit_mode = True
+        if self.selected_mode == 'edit':
             self.rbs.enabled = True
             self.rbs.is_selectable = False
             self._edit_pose = self.poses[self.current_frame_id].clone()
@@ -507,6 +505,13 @@ class SMPLSequence(Node):
             self.rbs.color = (1, 0, 0.5, 1.0)
             self._view_mode_color = self.mesh_seq.color
             self.mesh_seq.color = (*self._view_mode_color[:3], min(self._view_mode_color[3], 0.5))
+        else:
+            self.mesh_seq.backface_fragmap = False
+            self.mesh_seq.color = self._view_mode_color
+
+            self.rbs.color = (0, 1, 0.5, 1.0)
+            self.rbs.enabled = self._view_mode_joint_angles
+            self.rbs.is_selectable = True
 
         self.redraw(current_frame_only=True)
 
@@ -539,59 +544,47 @@ class SMPLSequence(Node):
                     self._gui_joint(imgui, c, tree)
                 imgui.tree_pop()
 
-    def gui(self, imgui):
-        super().gui_animation(imgui)
-        super().gui_position(imgui)
-        super().gui_rotation(imgui)
+    def gui_mode_edit(self, imgui):
+        skel = self.smpl_layer.skeletons()['body'].cpu().numpy()
 
-        if imgui.radio_button("View mode", not self.edit_mode):
-            self.edit_mode = False
-        if imgui.radio_button("Edit mode", self.edit_mode):
-            self.edit_mode = True
+        tree = {}
+        for i in range(skel.shape[1]):
+            if skel[0, i] != -1:
+                tree.setdefault(skel[0, i], []).append(skel[1, i])
 
-        imgui.spacing()
+        if not tree:
+            return
 
-        if self.edit_mode:
-            skel = self.smpl_layer.skeletons()['body'].cpu().numpy()
+        if self._edit_joint is None:
+            self._gui_joint(imgui, 0, tree)
+        else:
+            self._gui_joint(imgui, self._edit_joint)
 
-            tree = {}
-            for i in range(skel.shape[1]):
-                if skel[0, i] != -1:
-                    tree.setdefault(skel[0, i], []).append(skel[1, i])
+        if imgui.button("Apply"):
+            self.poses_root[self.current_frame_id] = self._edit_pose[:3]
+            self.poses_body[self.current_frame_id] = self._edit_pose[3:]
+            self._edit_pose_dirty = False
+            self.redraw(current_frame_only=True)
+        imgui.same_line()
+        if imgui.button("Apply to all"):
+            edit_rots = Rotation.from_rotvec(np.reshape(self._edit_pose.cpu().numpy(), (-1, 3)))
+            base_rots = Rotation.from_rotvec(np.reshape(self.poses[self.current_frame_id].cpu().numpy(), (-1, 3)))
+            relative = edit_rots * base_rots.inv()
+            for i in range(self.n_frames):
+                root = Rotation.from_rotvec(np.reshape(self.poses_root[i].cpu().numpy(), (-1, 3)))
+                self.poses_root[i] = torch.from_numpy((relative[0] * root).as_rotvec().flatten())
 
-            if not tree:
-                return
+                body = Rotation.from_rotvec(np.reshape(self.poses_body[i].cpu().numpy(), (-1, 3)))
+                self.poses_body[i] = torch.from_numpy((relative[1:] * body).as_rotvec().flatten())
+            self._edit_pose_dirty = False
+            self.redraw()
+        imgui.same_line()
+        if imgui.button("Reset"):
+            self._edit_pose = self.poses[self.current_frame_id]
+            self._edit_pose_dirty = False
+            self.redraw(current_frame_only=True)
 
-            if self._edit_joint is None:
-                self._gui_joint(imgui, 0, tree)
-            else:
-                self._gui_joint(imgui, self._edit_joint)
-
-            if imgui.button("Apply"):
-                self.poses_root[self.current_frame_id] = self._edit_pose[:3]
-                self.poses_body[self.current_frame_id] = self._edit_pose[3:]
-                self._edit_pose_dirty = False
-                self.redraw(current_frame_only=True)
-            imgui.same_line()
-            if imgui.button("Apply to all"):
-                edit_rots = Rotation.from_rotvec(np.reshape(self._edit_pose.cpu().numpy(), (-1, 3)))
-                base_rots = Rotation.from_rotvec(np.reshape(self.poses[self.current_frame_id].cpu().numpy(), (-1, 3)))
-                relative = edit_rots * base_rots.inv()
-                for i in range(self.n_frames):
-                    root = Rotation.from_rotvec(np.reshape(self.poses_root[i].cpu().numpy(), (-1, 3)))
-                    self.poses_root[i] = torch.from_numpy((relative[0] * root).as_rotvec().flatten())
-
-                    body = Rotation.from_rotvec(np.reshape(self.poses_body[i].cpu().numpy(), (-1, 3)))
-                    self.poses_body[i] = torch.from_numpy((relative[1:] * body).as_rotvec().flatten())
-                self._edit_pose_dirty = False
-                self.redraw()
-            imgui.same_line()
-            if imgui.button("Reset"):
-                self._edit_pose = self.poses[self.current_frame_id]
-                self._edit_pose_dirty = False
-                self.redraw(current_frame_only=True)
-
-        imgui.spacing()
+    def gui_io(self, imgui):
         if imgui.button("Export sequence to NPZ"):
             dir = os.path.join(C.export_dir, "SMPL")
             os.makedirs(dir, exist_ok=True)
@@ -604,10 +597,10 @@ class SMPLSequence(Node):
             self._gui_joint(imgui, self._edit_joint)
         else:
             if imgui.radio_button("View mode", not self.edit_mode):
-                self.edit_mode = False
+                self.selected_mode = 'view'
                 imgui.close_current_popup()
             if imgui.radio_button("Edit mode", self.edit_mode):
-                self.edit_mode = True
+                self.selected_mode = 'edit'
                 imgui.close_current_popup()
 
     def on_selection(self, node, tri_id):
