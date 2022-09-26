@@ -892,8 +892,8 @@ class Viewer(moderngl_window.WindowConfig):
             elif key == self._lock_selection_key:
                 self.lock_selection = not self.lock_selection
 
-            # No keys triggered Viewer shortcut, pass onto selected object
-            elif self.scene.gui_selected_object is not None:
+            # Pass onto selected object
+            if self.scene.gui_selected_object is not None:
                 self.scene.gui_selected_object.key_event(key, self.wnd.keys)
 
         if action == self.wnd.keys.ACTION_RELEASE:

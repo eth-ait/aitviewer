@@ -254,7 +254,8 @@ class Scene(Node):
 
                 # Mode specific GUI
                 imgui.spacing()
-                s.gui_modes[s.selected_mode]['fn'](imgui)
+                if 'fn' in s.gui_modes[s.selected_mode]:
+                    s.gui_modes[s.selected_mode]['fn'](imgui)
 
             # Custom GUI (i.e. Camera specific params)
             s.gui(imgui)
