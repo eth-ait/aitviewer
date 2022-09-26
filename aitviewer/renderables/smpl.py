@@ -153,7 +153,7 @@ class SMPLSequence(Node):
             kwargs = self._render_kwargs.copy()
             kwargs['color'] = (1.0, 177 / 255, 1 / 255, 1.0)
             kwargs['name'] = 'Skeleton'
-            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_elements=['material'], **kwargs)
+            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_affine=False, **kwargs)
             self.skeleton_seq.position = self.position
             self.skeleton_seq.rotation = self.rotation
 
@@ -170,7 +170,7 @@ class SMPLSequence(Node):
         if self._z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
-        self.rbs = RigidBodies(self.joints, global_oris, length=0.1, gui_elements=['material'], name='Joint Angles')
+        self.rbs = RigidBodies(self.joints, global_oris, length=0.1, gui_affine=False, name='Joint Angles')
         self.rbs.position = self.position
         self.rbs.rotation = self.rotation
         self._add_node(self.rbs, enabled=self._show_joint_angles)
@@ -178,7 +178,7 @@ class SMPLSequence(Node):
         kwargs = self._render_kwargs.copy()
         kwargs['name'] = 'Mesh'
         kwargs['color'] = kwargs.get('color', (160 / 255, 160 / 255, 160 / 255, 1.0))
-        self.mesh_seq = Meshes(self.vertices, self.faces, is_selectable=False, gui_elements=['material'], **kwargs)
+        self.mesh_seq = Meshes(self.vertices, self.faces, is_selectable=False, gui_affine=False, **kwargs)
         self.mesh_seq.position = self.position
         self.mesh_seq.rotation = self.rotation
         self._add_node(self.mesh_seq)

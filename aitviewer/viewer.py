@@ -166,8 +166,6 @@ class Viewer(moderngl_window.WindowConfig):
         self._load_cam_key = self.wnd.keys.L
         self._show_camera_target_key = self.wnd.keys.T
         self._visualize_key = self.wnd.keys.Z
-        self._flat_shading_key = self.wnd.keys.F
-        self._draw_edges_key = self.wnd.keys.E
         self._lock_selection_key = self.wnd.keys.K
         self._mode_inspect_key = self.wnd.keys.I
         self._mode_view_key = self.wnd.keys.V
@@ -891,18 +889,12 @@ class Viewer(moderngl_window.WindowConfig):
             elif key == self._visualize_key:
                 self.visualize = not self.visualize
 
-            elif key == self._flat_shading_key:
-                selected = self.scene.selected_object
-                if isinstance(selected, Meshes) or isinstance(selected, VariableTopologyMeshes):
-                    selected.flat_shading = not selected.flat_shading
-
-            elif key == self._draw_edges_key:
-                selected = self.scene.selected_object
-                if isinstance(selected, Meshes) or isinstance(selected, VariableTopologyMeshes):
-                    selected.draw_edges = not selected.draw_edges
-
             elif key == self._lock_selection_key:
                 self.lock_selection = not self.lock_selection
+
+            # No keys triggered Viewer shortcut, pass onto selected object
+            elif self.scene.gui_selected_object is not None:
+                self.scene.gui_selected_object.key_event(key, self.wnd.keys)
 
         if action == self.wnd.keys.ACTION_RELEASE:
             pass

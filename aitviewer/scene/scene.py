@@ -48,13 +48,13 @@ class Scene(Node):
         # If you update the number of lights, make sure to change the respective `define` statement in
         # directional_lights.glsl as well!
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
-        self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0), gui_elements=['affine', 'material']))
-        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0), gui_elements=['affine', 'material'], shadow_enabled=False))
+        self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
+        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0), shadow_enabled=False))
 
         self.add(*self.lights)
 
         # Scene items
-        self.origin = CoordinateSystem(name="Origin", length=0.1, gui_elements=[])
+        self.origin = CoordinateSystem(name="Origin", length=0.1, gui_affine=False, gui_material=False)
         self.add(self.origin)
 
         self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0),  (0.82, 0.82, 0.82, 1.0), name="Floor")
@@ -75,7 +75,7 @@ class Scene(Node):
         # Currently selected object, None if no object is selected
         self.selected_object = None
         # Object shown in the property panel
-        self._gui_selected_object = None
+        self.gui_selected_object = None
 
         # The scene node in the GUI is expanded at the start.
         self.expanded = True
@@ -219,7 +219,7 @@ class Scene(Node):
             self.selected_object.on_selection(selected_node, selected_tri_id)
         # Always keep the last selected object in the property panel
         if obj is not None:
-            self._gui_selected_object = obj
+            self.gui_selected_object = obj
 
     def is_selected(self, obj):
         """Returns true if obj is currently selected"""
@@ -227,8 +227,8 @@ class Scene(Node):
 
     def gui_selected(self, imgui):
         """GUI to edit the selected node"""
-        if self._gui_selected_object:
-            s = self._gui_selected_object
+        if self.gui_selected_object:
+            s = self.gui_selected_object
 
             # Custom GUI Elements
             imgui.indent(22)
@@ -261,18 +261,19 @@ class Scene(Node):
             imgui.unindent()
 
             # General GUI elements
-            if hasattr(s, 'gui_elements'):
+            if hasattr(s, 'gui_controls'):
                 imgui.spacing(); imgui.spacing(); imgui.spacing()
-
-                for ge in s.gui_elements:
+                for i, (gc_key, gc_val) in enumerate(s.gui_controls.items()):
+                    if not gc_val['is_visible']:
+                        continue
                     imgui.begin_group()
                     imgui.push_font(self.custom_font)
-                    imgui.text(f"{s.gui_controls[ge]['icon']}")
+                    imgui.text(f"{gc_val['icon']}")
                     imgui.pop_font()
                     imgui.end_group()
                     imgui.same_line(spacing=8)
                     imgui.begin_group()
-                    s.gui_controls[ge]['fn'](imgui)
+                    gc_val['fn'](imgui)
                     imgui.end_group()
                     imgui.spacing(); imgui.spacing(); imgui.spacing()
 

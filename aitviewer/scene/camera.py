@@ -101,7 +101,7 @@ class Camera(Node, CameraInterface):
         :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this
          camera in the viewer
         """
-        super(Camera, self).__init__(icon='\u0084', **kwargs)
+        super(Camera, self).__init__(icon='\u0084', gui_material=False, **kwargs)
 
         # Camera object geometry
         vertices = np.array([

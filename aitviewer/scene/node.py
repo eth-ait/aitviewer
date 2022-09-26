@@ -36,7 +36,8 @@ class Node(object):
                  material=None,
                  render_priority=1,
                  is_selectable=True,
-                 gui_elements=None,
+                 gui_affine=True,
+                 gui_material=True,
                  n_frames=1):
         """
         :param name: Name of the node
@@ -79,12 +80,11 @@ class Node(object):
         self.icon = icon if icon is not None else '\u0082'
         self._enabled = True
         self._expanded = False
-        self.gui_elements = ['affine', 'material', 'animation', 'io'] if gui_elements is None else gui_elements
         self.gui_controls = {
-            'affine': {'fn': self.gui_affine, 'icon': '\u009b'},
-            'material': {'fn': self.gui_material, 'icon': '\u0088'},
-            'animation': {'fn': self.gui_animation, 'icon': '\u0098'},
-            'io': {'fn': self.gui_io, 'icon': '\u009a'}
+            'affine': {'fn': self.gui_affine, 'icon': '\u009b', 'is_visible': gui_affine},
+            'material': {'fn': self.gui_material, 'icon': '\u0088', 'is_visible': gui_material},
+            'animation': {'fn': self.gui_animation, 'icon': '\u0098', 'is_visible': (lambda: self._n_frames > 1)()},
+            'io': {'fn': self.gui_io, 'icon': '\u009a', 'is_visible': (lambda: self.gui_io.__func__ is not Node.gui_io)()}
         }
         self.gui_modes = {
             'view': {'title': ' View', 'fn': self.gui_mode_view, 'icon': '\u0099'}
@@ -240,7 +240,6 @@ class Node(object):
                   enabled=True):
         """
         Add a single node
-        :param gui_elements: Which elements of the GUI are displayed by default.
         :param show_in_hierarchy: Whether to show the node in the scene hierarchy.
         :param expanded: Whether the node is initially expanded in the GUI.
         """
@@ -309,8 +308,6 @@ class Node(object):
                                     self.current_frame_id, min_value=0, max_value=self.n_frames - 1)
             if u:
                 self.current_frame_id = fid
-        else:
-            imgui.text("No animation")
 
     def gui_affine(self, imgui):
         """ Render GUI for affine transformations"""
@@ -352,6 +349,7 @@ class Node(object):
 
     def gui_io(self, imgui):
         """ Render GUI for import/export """
+        pass
 
     def gui_mode_view(self, imgui):
         """ Render custom GUI for view mode """
@@ -495,5 +493,11 @@ class Node(object):
         :param node:  the node which was clicked (can be None if the selection wasn't a mouse event)
         :param tri_id: the id of the triangle that was clicked from the 'node' mesh
                        (can be None if the selection wasn't a mouse event)
+        """
+        pass
+
+    def key_event(self, key, wnd_keys):
+        """
+        Handle shortcut key presses (if you are the selected object)
         """
         pass
