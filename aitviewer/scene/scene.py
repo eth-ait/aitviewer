@@ -237,8 +237,7 @@ class Scene(Node):
             imgui.pop_font()
 
             # Modes
-            num_modes = hasattr(s, 'gui_modes') and len(s.gui_modes) > 1
-            if num_modes > 1:
+            if hasattr(s, 'gui_modes') and len(s.gui_modes) > 1:
                 imgui.push_font(self.custom_font)
                 imgui.spacing()
                 for i, (gm_key, gm_val) in enumerate(s.gui_modes.items()):
@@ -249,7 +248,7 @@ class Scene(Node):
                         imgui.pop_style_color()
                     if mode_clicked:
                         s.selected_mode = gm_key
-                    if i != num_modes-1:
+                    if i != len(s.gui_modes)-1:
                         imgui.same_line()
                 imgui.pop_font()
 
