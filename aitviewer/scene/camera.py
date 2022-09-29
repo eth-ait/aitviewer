@@ -152,7 +152,7 @@ class Camera(Node, CameraInterface):
         self.active_color = active_color
         self.inactive_color = inactive_color
 
-        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True, position=kwargs.get('position'),
+        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True,
                            rotation=kwargs.get('rotation'), is_selectable=False)
         self.mesh.color = self.inactive_color
         self.add(self.mesh, show_in_hierarchy=False)
@@ -246,14 +246,12 @@ class Camera(Node, CameraInterface):
             lines = np.apply_along_axis(transform, 1, lines)
             all_lines[i] = lines
 
-        self.frustum = Lines(all_lines, r_base=0.005, mode='lines', color=(0.1, 0.1, 0.1, 1), cast_shadow=False,
-                             position=self.position, rotation=self.rotation)
+        self.frustum = Lines(all_lines, r_base=0.005, mode='lines', color=(0.1, 0.1, 0.1, 1), cast_shadow=False)
         self.add(self.frustum, show_in_hierarchy=False)
 
         ori = np.eye(3, dtype=np.float)
         ori[:, 2] *= -1
-        self.origin = RigidBodies(np.array([0.0, 0.0, 0.0])[np.newaxis], ori[np.newaxis],
-                                  position=self.position, rotation=self.rotation)
+        self.origin = RigidBodies(np.array([0.0, 0.0, 0.0])[np.newaxis], ori[np.newaxis])
         self.add(self.origin, show_in_hierarchy=False)
 
         self.current_frame_id = frame_id
@@ -360,7 +358,7 @@ class WeakPerspectiveCamera(Camera):
 
         super(WeakPerspectiveCamera, self).__init__(n_frames=scale.shape[0], viewer=viewer, **kwargs)
 
-        self.scale = scale
+        self.scale_factor = scale
         self.translation = translation
 
         self.cols = cols
@@ -387,7 +385,7 @@ class WeakPerspectiveCamera(Camera):
         return self._right
 
     def update_matrices(self, width, height):
-        sx, sy = self.scale[self.current_frame_id]
+        sx, sy = self.scale_factor[self.current_frame_id]
         tx, ty = self.translation[self.current_frame_id]
 
         window_ar = width / height

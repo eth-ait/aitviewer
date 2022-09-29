@@ -786,7 +786,7 @@ class Viewer(moderngl_window.WindowConfig):
             node = self.scene.get_node_by_uid(obj_id)
             # Camera space to world space
             point_world = np.array(np.linalg.inv(self.scene.camera.get_view_matrix()) @ np.array((x, y, z, 1.0)))[:-1]
-            point_local = (np.linalg.inv(node.model_matrix()) @ np.append(point_world, 1.0))[:-1]
+            point_local = (np.linalg.inv(node.model_matrix) @ np.append(point_world, 1.0))[:-1]
             vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
             bc_coords = node.get_bc_coords_from_points(tri_id, [point_local])
             return MeshMouseIntersection(node, tri_id, vert_id, point_world, point_local, bc_coords)

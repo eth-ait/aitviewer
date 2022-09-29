@@ -54,6 +54,7 @@ class Node(object):
         self._position = np.array([0.0, 0.0, 0.0]) if position is None else position
         self._rotation = np.eye(3) if rotation is None else rotation
         self._scale = scale
+        self.model_matrix = self.get_local_transform()
         self._n_frames = n_frames
         self._current_frame_id = 0
 
@@ -113,8 +114,8 @@ class Node(object):
     @position.setter
     def position(self, position):
         self._position = position
-        for n in self.nodes:
-            n.position = position
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
 
     @property
     def rotation(self):
@@ -123,8 +124,8 @@ class Node(object):
     @rotation.setter
     def rotation(self, rotation):
         self._rotation = rotation
-        for n in self.nodes:
-            n.rotation = rotation
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
 
     @property
     def scale(self):
@@ -133,10 +134,12 @@ class Node(object):
     @scale.setter
     def scale(self, scale):
         self._scale = scale
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
 
     @staticmethod
     @lru_cache()
-    def _compute_model_matrix(pos, rot, scale):
+    def _compute_transform(pos, rot, scale):
         rotation = np.eye(4)
         rotation[:3, :3] = np.array(rot)
 
@@ -147,12 +150,17 @@ class Node(object):
 
         return (trans @ rotation @ scale).astype('f4')
 
-    def model_matrix(self):
-        """Construct model matrix from this node's orientation and position."""
-        return self._compute_model_matrix(
+    def get_local_transform(self):
+        """Construct local transform as a 4x4 matrix from this node's position, orientation and scale."""
+        return self._compute_transform(
                tuple(self.position),
                tuple(map(tuple, self.rotation)),
                self.scale)
+
+    def update_transform(self, parent_transform=np.eye(4, dtype=np.float32)):
+        self.model_matrix = parent_transform.astype('f4') @ self.get_local_transform()
+        for n in self.nodes:
+            n.update_transform(self.model_matrix)
 
     @property
     def color(self):
@@ -179,7 +187,7 @@ class Node(object):
             [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]])
 
         # Transform bounding box with the model matrix.
-        val = (self.model_matrix() @ np.vstack((val, np.array([1.0, 1.0]))))[:3]
+        val = (self.model_matrix @ np.vstack((val, np.array([1.0, 1.0]))))[:3]
 
         # If any of the elements is NaN return an empty bounding box.
         if np.isnan(val).any():
@@ -250,6 +258,7 @@ class Node(object):
         n._enabled = enabled
         self.nodes.append(n)
         n.parent = self
+        n.update_transform(self.model_matrix)
 
     def _add_nodes(self, *nodes, **kwargs):
         """Add multiple nodes"""
@@ -392,7 +401,7 @@ class Node(object):
     def set_camera_matrices(self, prog, camera, **kwargs):
         """Set the model view projection matrix in the given program."""
         # Transpose because np is row-major but OpenGL expects column-major.
-        prog['model_matrix'].write(self.model_matrix().T.astype('f4').tobytes())
+        prog['model_matrix'].write(self.model_matrix.T.astype('f4').tobytes())
         prog['view_projection_matrix'].write(camera.get_view_projection_matrix().T.astype('f4').tobytes())
 
     def receive_shadow(self, program, **kwargs):
@@ -406,7 +415,7 @@ class Node(object):
 
             for i, light in enumerate(lights):
                 if light.shadow_enabled and light.shadow_map:
-                    light_matrix = light.mvp() @ self.model_matrix()
+                    light_matrix = light.mvp() @ self.model_matrix
                     program[f'dirLights[{i}].matrix'].write(light_matrix.T.tobytes())
 
                     # Bind shadowmap to slot i + 1, we reserve slot 0 for the mesh texture
@@ -421,8 +430,8 @@ class Node(object):
         if not self.cast_shadow or self.color[3] == 0.0:
             return
 
-        prog['model_matrix'].write(self.model_matrix().T.astype('f4').tobytes())
-        prog['view_projection_matrix'].write(light_matrix.T.astype('f4').tobytes())
+        prog['model_matrix'].write(self.model_matrix.T.tobytes())
+        prog['view_projection_matrix'].write(light_matrix.T.tobytes())
 
         self.render_positions(prog)
 
@@ -431,7 +440,7 @@ class Node(object):
             return
 
         p = camera.get_projection_matrix()
-        mv = camera.get_view_matrix() @ self.model_matrix()
+        mv = camera.get_view_matrix() @ self.model_matrix
 
         # Transpose because np is row-major but OpenGL expects column-major.
         prog['projection'].write(p.T.astype('f4').tobytes())
@@ -465,7 +474,7 @@ class Node(object):
 
     def render_outline(self, ctx, camera, prog):
         if self.outline:
-            mvp = camera.get_view_projection_matrix() @ self.model_matrix()
+            mvp = camera.get_view_projection_matrix() @ self.model_matrix
             prog['mvp'].write(mvp.T.tobytes())
 
             if self.backface_culling:

@@ -244,8 +244,6 @@ class Lines(Node):
         vs, fs, ns = self.get_mesh()
         material = kwargs.get('material', Material(color=color, ambient=0.2))
         self.mesh = Meshes(vs, fs, ns, color=color, material=material, cast_shadow=cast_shadow, is_selectable=False)
-        self.mesh.position = self.position
-        self.mesh.rotation = self.rotation
         self.add(self.mesh, show_in_hierarchy=False)
 
     @property

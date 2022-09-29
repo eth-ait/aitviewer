@@ -148,15 +148,7 @@ class SMPLSequence(Node):
         self.vertices, self.joints, self.faces, self.skeleton = self.fk()
 
         if self._is_rigged:
-            # Must first add skeleton, otherwise transparency does not work correctly.
-            # Overriding given color with a custom color for the skeleton.
-            kwargs = self._render_kwargs.copy()
-            kwargs['color'] = (1.0, 177 / 255, 1 / 255, 1.0)
-            kwargs['name'] = 'Skeleton'
-            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_affine=False, **kwargs)
-            self.skeleton_seq.position = self.position
-            self.skeleton_seq.rotation = self.rotation
-
+            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_affine=False, color=(1.0, 177 / 255, 1 / 255, 1.0), name='Skeleton')
             self._add_node(self.skeleton_seq)
 
         # First convert the relative joint angles to global joint angles in rotation matrix form.
@@ -171,16 +163,9 @@ class SMPLSequence(Node):
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
         self.rbs = RigidBodies(self.joints, global_oris, length=0.1, gui_affine=False, name='Joint Angles')
-        self.rbs.position = self.position
-        self.rbs.rotation = self.rotation
         self._add_node(self.rbs, enabled=self._show_joint_angles)
 
-        kwargs = self._render_kwargs.copy()
-        kwargs['name'] = 'Mesh'
-        kwargs['color'] = kwargs.get('color', (160 / 255, 160 / 255, 160 / 255, 1.0))
-        self.mesh_seq = Meshes(self.vertices, self.faces, is_selectable=False, gui_affine=False, **kwargs)
-        self.mesh_seq.position = self.position
-        self.mesh_seq.rotation = self.rotation
+        self.mesh_seq = Meshes(self.vertices, self.faces, is_selectable=False, gui_affine=False, color=kwargs.get('color', (160 / 255, 160 / 255, 160 / 255, 1.0)), name='Mesh')
         self._add_node(self.mesh_seq)
 
         # Save view mode state to restore when exiting edit mode.

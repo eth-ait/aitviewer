@@ -94,7 +94,7 @@ class Light(Node):
         lines = np.apply_along_axis(lambda x: (world_from_ndc @ np.append(x, 1.0))[:3] - self.position, 1, lines)
 
         if self._debug_lines is None:
-            self._debug_lines = Lines(lines, position=self.position, r_base=0.2, mode='lines', cast_shadow=False)
+            self._debug_lines = Lines(lines, r_base=0.2, mode='lines', cast_shadow=False)
             self.add(self._debug_lines)
         else:
             self._debug_lines.lines = lines
@@ -102,9 +102,7 @@ class Light(Node):
 
     @Node.position.setter
     def position(self, position):
-        self._position = position
-        for n in self.nodes:
-            n.position = position
+        super(Light, self.__class__).position.fset(self, position)
         self._update_debug_lines()
 
     def redraw(self, **kwargs):

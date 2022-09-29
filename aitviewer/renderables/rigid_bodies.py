@@ -50,7 +50,7 @@ class RigidBodies(Node):
         self.radius = radius
         self.length = length
 
-        self.spheres = Spheres(rb_pos, radius=radius, color=color, position=self.position, is_selectable=False)
+        self.spheres = Spheres(rb_pos, radius=radius, color=color, is_selectable=False)
         self._add_node(self.spheres, show_in_hierarchy=False)
 
         self.coords = []
@@ -64,8 +64,6 @@ class RigidBodies(Node):
             color[i] = 1.0
             axs = Arrows(self.rb_pos, self.rb_pos + line, r_base=r_base, r_head=r_head, color=tuple(color),
                          is_selectable=False)
-            axs.position = self.position
-            axs.rotation = self.rotation
             self._add_node(axs, show_in_hierarchy=False)
             self.coords.append(axs)
 
@@ -98,7 +96,6 @@ class RigidBodies(Node):
                 line = self.rb_ori[..., :, i][self.current_frame_id]
                 line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
                 axs = self.coords[i]
-                axs.position = self.position
                 axs.current_origins = self.current_rb_pos
                 axs.current_tips = self.current_rb_pos + line
         else:
@@ -108,7 +105,6 @@ class RigidBodies(Node):
                 line = self.rb_ori[..., :, i]
                 line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
                 axs = self.coords[i]
-                axs.position = self.position
                 axs.origins = self.rb_pos
                 axs.tips = self.rb_pos + line
 
