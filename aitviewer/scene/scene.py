@@ -154,19 +154,22 @@ class Scene(Node):
         rs = self.collect_nodes()
         collected_bounds = []
         for r in rs:
-            if r.bounds is not None:
-                collected_bounds.append(r.bounds)
+            bounds = r.bounds
+            if bounds is not None:
+                collected_bounds.append(bounds)
 
         if len(collected_bounds) > 0:
             self.floor.position[1] = np.array(collected_bounds)[:, 1, 0].min()
+            self.floor.update_transform()
 
     def auto_set_camera_target(self):
         """Sets the camera target to the average of the center of all objects in the scene"""
         rs = self.collect_nodes()
         centers = []
         for r in rs:
-            if r.bounds is not None:
-                center = r.bounds.mean(-1)
+            bounds = r.bounds
+            if bounds is not None:
+                center = bounds.mean(-1)
                 if center.sum() != 0.0:
                     centers.append(center)
 
