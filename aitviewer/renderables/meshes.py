@@ -450,7 +450,7 @@ class Meshes(Node):
         self.normals_r.position = self.position
         self.normals_r.rotation = self.rotation
         self.normals_r.current_frame_id = self.current_frame_id
-        self.add(self.normals_r, gui_affine=False)
+        self.add(self.normals_r)
 
     def gui(self, imgui):
         super(Meshes, self).gui(imgui)
@@ -842,9 +842,9 @@ class VariableTopologyMeshes(Node):
 
     def key_event(self, key, wnd_keys):
         if key == wnd_keys.F:
-            self.flat_shading = not selected.flat_shading
+            self.flat_shading = not self.flat_shading
         elif key == wnd_keys.E:
-            self.draw_edges = not selected.draw_edges
+            self.draw_edges = not self.draw_edges
 
     @hooked
     def release(self):

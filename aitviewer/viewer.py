@@ -893,7 +893,7 @@ class Viewer(moderngl_window.WindowConfig):
                 self.lock_selection = not self.lock_selection
 
             # Pass onto selected object
-            if self.scene.gui_selected_object is not None:
+            if isinstance(self.scene.gui_selected_object, Node):
                 self.scene.gui_selected_object.key_event(key, self.wnd.keys)
 
         if action == self.wnd.keys.ACTION_RELEASE:
