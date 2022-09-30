@@ -1030,7 +1030,6 @@ class Viewer(moderngl_window.WindowConfig):
         # Convert the id to integer values.
         id_int = np.asarray(id).astype(dtype=np.int32)
 
-        print(np.max(id_int))
         # Hash the ids.
         def hash(h):
             h ^= h >> 16
