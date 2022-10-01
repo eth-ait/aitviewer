@@ -256,12 +256,14 @@ class Lines(Node):
 
     @property
     def current_lines(self):
-        return self._lines[self.current_frame_id]
+        idx = self.current_frame_id if self._lines.shape[0] > 1 else 0
+        return self._lines[idx]
 
     @current_lines.setter
     def current_lines(self, lines):
         assert len(lines.shape) == 2
-        self._lines[self.current_frame_id] = lines
+        idx = self.current_frame_id if self._lines.shape[0] > 1 else 0
+        self._lines[idx] = lines
 
     def gui(self, imgui):
         self.mesh.gui(imgui)

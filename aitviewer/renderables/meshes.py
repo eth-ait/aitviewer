@@ -136,11 +136,13 @@ class Meshes(Node):
 
     @property
     def current_vertices(self):
-        return self.vertices[self.current_frame_id]
+        idx = self.current_frame_id if self.vertices.shape[0] > 1 else 0
+        return self.vertices[idx]
 
     @current_vertices.setter
     def current_vertices(self, vertices):
-        self._vertices[self.current_frame_id] = vertices
+        idx = self.current_frame_id if self.vertices.shape[0] > 1 else 0
+        self._vertices[idx] = vertices
         self.compute_vertex_and_face_normals.cache_clear()
         self.redraw()
 
@@ -229,7 +231,8 @@ class Meshes(Node):
         if self._use_uniform_color:
             return np.full((self.n_vertices, 4), self.material.color)
         else:
-            return self.vertex_colors[self.current_frame_id]
+            idx = self.current_frame_id if self.vertex_colors.shape[0] > 1 else 0
+            return self.vertex_colors[idx]
 
     @property
     def face_colors(self):

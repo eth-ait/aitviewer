@@ -68,19 +68,23 @@ class Arrows(Node):
 
     @property
     def current_origins(self):
-        return self.origins[self.current_frame_id]
+        idx = self.current_frame_id if self.origins.shape[0] > 1 else 0
+        return self.origins[idx]
 
     @current_origins.setter
     def current_origins(self, origins):
-        self.origins[self.current_frame_id] = origins
+        idx = self.current_frame_id if self.origins.shape[0] > 1 else 0
+        self.origins[idx] = origins
 
     @property
     def current_tips(self):
-        return self.tips[self.current_frame_id]
+        idx = self.current_frame_id if self.tips.shape[0] > 1 else 0
+        return self.tips[idx]
 
     @current_tips.setter
     def current_tips(self, tips):
-        self.tips[self.current_frame_id] = tips
+        idx = self.current_frame_id if self.tips.shape[0] > 1 else 0
+        self.tips[idx] = tips
 
     @property
     def mid_points(self):

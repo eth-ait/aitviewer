@@ -50,13 +50,38 @@ class Node(object):
         :param n_frames: How many frames this renderable has.
         """
 
+
         # Transform & Animation
-        self._position = np.array([0.0, 0.0, 0.0]) if position is None else position
-        self._rotation = np.eye(3) if rotation is None else rotation
-        self._scale = scale
-        self.model_matrix = self.get_local_transform()
+        position = np.array([0.0, 0.0, 0.0]) if position is None else np.array(position)
+        rotation = np.eye(3) if rotation is None else np.array(rotation)
+
+        self._positions = position if len(position.shape) != 1 else position[np.newaxis]
+        self._rotations = rotation if len(rotation.shape) != 2 else rotation[np.newaxis]
+        self._scales = scale if isinstance(scale, np.ndarray) else np.array([scale])
+
+        n_positions = self._positions.shape[0]
+        n_rotations = self._rotations.shape[0]
+        n_scales = self._scales.shape[0]
+
+        if n_frames > 1:
+            assert n_positions == 1 or n_frames == n_positions, f"Number of position frames \
+                ({n_positions}) must be 1 or match number of Node frames {n_frames}"
+            assert n_rotations== 1 or n_frames == n_rotations, f"Number of rotations frames \
+                ({n_rotations}) must be 1 or match number of Node frames {n_frames}"
+            assert n_scales == 1 or n_frames == n_scales, f"Number of scales frames \
+                ({n_scales}) must be 1 or match number of Node frames {n_frames}"
+        else:
+            n_frames = max(n_positions, n_rotations, n_scales)
+            assert ((n_positions == 1 or n_positions == n_frames) and
+                    (n_rotations == 1 or n_rotations == n_frames) and
+                    (n_scales == 1 or n_scales == n_frames)), f"Number of position \
+                        ({n_positions}), rotation ({n_rotations}) and scale ({n_scales}) \
+                        frames must be 1 or match."
+
+        # Frames
         self._n_frames = n_frames
         self._current_frame_id = 0
+        self.model_matrix = self.get_local_transform()
 
         # Material
         self.material = Material(color=color) if material is None else material
@@ -109,31 +134,67 @@ class Node(object):
     # Transform
     @property
     def position(self):
-        return self._position
+        idx = self.current_frame_id if self._positions.shape[0] > 1 else 0
+        return self._positions[idx]
 
     @position.setter
     def position(self, position):
-        self._position = position
+        idx = self.current_frame_id if self._positions.shape[0] > 1 else 0
+        self._positions[idx] = position
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
+
+    @property
+    def positions(self):
+        return self._positions
+
+    @positions.setter
+    def positions(self, positions):
+        self._positions = positions
         if self.parent is not None:
             self.update_transform(self.parent.model_matrix)
 
     @property
     def rotation(self):
-        return self._rotation
+        idx = self.current_frame_id if self._rotations.shape[0] > 1 else 0
+        return self._rotations[idx]
 
     @rotation.setter
     def rotation(self, rotation):
-        self._rotation = rotation
+        idx = self.current_frame_id if self._rotations.shape[0] > 1 else 0
+        self._rotations[idx] = rotation
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
+
+    @property
+    def rotations(self):
+        return self._rotations
+
+    @rotations.setter
+    def rotations(self, rotations):
+        self._rotations = rotations
         if self.parent is not None:
             self.update_transform(self.parent.model_matrix)
 
     @property
     def scale(self):
-        return self._scale
+        idx = self.current_frame_id if self._scales.shape[0] > 1 else 0
+        return self._scales[idx]
 
     @scale.setter
     def scale(self, scale):
-        self._scale = scale
+        idx = self.current_frame_id if self._scales.shape[0] > 1 else 0
+        self._scales[idx] = scale
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
+
+    @property
+    def scales(self):
+        return self._scales
+
+    @scales.setter
+    def scales(self, scales):
+        self._scales = scales
         if self.parent is not None:
             self.update_transform(self.parent.model_matrix)
 
@@ -222,6 +283,8 @@ class Node(object):
         else:
             self._current_frame_id = frame_id
         self.on_frame_update()
+        if self.parent and (self._positions.shape[0] > 1 or self._rotations.shape[0] > 1 or self._scales.shape[0] > 1):
+            self.update_transform(self.parent.model_matrix)
 
     def next_frame(self):
         self.current_frame_id = self.current_frame_id + 1 if self.current_frame_id < len(self) - 1 else 0

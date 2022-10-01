@@ -611,15 +611,14 @@ class PinholeCamera(Camera):
     Your classic pinhole camera.
     """
     def __init__(self, position, target, cols, rows, fov=45, near=C.znear, far=C.zfar, viewer=None, **kwargs):
-        self._positions = position if len(position.shape) == 2 else position[np.newaxis]
-        self._targets = target if len(target.shape) == 2 else target[np.newaxis]
-        assert self._positions.shape[0] == 1 or self._targets.shape[0] == 1 or self._positions.shape[0] == self._targets.shape[0], (
-            f"position and target array shape mismatch: {self._positions.shape} and {self._targets.shape}")
+        positions = position if len(position.shape) == 2 else position[np.newaxis]
+        targets = target if len(target.shape) == 2 else target[np.newaxis]
+        assert positions.shape[0] == 1 or targets.shape[0] == 1 or positions.shape[0] == targets.shape[0], (
+            f"position and target array shape mismatch: {positions.shape} and {targets.shape}")
 
-        super(PinholeCamera, self).__init__(n_frames=self._positions.shape[0], viewer=viewer, **kwargs)
         self._world_up = np.array([0.0, 1.0, 0.0])
-        self.position = self.current_position
-        self.rotation = self.current_rotation
+        self._targets = targets
+        super(PinholeCamera, self).__init__(position=position, n_frames=targets.shape[0], viewer=viewer, **kwargs)
 
         self.cols = cols
         self.rows = rows
@@ -628,14 +627,9 @@ class PinholeCamera(Camera):
         self.far = far
         self.fov = fov
 
-    @hooked
-    def on_frame_update(self):
-        self.position = self.current_position
-        self.rotation = self.current_rotation
-
     @property
     def forward(self):
-        forward = self.current_target - self.current_position
+        forward = self.current_target - self.position
         forward = forward / np.linalg.norm(forward)
         return forward / np.linalg.norm(forward)
 
@@ -654,11 +648,7 @@ class PinholeCamera(Camera):
         return self._targets[0] if self._targets.shape[0] == 1 else self._targets[self.current_frame_id]
 
     @property
-    def current_position(self):
-        return self._positions[0] if self._positions.shape[0] == 1 else self._positions[self.current_frame_id]
-
-    @property
-    def current_rotation(self):
+    def rotation(self):
         return np.array([-self.right, self.up, -self.forward]).T
 
     def update_matrices(self, width, height):
@@ -666,7 +656,7 @@ class PinholeCamera(Camera):
         P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
 
         # Compute view matrix.
-        V = look_at(self.current_position, self.current_target, self._world_up)
+        V = look_at(self.position, self.current_target, self._world_up)
 
         # Update camera matrices.
         self.projection_matrix = P.astype('f4')

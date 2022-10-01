@@ -74,19 +74,23 @@ class RigidBodies(Node):
 
     @property
     def current_rb_pos(self):
-        return self.rb_pos[self.current_frame_id]
+        idx = self.current_frame_id if self.rb_pos.shape[0] > 1 else 0
+        return self.rb_pos[idx]
 
     @current_rb_pos.setter
     def current_rb_pos(self, pos):
-        self.rb_pos[self.current_frame_id] = pos
+        idx = self.current_frame_id if self.rb_pos.shape[0] > 1 else 0
+        self.rb_pos[idx] = pos
 
     @property
     def current_rb_ori(self):
-        return self.rb_ori[self.current_frame_id]
+        idx = self.current_frame_id if self.rb_ori.shape[0] > 1 else 0
+        return self.rb_ori[idx]
 
     @current_rb_ori.setter
     def current_rb_ori(self, ori):
-        self.rb_ori[self.current_frame_id] = ori
+        idx = self.current_frame_id if self.rb_ori.shape[0] > 1 else 0
+        self.rb_ori[idx] = ori
 
     def redraw(self, **kwargs):
         if kwargs.get('current_frame_only', False):

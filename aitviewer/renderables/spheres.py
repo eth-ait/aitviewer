@@ -124,12 +124,14 @@ class Spheres(Node):
 
     @property
     def current_sphere_positions(self):
-        return self.sphere_positions[self.current_frame_id]
+        idx = self.current_frame_id if self.sphere_positions.shape[0] > 1 else 0
+        return self.sphere_positions[idx]
 
     @current_sphere_positions.setter
     def current_sphere_positions(self, positions):
         assert len(positions.shape) == 2
-        self.sphere_positions[self.current_frame_id] = positions
+        idx = self.current_frame_id if self.sphere_positions.shape[0] > 1 else 0
+        self.sphere_positions[idx] = positions
 
     def on_frame_update(self):
         self.redraw()
