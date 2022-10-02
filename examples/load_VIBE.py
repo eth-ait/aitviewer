@@ -86,7 +86,7 @@ if __name__ == '__main__':
     viewer.auto_set_floor = False
     viewer.playback_fps = 25
     viewer.scene.fps = 25
-    viewer.scene.floor.position[1] = -1.15
+    viewer.scene.floor.position = np.array([0, -1.15, 0])
     viewer.scene.origin.enabled = False
     viewer.shadows_enabled = False
 
