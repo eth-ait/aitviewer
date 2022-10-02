@@ -402,7 +402,10 @@ class Scene(Node):
         n_frames = 1
         ns = self.collect_nodes(req_enabled=False)
         for n in ns:
-            n_frames = max(n_frames, n.n_frames)
+            if n._enabled_mask is None:
+                n_frames = max(n_frames, n.n_frames)
+            else:
+                n_frames = max(n_frames, n._enabled_mask.shape[0])
         return n_frames
 
     def render_outline(self, ctx, camera, prog):

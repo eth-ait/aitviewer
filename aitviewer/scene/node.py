@@ -34,19 +34,24 @@ class Node(object):
                  scale=1.0,
                  color=(0.5, 0.5, 0.5, 1.0),
                  material=None,
-                 render_priority=1,
                  is_selectable=True,
                  gui_affine=True,
                  gui_material=True,
+                 enabled_mask=None,
                  n_frames=1):
         """
         :param name: Name of the node
         :param icon: Custom Node Icon using custom Icon font
-        :param position: Starting position in the format (X,Y,Z)
-        :param rotation: Starting rotation in rotation matrix representation (3,3)
-        :param scale: Starting scale (scalar)
+        :param position: Starting position in the format (X,Y,Z) or np array of positions with shape (F, 3)
+        :param rotation: Starting rotation in rotation matrix representation (3,3) or np array of rotations with shape (F, 3, 3)
+        :param scale: Starting scale (scalar) or np array of scale values with shape (F)
         :param color: (R,G,B,A) 0-1 formatted color value.
         :param material: Object material properties. The color specified in the material will override node color
+        :param is_selectable: If True the node is selectable when clicked on, otherwise the parent node will be selected.
+        :param gui_affine: If True the node will have transform controls (position, rotation, scale) in the GUI.
+        :param gui_material: If True the node will have material controls in the GUI.
+        :param enabled_mask: Numpy array of boolean values, the object will be enabled only in frames where the mask value is True,
+         the number of ones in the mask must match the number of frames of the object.
         :param n_frames: How many frames this renderable has.
         """
 
@@ -64,30 +69,34 @@ class Node(object):
         n_scales = self._scales.shape[0]
 
         if n_frames > 1:
-            assert n_positions == 1 or n_frames == n_positions, f"Number of position frames \
-                ({n_positions}) must be 1 or match number of Node frames {n_frames}"
-            assert n_rotations== 1 or n_frames == n_rotations, f"Number of rotations frames \
-                ({n_rotations}) must be 1 or match number of Node frames {n_frames}"
-            assert n_scales == 1 or n_frames == n_scales, f"Number of scales frames \
-                ({n_scales}) must be 1 or match number of Node frames {n_frames}"
+            assert n_positions == 1 or n_frames == n_positions, (f"Number of position frames"
+                f" ({n_positions}) must be 1 or match number of Node frames {n_frames}")
+            assert n_rotations== 1 or n_frames == n_rotations, (f"Number of rotations frames"
+                f" ({n_rotations}) must be 1 or match number of Node frames {n_frames}")
+            assert n_scales == 1 or n_frames == n_scales, (f"Number of scales frames"
+                f" ({n_scales}) must be 1 or match number of Node frames {n_frames}")
         else:
             n_frames = max(n_positions, n_rotations, n_scales)
             assert ((n_positions == 1 or n_positions == n_frames) and
                     (n_rotations == 1 or n_rotations == n_frames) and
-                    (n_scales == 1 or n_scales == n_frames)), f"Number of position \
-                        ({n_positions}), rotation ({n_rotations}) and scale ({n_scales}) \
-                        frames must be 1 or match."
+                    (n_scales == 1 or n_scales == n_frames)), (f"Number of position"
+                        f"({n_positions}), rotation ({n_rotations}) and scale ({n_scales})"
+                        "frames must be 1 or match.")
 
         # Frames
         self._n_frames = n_frames
         self._current_frame_id = 0
         self.model_matrix = self.get_local_transform()
+        self._enabled_mask = enabled_mask
+        if self._enabled_mask is not None:
+            assert np.count_nonzero(self._enabled_mask) == n_frames, (f"Number of non-zero elements in enabled_mask"
+                f" ({np.count_nonzero(self._enabled_mask)}) must match number of frames in sequence ({n_frames})")
+            self._enabled_frame_id = np.cumsum(self._enabled_mask) - 1
 
         # Material
         self.material = Material(color=color) if material is None else material
 
         # Renderable Attributes
-        self.render_priority = render_priority
         self.is_renderable = False
         self.backface_culling = True
         self.backface_fragmap = False
@@ -276,12 +285,29 @@ class Node(object):
         if self.n_frames == 1 or frame_id == self._current_frame_id:
             return
         self.on_before_frame_update()
-        if frame_id < 0:
-            self._current_frame_id = 0
-        elif frame_id >= len(self):
-            self._current_frame_id = len(self) - 1
+        if self._enabled_mask is None:
+            if frame_id < 0:
+                self._current_frame_id = 0
+            elif frame_id >= len(self):
+                self._current_frame_id = len(self) - 1
+            else:
+                self._current_frame_id = frame_id
         else:
-            self._current_frame_id = frame_id
+            # If an enabled_mask is present use it to get the current frame.
+            if frame_id < 0:
+                new_frame_id = 0
+            elif frame_id >= self._enabled_mask.shape[0]:
+                new_frame_id = self._enabled_mask.shape[0] - 1
+            else:
+                new_frame_id = frame_id
+            self._current_frame_id = self._enabled_frame_id[new_frame_id]
+            # Update enabled using the mask.
+            self.enabled = self._enabled_mask[new_frame_id]
+
+        # Update frame id of all children nodes.
+        for n in self.nodes:
+            n.current_frame_id = frame_id
+
         self.on_frame_update()
         if self.parent and (self._positions.shape[0] > 1 or self._rotations.shape[0] > 1 or self._scales.shape[0] > 1):
             self.update_transform(self.parent.model_matrix)
@@ -298,8 +324,7 @@ class Node(object):
 
     def on_frame_update(self):
         """Called when the current frame is changed."""
-        for n in self.nodes:
-            n.current_frame_id = self.current_frame_id
+        pass
 
     def add(self, *nodes, **kwargs):
         self._add_nodes(*nodes, **kwargs)
