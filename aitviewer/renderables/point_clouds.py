@@ -55,7 +55,7 @@ class PointClouds(Node):
         self.max_n_points = max([p.shape[0] for p in self.points])
 
         self.vao = VAO("points", mode=moderngl.POINTS)
-        
+
         if z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
@@ -104,7 +104,8 @@ class PointClouds(Node):
 
     @property
     def current_points(self):
-        return self.points[self.current_frame_id]
+        idx = self.current_frame_id if self.points.shape[0] > 1 else 0
+        return self.points[idx]
 
     @property
     def current_colors(self):
@@ -112,7 +113,8 @@ class PointClouds(Node):
             n_points = self.current_points.shape[0]
             return np.full((n_points, 4), self.colors[0])
         else:
-            return self.colors[self.current_frame_id]
+            idx = self.current_frame_id if self.colors.shape[0] > 1 else 0
+            return self.colors[idx]
 
     @property
     def bounds(self):

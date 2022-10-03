@@ -181,7 +181,7 @@ class Billboard(Node):
         self.prog['texture0'].value = 0
         self.texture.use(0)
 
-        mvp = camera.get_view_projection_matrix() @ self.model_matrix()
+        mvp = camera.get_view_projection_matrix() @ self.model_matrix
         self.prog['mvp'].write(mvp.T.astype("f4").tobytes())
 
         # Compute the index of the first vertex to use if we have a sequence of vertices of length > 1

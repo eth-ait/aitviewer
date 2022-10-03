@@ -244,7 +244,6 @@ class Chessboard(Node):
         self.c2_idxs = c2_idxs
 
         self.mesh = Meshes(vs, fs, face_colors=fc)
-        self.mesh.position = self.position
         self.mesh.backface_culling = False
         self.add(self.mesh, show_in_hierarchy=False)
 

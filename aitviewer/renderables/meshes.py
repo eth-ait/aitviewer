@@ -35,6 +35,7 @@ from functools import lru_cache
 from moderngl_window.opengl.vao import VAO
 from trimesh.triangles import points_to_barycentric
 from PIL import Image
+from aitviewer.utils.so3 import euler2rot_numpy, rot2euler_numpy
 
 
 class Meshes(Node):
@@ -135,11 +136,13 @@ class Meshes(Node):
 
     @property
     def current_vertices(self):
-        return self.vertices[self.current_frame_id]
+        idx = self.current_frame_id if self.vertices.shape[0] > 1 else 0
+        return self.vertices[idx]
 
     @current_vertices.setter
     def current_vertices(self, vertices):
-        self._vertices[self.current_frame_id] = vertices
+        idx = self.current_frame_id if self.vertices.shape[0] > 1 else 0
+        self._vertices[idx] = vertices
         self.compute_vertex_and_face_normals.cache_clear()
         self.redraw()
 
@@ -228,7 +231,8 @@ class Meshes(Node):
         if self._use_uniform_color:
             return np.full((self.n_vertices, 4), self.material.color)
         else:
-            return self.vertex_colors[self.current_frame_id]
+            idx = self.current_frame_id if self.vertex_colors.shape[0] > 1 else 0
+            return self.vertex_colors[idx]
 
     @property
     def face_colors(self):
@@ -278,7 +282,7 @@ class Meshes(Node):
           enforce unit length of normals anyway.
         :return: The vertex and face normals as a np arrays of shape (V, 3) and (F, 3) respectively.
         """
-        vs = self.vertices[frame_id:frame_id + 1]
+        vs = self.vertices[frame_id:frame_id + 1] if self.vertices.shape[0] > 1 else self.vertices
         vn, fn = compute_vertex_and_face_normals(vs, self.faces, self.vertex_faces, normalize)
         return vn.squeeze(0), fn.squeeze(0)
 
@@ -438,19 +442,17 @@ class Meshes(Node):
         bounds = self.bounds
         diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
 
-        length = 0.005 * max(diag, 1)
+        length = 0.005 * max(diag, 1) / self.scale
         vn = vn / np.linalg.norm(vn, axis=-1, keepdims=True) * length
 
         # Must import here because if we do it at the top we create a circular dependency.
         from aitviewer.renderables.arrows import Arrows
 
-        positions = self.vertices * self.scale
+        positions = self.vertices
         self.normals_r = Arrows(positions, positions + vn,
                                 r_base=length / 10, r_head=2 * length / 10, p=0.25, name='Normals')
-        self.normals_r.position = self.position
-        self.normals_r.rotation = self.rotation
         self.normals_r.current_frame_id = self.current_frame_id
-        self.add(self.normals_r, gui_affine=False)
+        self.add(self.normals_r)
 
     def gui(self, imgui):
         super(Meshes, self).gui(imgui)
@@ -692,8 +694,7 @@ class VariableTopologyMeshes(Node):
                 m = self._construct_mesh_at_frame(self.current_frame_id)
 
                 # Set mesh position and scale
-                m.position = self.position
-                m.scale = self.scale
+                m.update_transform(self.model_matrix)
 
                 # Set mesh material
                 m.material = self.material
@@ -760,32 +761,32 @@ class VariableTopologyMeshes(Node):
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
-    def gui_position(self, imgui):
-        # Position controls
-        u, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
-        if u:
-            self.position = pos
-            # If meshes are already loaded go through all and update the positions
-            if self.preload:
-                for m in self._all_meshes:
-                    m.position = pos
-            # Otherwise only update the current mesh, other meshes will be updated when loaded
-            else:
-                self.current_mesh.position = pos
 
-    def gui_scale(self, imgui):
+    def gui_affine(self, imgui):
+        """ Render GUI for affine transformations"""
+        # Position controls
+        up, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
+        if up:
+            self.position = pos
+
+        # Rotation controls
+        euler_angles = rot2euler_numpy(self.rotation[np.newaxis], degrees=True)[0]
+        ur, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1, format='%.2f')
+        if ur:
+            self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
+
         # Scale controls
-        u, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
+        us, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
                                     max_value=10.0, format='%.3f')
-        if u:
+        if us:
             self.scale = scale
-            # If meshes are already loaded go through all and update the scale factors
+
+        if up or ur or us:
             if self.preload:
                 for m in self._all_meshes:
-                    m.scale = scale
-            # Otherwise only update the current mesh, other meshes will be updated when loaded
+                    m.update_transform(self.model_matrix)
             else:
-                self.current_mesh.scale = scale
+                self.current_mesh.update_transform((self.model_matrix))
 
     def gui_material(self, imgui, show_advanced=True):
         # Color Control
@@ -842,9 +843,9 @@ class VariableTopologyMeshes(Node):
 
     def key_event(self, key, wnd_keys):
         if key == wnd_keys.F:
-            self.flat_shading = not selected.flat_shading
+            self.flat_shading = not self.flat_shading
         elif key == wnd_keys.E:
-            self.draw_edges = not selected.draw_edges
+            self.draw_edges = not self.draw_edges
 
     @hooked
     def release(self):

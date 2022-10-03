@@ -152,7 +152,7 @@ class Camera(Node, CameraInterface):
         self.active_color = active_color
         self.inactive_color = inactive_color
 
-        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True, position=kwargs.get('position'),
+        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True,
                            rotation=kwargs.get('rotation'), is_selectable=False)
         self.mesh.color = self.inactive_color
         self.add(self.mesh, show_in_hierarchy=False)
@@ -246,14 +246,12 @@ class Camera(Node, CameraInterface):
             lines = np.apply_along_axis(transform, 1, lines)
             all_lines[i] = lines
 
-        self.frustum = Lines(all_lines, r_base=0.005, mode='lines', color=(0.1, 0.1, 0.1, 1), cast_shadow=False,
-                             position=self.position, rotation=self.rotation)
+        self.frustum = Lines(all_lines, r_base=0.005, mode='lines', color=(0.1, 0.1, 0.1, 1), cast_shadow=False)
         self.add(self.frustum, show_in_hierarchy=False)
 
         ori = np.eye(3, dtype=np.float)
         ori[:, 2] *= -1
-        self.origin = RigidBodies(np.array([0.0, 0.0, 0.0])[np.newaxis], ori[np.newaxis],
-                                  position=self.position, rotation=self.rotation)
+        self.origin = RigidBodies(np.array([0.0, 0.0, 0.0])[np.newaxis], ori[np.newaxis])
         self.add(self.origin, show_in_hierarchy=False)
 
         self.current_frame_id = frame_id
@@ -360,7 +358,7 @@ class WeakPerspectiveCamera(Camera):
 
         super(WeakPerspectiveCamera, self).__init__(n_frames=scale.shape[0], viewer=viewer, **kwargs)
 
-        self.scale = scale
+        self.scale_factor = scale
         self.translation = translation
 
         self.cols = cols
@@ -387,7 +385,7 @@ class WeakPerspectiveCamera(Camera):
         return self._right
 
     def update_matrices(self, width, height):
-        sx, sy = self.scale[self.current_frame_id]
+        sx, sy = self.scale_factor[self.current_frame_id]
         tx, ty = self.translation[self.current_frame_id]
 
         window_ar = width / height
@@ -613,15 +611,14 @@ class PinholeCamera(Camera):
     Your classic pinhole camera.
     """
     def __init__(self, position, target, cols, rows, fov=45, near=C.znear, far=C.zfar, viewer=None, **kwargs):
-        self._positions = position if len(position.shape) == 2 else position[np.newaxis]
-        self._targets = target if len(target.shape) == 2 else target[np.newaxis]
-        assert self._positions.shape[0] == 1 or self._targets.shape[0] == 1 or self._positions.shape[0] == self._targets.shape[0], (
-            f"position and target array shape mismatch: {self._positions.shape} and {self._targets.shape}")
+        positions = position if len(position.shape) == 2 else position[np.newaxis]
+        targets = target if len(target.shape) == 2 else target[np.newaxis]
+        assert positions.shape[0] == 1 or targets.shape[0] == 1 or positions.shape[0] == targets.shape[0], (
+            f"position and target array shape mismatch: {positions.shape} and {targets.shape}")
 
-        super(PinholeCamera, self).__init__(n_frames=self._positions.shape[0], viewer=viewer, **kwargs)
         self._world_up = np.array([0.0, 1.0, 0.0])
-        self.position = self.current_position
-        self.rotation = self.current_rotation
+        self._targets = targets
+        super(PinholeCamera, self).__init__(position=position, n_frames=targets.shape[0], viewer=viewer, **kwargs)
 
         self.cols = cols
         self.rows = rows
@@ -630,14 +627,9 @@ class PinholeCamera(Camera):
         self.far = far
         self.fov = fov
 
-    @hooked
-    def on_frame_update(self):
-        self.position = self.current_position
-        self.rotation = self.current_rotation
-
     @property
     def forward(self):
-        forward = self.current_target - self.current_position
+        forward = self.current_target - self.position
         forward = forward / np.linalg.norm(forward)
         return forward / np.linalg.norm(forward)
 
@@ -656,11 +648,7 @@ class PinholeCamera(Camera):
         return self._targets[0] if self._targets.shape[0] == 1 else self._targets[self.current_frame_id]
 
     @property
-    def current_position(self):
-        return self._positions[0] if self._positions.shape[0] == 1 else self._positions[self.current_frame_id]
-
-    @property
-    def current_rotation(self):
+    def rotation(self):
         return np.array([-self.right, self.up, -self.forward]).T
 
     def update_matrices(self, width, height):
@@ -668,7 +656,7 @@ class PinholeCamera(Camera):
         P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
 
         # Compute view matrix.
-        V = look_at(self.current_position, self.current_target, self._world_up)
+        V = look_at(self.position, self.current_target, self._world_up)
 
         # Update camera matrices.
         self.projection_matrix = P.astype('f4')
@@ -756,7 +744,7 @@ class ViewerCamera(CameraInterface):
 
     @position.setter
     def position(self, position):
-        self._position = position
+        self._position = np.array(position)
 
     @property
     def forward(self):

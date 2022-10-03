@@ -76,12 +76,14 @@ class Skeletons(Node):
 
     @property
     def current_joint_positions(self):
-        return self._joint_positions[self.current_frame_id]
+        idx = self.current_frame_id if self._joint_positions.shape[0] > 1 else 0
+        return self._joint_positions[idx]
 
     @current_joint_positions.setter
     def current_joint_positions(self, positions):
         assert len(positions.shape) == 2
-        self._joint_positions[self.current_frame_id] = positions
+        idx = self.current_frame_id if self._joint_positions.shape[0] > 1 else 0
+        self._joint_positions[idx] = positions
 
     def redraw(self, **kwargs):
         if kwargs.get('current_frame_only', False):

@@ -34,34 +34,75 @@ class Node(object):
                  scale=1.0,
                  color=(0.5, 0.5, 0.5, 1.0),
                  material=None,
-                 render_priority=1,
                  is_selectable=True,
                  gui_affine=True,
                  gui_material=True,
+                 enabled_frames=None,
                  n_frames=1):
         """
         :param name: Name of the node
         :param icon: Custom Node Icon using custom Icon font
-        :param position: Starting position in the format (X,Y,Z)
-        :param rotation: Starting rotation in rotation matrix representation (3,3)
-        :param scale: Starting scale (scalar)
+        :param position: Starting position in the format (X,Y,Z) or np array of positions with shape (F, 3)
+        :param rotation: Starting rotation in rotation matrix representation (3,3) or np array of rotations with shape (F, 3, 3)
+        :param scale: Starting scale (scalar) or np array of scale values with shape (F)
         :param color: (R,G,B,A) 0-1 formatted color value.
         :param material: Object material properties. The color specified in the material will override node color
+        :param is_selectable: If True the node is selectable when clicked on, otherwise the parent node will be selected.
+        :param gui_affine: If True the node will have transform controls (position, rotation, scale) in the GUI.
+        :param gui_material: If True the node will have material controls in the GUI.
+        :param enabled_frames: Numpy array of boolean values, the object will be enabled only in frames where the value is True,
+         the number of ones in the mask must match the number of frames of the object.
         :param n_frames: How many frames this renderable has.
         """
 
+
         # Transform & Animation
-        self._position = np.array([0.0, 0.0, 0.0]) if position is None else position
-        self._rotation = np.eye(3) if rotation is None else rotation
-        self._scale = scale
+        position = np.array([0.0, 0.0, 0.0]) if position is None else np.array(position)
+        rotation = np.eye(3) if rotation is None else np.array(rotation)
+
+        self._positions = position if len(position.shape) != 1 else position[np.newaxis]
+        self._rotations = rotation if len(rotation.shape) != 2 else rotation[np.newaxis]
+        self._scales = scale if isinstance(scale, np.ndarray) else np.array([scale])
+
+        n_positions = self._positions.shape[0]
+        n_rotations = self._rotations.shape[0]
+        n_scales = self._scales.shape[0]
+
+        if n_frames > 1:
+            assert n_positions == 1 or n_frames == n_positions, (f"Number of position frames"
+                f" ({n_positions}) must be 1 or match number of Node frames {n_frames}")
+            assert n_rotations== 1 or n_frames == n_rotations, (f"Number of rotations frames"
+                f" ({n_rotations}) must be 1 or match number of Node frames {n_frames}")
+            assert n_scales == 1 or n_frames == n_scales, (f"Number of scales frames"
+                f" ({n_scales}) must be 1 or match number of Node frames {n_frames}")
+        else:
+            n_frames = max(n_positions, n_rotations, n_scales)
+            assert ((n_positions == 1 or n_positions == n_frames) and
+                    (n_rotations == 1 or n_rotations == n_frames) and
+                    (n_scales == 1 or n_scales == n_frames)), (f"Number of position"
+                        f"({n_positions}), rotation ({n_rotations}) and scale ({n_scales})"
+                        "frames must be 1 or match.")
+
+        # Frames
         self._n_frames = n_frames
         self._current_frame_id = 0
+        self.model_matrix = self.get_local_transform()
+        self._enabled_frames = enabled_frames
+        if self._enabled_frames is not None:
+            assert np.count_nonzero(self._enabled_frames) == n_frames, (f"Number of non-zero elements in enabled_frames"
+                f" ({np.count_nonzero(self._enabled_frames)}) must match number of frames in sequence ({n_frames})")
+            # Create an array that maps from the true frame id (counting also disabled frames) to the index of the
+            # first existing frame in the sequence.
+            self._enabled_frame_id = np.cumsum(self._enabled_frames) - 1
+
+            # Stores the true frame id (counting also disabled frames) we use this to allow going
+            # through both enabled and disabled frames from the GUI.
+            self._internal_frame_id = 0
 
         # Material
         self.material = Material(color=color) if material is None else material
 
         # Renderable Attributes
-        self.render_priority = render_priority
         self.is_renderable = False
         self.backface_culling = True
         self.backface_fragmap = False
@@ -108,35 +149,73 @@ class Node(object):
     # Transform
     @property
     def position(self):
-        return self._position
+        idx = self.current_frame_id if self._positions.shape[0] > 1 else 0
+        return self._positions[idx]
 
     @position.setter
     def position(self, position):
-        self._position = position
-        for n in self.nodes:
-            n.position = position
+        idx = self.current_frame_id if self._positions.shape[0] > 1 else 0
+        self._positions[idx] = np.array(position)
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
+
+    @property
+    def positions(self):
+        return self._positions
+
+    @positions.setter
+    def positions(self, positions):
+        self._positions = positions
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
 
     @property
     def rotation(self):
-        return self._rotation
+        idx = self.current_frame_id if self._rotations.shape[0] > 1 else 0
+        return self._rotations[idx]
 
     @rotation.setter
     def rotation(self, rotation):
-        self._rotation = rotation
-        for n in self.nodes:
-            n.rotation = rotation
+        idx = self.current_frame_id if self._rotations.shape[0] > 1 else 0
+        self._rotations[idx] = rotation
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
+
+    @property
+    def rotations(self):
+        return self._rotations
+
+    @rotations.setter
+    def rotations(self, rotations):
+        self._rotations = rotations
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
 
     @property
     def scale(self):
-        return self._scale
+        idx = self.current_frame_id if self._scales.shape[0] > 1 else 0
+        return self._scales[idx]
 
     @scale.setter
     def scale(self, scale):
-        self._scale = scale
+        idx = self.current_frame_id if self._scales.shape[0] > 1 else 0
+        self._scales[idx] = scale
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
+
+    @property
+    def scales(self):
+        return self._scales
+
+    @scales.setter
+    def scales(self, scales):
+        self._scales = scales
+        if self.parent is not None:
+            self.update_transform(self.parent.model_matrix)
 
     @staticmethod
     @lru_cache()
-    def _compute_model_matrix(pos, rot, scale):
+    def _compute_transform(pos, rot, scale):
         rotation = np.eye(4)
         rotation[:3, :3] = np.array(rot)
 
@@ -147,12 +226,22 @@ class Node(object):
 
         return (trans @ rotation @ scale).astype('f4')
 
-    def model_matrix(self):
-        """Construct model matrix from this node's orientation and position."""
-        return self._compute_model_matrix(
+    def get_local_transform(self):
+        """Construct local transform as a 4x4 matrix from this node's position, orientation and scale."""
+        return self._compute_transform(
                tuple(self.position),
                tuple(map(tuple, self.rotation)),
                self.scale)
+
+    def update_transform(self, parent_transform=None):
+        """Update the model matrix of this node and all of its descendants."""
+        if parent_transform is None:
+            self.model_matrix = self.get_local_transform()
+        else:
+            self.model_matrix = parent_transform.astype('f4') @ self.get_local_transform()
+
+        for n in self.nodes:
+            n.update_transform(self.model_matrix)
 
     @property
     def color(self):
@@ -179,7 +268,7 @@ class Node(object):
             [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]])
 
         # Transform bounding box with the model matrix.
-        val = (self.model_matrix() @ np.vstack((val, np.array([1.0, 1.0]))))[:3]
+        val = (self.model_matrix @ np.vstack((val, np.array([1.0, 1.0]))))[:3]
 
         # If any of the elements is NaN return an empty bounding box.
         if np.isnan(val).any():
@@ -204,16 +293,38 @@ class Node(object):
 
     @current_frame_id.setter
     def current_frame_id(self, frame_id):
-        if self.n_frames == 1 or frame_id == self._current_frame_id:
+        # Check if the frame changed.
+        last_frame_id = self._current_frame_id if self._enabled_frames is None else self._internal_frame_id
+        if self.n_frames == 1 or frame_id == last_frame_id:
             return
+
         self.on_before_frame_update()
-        if frame_id < 0:
-            self._current_frame_id = 0
-        elif frame_id >= len(self):
-            self._current_frame_id = len(self) - 1
+        if self._enabled_frames is None:
+            if frame_id < 0:
+                self._current_frame_id = 0
+            elif frame_id >= len(self):
+                self._current_frame_id = len(self) - 1
+            else:
+                self._current_frame_id = frame_id
         else:
-            self._current_frame_id = frame_id
+            # If an enabled_frames is present use it to get the current frame.
+            if frame_id < 0:
+                self._internal_frame_id = 0
+            elif frame_id >= self._enabled_frames.shape[0]:
+                self._internal_frame_id = self._enabled_frames.shape[0] - 1
+            else:
+                self._internal_frame_id = frame_id
+            self._current_frame_id = self._enabled_frame_id[self._internal_frame_id]
+            # Update enabled using the mask.
+            self.enabled = self._enabled_frames[self._internal_frame_id]
+
+        # Update frame id of all children nodes.
+        for n in self.nodes:
+            n.current_frame_id = self._current_frame_id
+
         self.on_frame_update()
+        if self.parent and (self._positions.shape[0] > 1 or self._rotations.shape[0] > 1 or self._scales.shape[0] > 1):
+            self.update_transform(self.parent.model_matrix)
 
     def next_frame(self):
         self.current_frame_id = self.current_frame_id + 1 if self.current_frame_id < len(self) - 1 else 0
@@ -227,8 +338,7 @@ class Node(object):
 
     def on_frame_update(self):
         """Called when the current frame is changed."""
-        for n in self.nodes:
-            n.current_frame_id = self.current_frame_id
+        pass
 
     def add(self, *nodes, **kwargs):
         self._add_nodes(*nodes, **kwargs)
@@ -250,6 +360,7 @@ class Node(object):
         n._enabled = enabled
         self.nodes.append(n)
         n.parent = self
+        n.update_transform(self.model_matrix)
 
     def _add_nodes(self, *nodes, **kwargs):
         """Add multiple nodes"""
@@ -303,9 +414,15 @@ class Node(object):
     def gui_animation(self, imgui):
         """ Render GUI for animation related settings"""
 
-        if self.n_frames > 1:
-            u, fid = imgui.drag_int('Frame##r_{}'.format(self.unique_name),
-                                    self.current_frame_id, min_value=0, max_value=self.n_frames - 1)
+        if self._enabled_frames is None:
+            if self.n_frames > 1:
+                u, fid = imgui.slider_int('Frame##r_{}'.format(self.unique_name),
+                                        self.current_frame_id, min_value=0, max_value=self.n_frames - 1)
+                if u:
+                    self.current_frame_id = fid
+        else:
+            u, fid = imgui.slider_int('Frame##r_{}'.format(self.unique_name),
+                                    self._internal_frame_id, min_value=0, max_value=self._enabled_frames.shape[0] - 1)
             if u:
                 self.current_frame_id = fid
 
@@ -392,7 +509,7 @@ class Node(object):
     def set_camera_matrices(self, prog, camera, **kwargs):
         """Set the model view projection matrix in the given program."""
         # Transpose because np is row-major but OpenGL expects column-major.
-        prog['model_matrix'].write(self.model_matrix().T.astype('f4').tobytes())
+        prog['model_matrix'].write(self.model_matrix.T.astype('f4').tobytes())
         prog['view_projection_matrix'].write(camera.get_view_projection_matrix().T.astype('f4').tobytes())
 
     def receive_shadow(self, program, **kwargs):
@@ -406,7 +523,7 @@ class Node(object):
 
             for i, light in enumerate(lights):
                 if light.shadow_enabled and light.shadow_map:
-                    light_matrix = light.mvp() @ self.model_matrix()
+                    light_matrix = light.mvp() @ self.model_matrix
                     program[f'dirLights[{i}].matrix'].write(light_matrix.T.tobytes())
 
                     # Bind shadowmap to slot i + 1, we reserve slot 0 for the mesh texture
@@ -421,8 +538,8 @@ class Node(object):
         if not self.cast_shadow or self.color[3] == 0.0:
             return
 
-        prog['model_matrix'].write(self.model_matrix().T.astype('f4').tobytes())
-        prog['view_projection_matrix'].write(light_matrix.T.astype('f4').tobytes())
+        prog['model_matrix'].write(self.model_matrix.T.tobytes())
+        prog['view_projection_matrix'].write(light_matrix.T.tobytes())
 
         self.render_positions(prog)
 
@@ -431,7 +548,7 @@ class Node(object):
             return
 
         p = camera.get_projection_matrix()
-        mv = camera.get_view_matrix() @ self.model_matrix()
+        mv = camera.get_view_matrix() @ self.model_matrix
 
         # Transpose because np is row-major but OpenGL expects column-major.
         prog['projection'].write(p.T.astype('f4').tobytes())
@@ -465,7 +582,7 @@ class Node(object):
 
     def render_outline(self, ctx, camera, prog):
         if self.outline:
-            mvp = camera.get_view_projection_matrix() @ self.model_matrix()
+            mvp = camera.get_view_projection_matrix() @ self.model_matrix
             prog['mvp'].write(mvp.T.tobytes())
 
             if self.backface_culling:

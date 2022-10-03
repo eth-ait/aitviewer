@@ -50,7 +50,7 @@ class RigidBodies(Node):
         self.radius = radius
         self.length = length
 
-        self.spheres = Spheres(rb_pos, radius=radius, color=color, position=self.position, is_selectable=False)
+        self.spheres = Spheres(rb_pos, radius=radius, color=color, is_selectable=False)
         self._add_node(self.spheres, show_in_hierarchy=False)
 
         self.coords = []
@@ -64,8 +64,6 @@ class RigidBodies(Node):
             color[i] = 1.0
             axs = Arrows(self.rb_pos, self.rb_pos + line, r_base=r_base, r_head=r_head, color=tuple(color),
                          is_selectable=False)
-            axs.position = self.position
-            axs.rotation = self.rotation
             self._add_node(axs, show_in_hierarchy=False)
             self.coords.append(axs)
 
@@ -76,19 +74,23 @@ class RigidBodies(Node):
 
     @property
     def current_rb_pos(self):
-        return self.rb_pos[self.current_frame_id]
+        idx = self.current_frame_id if self.rb_pos.shape[0] > 1 else 0
+        return self.rb_pos[idx]
 
     @current_rb_pos.setter
     def current_rb_pos(self, pos):
-        self.rb_pos[self.current_frame_id] = pos
+        idx = self.current_frame_id if self.rb_pos.shape[0] > 1 else 0
+        self.rb_pos[idx] = pos
 
     @property
     def current_rb_ori(self):
-        return self.rb_ori[self.current_frame_id]
+        idx = self.current_frame_id if self.rb_ori.shape[0] > 1 else 0
+        return self.rb_ori[idx]
 
     @current_rb_ori.setter
     def current_rb_ori(self, ori):
-        self.rb_ori[self.current_frame_id] = ori
+        idx = self.current_frame_id if self.rb_ori.shape[0] > 1 else 0
+        self.rb_ori[idx] = ori
 
     def redraw(self, **kwargs):
         if kwargs.get('current_frame_only', False):
@@ -98,7 +100,6 @@ class RigidBodies(Node):
                 line = self.rb_ori[..., :, i][self.current_frame_id]
                 line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
                 axs = self.coords[i]
-                axs.position = self.position
                 axs.current_origins = self.current_rb_pos
                 axs.current_tips = self.current_rb_pos + line
         else:
@@ -108,7 +109,6 @@ class RigidBodies(Node):
                 line = self.rb_ori[..., :, i]
                 line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
                 axs = self.coords[i]
-                axs.position = self.position
                 axs.origins = self.rb_pos
                 axs.tips = self.rb_pos + line
 
