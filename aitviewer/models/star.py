@@ -24,7 +24,8 @@ try:
     from star.pytorch.star import STAR
     from star.config import cfg
 except Exception as e:
-    print("{}. Please run `pip install git+https://github.com/ahmedosman/STAR.git`".format(e))
+    print(f"{e}. Please run `pip install git+https://github.com/ahmedosman/STAR.git`")
+    raise
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.utils.so3 import aa2rot_torch as aa2rot
