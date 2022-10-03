@@ -24,13 +24,13 @@ from aitviewer.viewer import Viewer
 
 if __name__ == '__main__':
     star_layer = STARLayer(device=C.device)
-    star_template = STARSequence.t_pose(model=star_layer)
 
+    # Load a STAR Sequence from AMASS data. BETAs will not be loaded by default and need to be converted.
     star_seq = STARSequence.from_amass(
         npz_data_path=os.path.join(C.datasets.amass, "ACCAD/Female1Running_c3d/C2 - Run to stand_poses.npz"),
         fps_out=60.0, name="AMASS Running", show_joint_angles=False)
 
     # Add to scene and render
     v = Viewer()
-    v.scene.add(star_template, star_seq)
+    v.scene.add(star_seq)
     v.run()
