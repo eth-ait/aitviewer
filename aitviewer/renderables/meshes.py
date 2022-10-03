@@ -282,7 +282,7 @@ class Meshes(Node):
           enforce unit length of normals anyway.
         :return: The vertex and face normals as a np arrays of shape (V, 3) and (F, 3) respectively.
         """
-        vs = self.vertices[frame_id:frame_id + 1]
+        vs = self.vertices[frame_id:frame_id + 1] if self.vertices.shape[0] > 1 else self.vertices
         vn, fn = compute_vertex_and_face_normals(vs, self.faces, self.vertex_faces, normalize)
         return vn.squeeze(0), fn.squeeze(0)
 
