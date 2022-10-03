@@ -37,7 +37,7 @@ class Node(object):
                  is_selectable=True,
                  gui_affine=True,
                  gui_material=True,
-                 enabled_mask=None,
+                 enabled_frames=None,
                  n_frames=1):
         """
         :param name: Name of the node
@@ -50,7 +50,7 @@ class Node(object):
         :param is_selectable: If True the node is selectable when clicked on, otherwise the parent node will be selected.
         :param gui_affine: If True the node will have transform controls (position, rotation, scale) in the GUI.
         :param gui_material: If True the node will have material controls in the GUI.
-        :param enabled_mask: Numpy array of boolean values, the object will be enabled only in frames where the mask value is True,
+        :param enabled_frames: Numpy array of boolean values, the object will be enabled only in frames where the value is True,
          the number of ones in the mask must match the number of frames of the object.
         :param n_frames: How many frames this renderable has.
         """
@@ -87,13 +87,13 @@ class Node(object):
         self._n_frames = n_frames
         self._current_frame_id = 0
         self.model_matrix = self.get_local_transform()
-        self._enabled_mask = enabled_mask
-        if self._enabled_mask is not None:
-            assert np.count_nonzero(self._enabled_mask) == n_frames, (f"Number of non-zero elements in enabled_mask"
-                f" ({np.count_nonzero(self._enabled_mask)}) must match number of frames in sequence ({n_frames})")
+        self._enabled_frames = enabled_frames
+        if self._enabled_frames is not None:
+            assert np.count_nonzero(self._enabled_frames) == n_frames, (f"Number of non-zero elements in enabled_frames"
+                f" ({np.count_nonzero(self._enabled_frames)}) must match number of frames in sequence ({n_frames})")
             # Create an array that maps from the true frame id (counting also disabled frames) to the index of the
             # first existing frame in the sequence.
-            self._enabled_frame_id = np.cumsum(self._enabled_mask) - 1
+            self._enabled_frame_id = np.cumsum(self._enabled_frames) - 1
 
             # Stores the true frame id (counting also disabled frames) we use this to allow going
             # through both enabled and disabled frames from the GUI.
@@ -289,12 +289,12 @@ class Node(object):
     @current_frame_id.setter
     def current_frame_id(self, frame_id):
         # Check if the frame changed.
-        last_frame_id = self._current_frame_id if self._enabled_mask is None else self._internal_frame_id
+        last_frame_id = self._current_frame_id if self._enabled_frames is None else self._internal_frame_id
         if self.n_frames == 1 or frame_id == last_frame_id:
             return
 
         self.on_before_frame_update()
-        if self._enabled_mask is None:
+        if self._enabled_frames is None:
             if frame_id < 0:
                 self._current_frame_id = 0
             elif frame_id >= len(self):
@@ -302,16 +302,16 @@ class Node(object):
             else:
                 self._current_frame_id = frame_id
         else:
-            # If an enabled_mask is present use it to get the current frame.
+            # If an enabled_frames is present use it to get the current frame.
             if frame_id < 0:
                 self._internal_frame_id = 0
-            elif frame_id >= self._enabled_mask.shape[0]:
-                self._internal_frame_id = self._enabled_mask.shape[0] - 1
+            elif frame_id >= self._enabled_frames.shape[0]:
+                self._internal_frame_id = self._enabled_frames.shape[0] - 1
             else:
                 self._internal_frame_id = frame_id
             self._current_frame_id = self._enabled_frame_id[self._internal_frame_id]
             # Update enabled using the mask.
-            self.enabled = self._enabled_mask[self._internal_frame_id]
+            self.enabled = self._enabled_frames[self._internal_frame_id]
 
         # Update frame id of all children nodes.
         for n in self.nodes:
@@ -409,7 +409,7 @@ class Node(object):
     def gui_animation(self, imgui):
         """ Render GUI for animation related settings"""
 
-        if self._enabled_mask is None:
+        if self._enabled_frames is None:
             if self.n_frames > 1:
                 u, fid = imgui.slider_int('Frame##r_{}'.format(self.unique_name),
                                         self.current_frame_id, min_value=0, max_value=self.n_frames - 1)
@@ -417,7 +417,7 @@ class Node(object):
                     self.current_frame_id = fid
         else:
             u, fid = imgui.slider_int('Frame##r_{}'.format(self.unique_name),
-                                    self._internal_frame_id, min_value=0, max_value=self._enabled_mask.shape[0] - 1)
+                                    self._internal_frame_id, min_value=0, max_value=self._enabled_frames.shape[0] - 1)
             if u:
                 self.current_frame_id = fid
 
