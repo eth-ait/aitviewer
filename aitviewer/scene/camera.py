@@ -744,7 +744,7 @@ class ViewerCamera(CameraInterface):
 
     @position.setter
     def position(self, position):
-        self._position = position
+        self._position = np.array(position)
 
     @property
     def forward(self):

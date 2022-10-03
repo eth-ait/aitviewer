@@ -155,7 +155,7 @@ class Node(object):
     @position.setter
     def position(self, position):
         idx = self.current_frame_id if self._positions.shape[0] > 1 else 0
-        self._positions[idx] = position
+        self._positions[idx] = np.array(position)
         if self.parent is not None:
             self.update_transform(self.parent.model_matrix)
 
@@ -233,8 +233,13 @@ class Node(object):
                tuple(map(tuple, self.rotation)),
                self.scale)
 
-    def update_transform(self, parent_transform=np.eye(4, dtype=np.float32)):
-        self.model_matrix = parent_transform.astype('f4') @ self.get_local_transform()
+    def update_transform(self, parent_transform=None):
+        """Update the model matrix of this node and all of its descendants."""
+        if parent_transform is None:
+            self.model_matrix = self.get_local_transform()
+        else:
+            self.model_matrix = parent_transform.astype('f4') @ self.get_local_transform()
+
         for n in self.nodes:
             n.update_transform(self.model_matrix)
 
