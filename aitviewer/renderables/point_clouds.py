@@ -89,7 +89,8 @@ class PointClouds(Node):
 
     @Node.color.setter
     def color(self, color):
-        alpha_changed = np.abs((np.array(color) - np.array(self._colors[0])))[-1] > 0
+        # Take any point to check if the alpha changed.
+        alpha_changed = abs(color[-1] - self.colors[self.current_frame_id][0, -1]) > 0
         self.material.color = color
         if self.is_renderable:
             # If alpha changed, don't update all colors
