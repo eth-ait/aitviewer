@@ -31,4 +31,7 @@ setup(name='aitviewer',
               'joblib',
               'scikit-video',
               'Pillow'
-          ])
+          ],
+        extras_require = {
+            "star": ["star @ git+https://github.com/ahmedosman/STAR.git"]
+        })
