@@ -36,6 +36,6 @@ auto_set_floor: True
 auto_set_camera_target: True
 backface_culling: True
 background_color: [1.0, 1.0, 1.0, 1.0]
-
+window_type: "pyqt5"
 
 
