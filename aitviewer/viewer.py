@@ -75,6 +75,7 @@ class Viewer(moderngl_window.WindowConfig):
     size_mult = 1.0
     samples = 4
     gl_version = (4, 0)
+    window_type = C.window_type
 
     def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, **kwargs):
         """
@@ -89,7 +90,9 @@ class Viewer(moderngl_window.WindowConfig):
             C.update_conf(config)
 
         # Window Setup (Following `moderngl_window.run_window_config`).
-        base_window_cls = get_local_window_cls(C.window_type)
+        if self.window_type != 'headless':
+            self.window_type = C.window_type
+        base_window_cls = get_local_window_cls(self.window_type)
 
         # If no size is provided use the size from the configuration file
         if size is None:
