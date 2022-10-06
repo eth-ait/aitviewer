@@ -104,7 +104,7 @@ class PointClouds(Node):
 
     @property
     def current_points(self):
-        idx = self.current_frame_id if self.points.shape[0] > 1 else 0
+        idx = self.current_frame_id if len(self.points) > 1 else 0
         return self.points[idx]
 
     @property
@@ -113,7 +113,7 @@ class PointClouds(Node):
             n_points = self.current_points.shape[0]
             return np.full((n_points, 4), self.colors[0])
         else:
-            idx = self.current_frame_id if self.colors.shape[0] > 1 else 0
+            idx = self.current_frame_id if len(self.colors) > 1 else 0
             return self.colors[idx]
 
     @property
