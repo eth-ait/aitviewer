@@ -460,6 +460,8 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_scene(self):
         # Render scene GUI
+        imgui.set_next_window_position(50, 50, imgui.FIRST_USE_EVER)
+        imgui.set_next_window_size(self.window_size[0] * 0.25, self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
         imgui.begin("Editor", True)
         self.scene.gui_editor(imgui)
         imgui.end()
@@ -697,6 +699,8 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_playback(self):
         """GUI to control playback settings."""
+        imgui.set_next_window_position(50, 100 + self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
+        imgui.set_next_window_size(self.window_size[0] * 0.4, self.window_size[1] * 0.15, imgui.FIRST_USE_EVER)
         imgui.begin("Playback", True)
         u, run_animations = imgui.checkbox("Run animations [{}]".format(self._shortcut_names[self._pause_key]),
                                                 self.run_animations)
@@ -731,6 +735,8 @@ class Viewer(moderngl_window.WindowConfig):
     def gui_inspect(self):
         """GUI to control playback settings."""
         if self.selected_mode == 'inspect':
+            imgui.set_next_window_position(self.window_size[0] * 0.6, 50, imgui.FIRST_USE_EVER)
+            imgui.set_next_window_size(self.window_size[0] * 0.35, 140, imgui.FIRST_USE_EVER)
             imgui.begin("Inspect", True)
 
             if self.mmi is not None:
