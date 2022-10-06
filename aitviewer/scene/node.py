@@ -344,7 +344,7 @@ class Node(object):
         self._add_nodes(*nodes, **kwargs)
 
     def _add_node(self,
-                  n,
+                  n: 'Node',
                   show_in_hierarchy=True,
                   expanded=False,
                   enabled=True):
@@ -357,7 +357,7 @@ class Node(object):
             return
         n._show_in_hierarchy = show_in_hierarchy
         n._expanded = expanded
-        n._enabled = enabled
+        n._enabled = enabled if n._enabled_frames is None else n._enabled_frames[n.current_frame_id]
         self.nodes.append(n)
         n.parent = self
         n.update_transform(self.model_matrix)
@@ -395,9 +395,9 @@ class Node(object):
     def is_transparent(self):
         """
         Returns true if the object is transparent and should thus be sorted when rendering.
-        Subclasses should implement this method to be rendered correctly when transparent.
+        Subclassess that use a different color should implement this method to be rendered correctly when transparent.
         """
-        return False
+        return self.material.color[3] < 1.0
 
     def gui(self, imgui):
         """

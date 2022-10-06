@@ -30,6 +30,7 @@ from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.scene import Scene
 from aitviewer.scene.node import Node
+from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
 from aitviewer.utils import PerfTimer
 from aitviewer.utils.utils import get_video_paths, video_to_gif
@@ -48,6 +49,26 @@ from typing import Tuple, Union
 
 MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')
 
+SHORTCUTS = {
+    "SPACE": "Start/stop playing animation.",
+    ".": "Go to next frame.",
+    ",": "Go to previous frame.",
+    "X": "Center view on the selected object.",
+    "O": "Enable/disable orthographic camera.",
+    "T": "Show the camera target in the scene.",
+    "C": "Save the camera position and orientation to disk.",
+    "L": "Load the camera position and orientation from disk.",
+    "K": "Lock the selection to the currently selected object.",
+    "S": "Show/hide shadows.",
+    "D": "Enabled/disable dark mode.",
+    "P": "Save a screenshot to the the 'export/screenshots' directory.",
+    "I": "Change the viewer mode to 'inspect'",
+    "V": "Change the viewer mode to 'view'",
+    "E": "If a mesh is selected, show the edges of the mesh.",
+    "F": "If a mesh is selected, switch between flat and smooth shading.",
+    "Z": "Show a debug visualization of the object IDs.",
+    "ESC": "Exit the viewer.",
+}
 
 class Viewer(moderngl_window.WindowConfig):
     resource_dir = Path(__file__).parent / 'shaders'
@@ -139,6 +160,7 @@ class Viewer(moderngl_window.WindowConfig):
             'scene': self.gui_scene,
             'playback': self.gui_playback,
             'inspect': self.gui_inspect,
+            'shortcuts': self.gui_shortcuts,
             'exit': self.gui_exit,
         }
 
@@ -157,6 +179,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._previous_frame_key = self.wnd.keys.COMMA
         self._shadow_key = self.wnd.keys.S
         self._orthographic_camera_key = self.wnd.keys.O
+        self._center_view_on_selection_key = self.wnd.keys.X
         self._dark_mode_key = self.wnd.keys.D
         self._screenshot_key = self.wnd.keys.P
         self._middle_mouse_button = 3  # middle
@@ -179,11 +202,15 @@ class Viewer(moderngl_window.WindowConfig):
                                 self.wnd.keys.P: "P",
                                 self.wnd.keys.S: "S",
                                 self.wnd.keys.T: "T",
+                                self.wnd.keys.X: "X",
                                 self.wnd.keys.Z: "Z"}
 
         # Disable exit on escape key
         self.window.exit_key = None
+
+        # GUI
         self._exit_popup_open = False
+        self._show_shortcuts_window = False
 
     def create_framebuffers(self):
         """
@@ -283,6 +310,8 @@ class Viewer(moderngl_window.WindowConfig):
             self.window.swap_buffers()
         _, duration = self.timer.stop()
         self.on_close()
+        # Necessary for pyglet window, otherwise the window is not closed.
+        self.window.close()
         self.window.destroy()
         if duration > 0 and log:
             print("Duration: {0:.2f}s @ {1:.2f} FPS".format(duration, self.window.frames / duration))
@@ -457,6 +486,8 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_scene(self):
         # Render scene GUI
+        imgui.set_next_window_position(50, 50, imgui.FIRST_USE_EVER)
+        imgui.set_next_window_size(self.window_size[0] * 0.25, self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
         imgui.begin("Editor", True)
         self.scene.gui_editor(imgui)
         imgui.end()
@@ -497,6 +528,11 @@ class Viewer(moderngl_window.WindowConfig):
                 _, self.show_camera_target = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
                                                     self.show_camera_target, True)
 
+                clicked, _ = imgui.menu_item("Center view on selection", self._shortcut_names[self._center_view_on_selection_key],
+                                             False, isinstance(self.scene.selected_object, Node))
+                if clicked:
+                    self.center_view_on_selection()
+
                 is_ortho = False if self._using_temp_camera else self.scene.camera.is_ortho
                 _, is_ortho = imgui.menu_item("Orthographic Camera",
                                                                 self._shortcut_names[self._orthographic_camera_key],
@@ -527,6 +563,10 @@ class Viewer(moderngl_window.WindowConfig):
                     if mode_clicked:
                         self.selected_mode = id
 
+                imgui.end_menu()
+
+            if imgui.begin_menu("Help", True):
+                clicked, self._show_shortcuts_window = imgui.menu_item("Keyboard shortcuts", None, self._show_shortcuts_window)
                 imgui.end_menu()
 
             if imgui.begin_menu("Debug", True):
@@ -694,6 +734,8 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_playback(self):
         """GUI to control playback settings."""
+        imgui.set_next_window_position(50, 100 + self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
+        imgui.set_next_window_size(self.window_size[0] * 0.4, self.window_size[1] * 0.15, imgui.FIRST_USE_EVER)
         imgui.begin("Playback", True)
         u, run_animations = imgui.checkbox("Run animations [{}]".format(self._shortcut_names[self._pause_key]),
                                                 self.run_animations)
@@ -725,9 +767,20 @@ class Viewer(moderngl_window.WindowConfig):
         self.prevent_background_interactions()
         imgui.end()
 
+    def gui_shortcuts(self):
+        if self._show_shortcuts_window:
+            imgui.set_next_window_position(self.window_size[0] * 0.6, 200, imgui.FIRST_USE_EVER)
+            imgui.set_next_window_size(self.window_size[0] * 0.35, 350, imgui.FIRST_USE_EVER)
+            imgui.begin("Keyboard shortcuts", True)
+            for k, v in SHORTCUTS.items():
+                imgui.bullet_text(f"{k:5} - {v}")
+            imgui.end()
+
     def gui_inspect(self):
         """GUI to control playback settings."""
         if self.selected_mode == 'inspect':
+            imgui.set_next_window_position(self.window_size[0] * 0.6, 50, imgui.FIRST_USE_EVER)
+            imgui.set_next_window_size(self.window_size[0] * 0.35, 140, imgui.FIRST_USE_EVER)
             imgui.begin("Inspect", True)
 
             if self.mmi is not None:
@@ -812,6 +865,12 @@ class Viewer(moderngl_window.WindowConfig):
 
         return False
 
+    def center_view_on_selection(self):
+        if isinstance(self.scene.selected_object, Node):
+            if self._using_temp_camera:
+                self.reset_camera()
+            self.scene.camera.target = self.scene.selected_object.position
+
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
         self.imgui.resize(width, height)
@@ -864,6 +923,9 @@ class Viewer(moderngl_window.WindowConfig):
                 if self._using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
+
+            elif key == self._center_view_on_selection_key:
+                self.center_view_on_selection()
 
             elif key == self._mode_view_key:
                 self.selected_mode = 'view'
@@ -1051,6 +1113,11 @@ class Viewer(moderngl_window.WindowConfig):
         # Shut down all streams
         for s in self.scene.collect_nodes(obj_type=Streamable):
             s.stop()
+
+        # Clear the lru_cache on all shaders, we do this so that future instances of the viewer
+        # have to recompile shaders with the current moderngl context.
+        # See issue #12 https://github.com/eth-ait/aitviewer/issues/12
+        clear_shader_cache()
 
     def take_screenshot(self):
         """Save the current frame to an image in the screenshots directory inside the export directory"""
