@@ -1,12 +1,28 @@
+"""
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+import joblib
+import numpy as np
+
 from aitviewer.viewer import Viewer
-from aitviewer.headless import HeadlessRenderer
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.configuration import CONFIG as C
 from aitviewer.utils.so3 import aa2rot_numpy
 
-import joblib
-import numpy as np
 
 if __name__ == '__main__':
     # In this example we show a way to play sequences of data that has missing frames.
@@ -36,7 +52,6 @@ if __name__ == '__main__':
     # Set to zero the values at the indices of the 100 missing frames. There are now only M ones in the mask.
     enabled_frames[25:125] = 0
 
-
     # Instantiate an SMPL sequence using the parameters and the enabled_frames mask.
     smpl_layer = SMPLLayer(model_type='smpl', gender='neutral', device=C.device)
     smpl_seq = SMPLSequence(poses_body=p[:, 3:24 * 3],
@@ -56,12 +71,12 @@ if __name__ == '__main__':
     enabled_frames2[175:275] = 0
     smpl_layer2 = SMPLLayer(model_type='smpl', gender='neutral', device=C.device)
     smpl_seq2 = SMPLSequence(poses_body=p2[:, 3:24 * 3],
-                            poses_root=p2[:, 0:3],
-                            betas=b2,
-                            smpl_layer=smpl_layer2,
-                            position=(-1, 0, 0),
-                            rotation=aa2rot_numpy(np.array([1, 0, 0]) * np.pi),
-                            enabled_frames=enabled_frames2)
+                             poses_root=p2[:, 0:3],
+                             betas=b2,
+                             smpl_layer=smpl_layer2,
+                             position=(-1, 0, 0),
+                             rotation=aa2rot_numpy(np.array([1, 0, 0]) * np.pi),
+                             enabled_frames=enabled_frames2)
 
     # Run the viewer
     viewer = Viewer(size=(1600, 900))
@@ -71,4 +86,3 @@ if __name__ == '__main__':
     viewer.playback_fps = 25
     viewer.scene.add(smpl_seq, smpl_seq2)
     viewer.run()
-

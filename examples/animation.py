@@ -1,9 +1,26 @@
+"""
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+import numpy as np
+import trimesh
+
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.viewer import Viewer
 from aitviewer.utils.so3 import aa2rot_numpy
 
-import numpy as np
-import trimesh
 
 if __name__ == '__main__':
     # Number of frames.
@@ -24,9 +41,10 @@ if __name__ == '__main__':
     # of values (e.g. an array of positions with shape (N, 3) where N is the number of frames).
     # Array properties will be animated when playing the sequence (you can start playing pressing the spacebar).
     c1 = Meshes(cube.vertices, cube.faces, name='C1', position=p1, color=(0.5, 0, 0, 1), flat_shading=True)
-    c2 = Meshes(cube.vertices, cube.faces, name='C2', position=p2 + [3.0, 0.0, 0.0], rotation=r2, color=(0.3, 0, 0, 1), flat_shading=True)
-    c3 = Meshes(cube.vertices, cube.faces, name='C3', position=p3 + [3.0, 0.0, 0.0], scale=s3, color=(0.1, 0.1, 0.1, 1), flat_shading=True)
-
+    c2 = Meshes(cube.vertices, cube.faces, name='C2', position=p2 + [3.0, 0.0, 0.0], rotation=r2, color=(0.3, 0, 0, 1),
+                flat_shading=True)
+    c3 = Meshes(cube.vertices, cube.faces, name='C3', position=p3 + [3.0, 0.0, 0.0], scale=s3, color=(0.1, 0.1, 0.1, 1),
+                flat_shading=True)
 
     # Some properties of renderable objects can also be animated, such as the vertices of a mesh.
     # Here we create an array of vertices and vertex colors with shape (N, V, 3) and (N, V, 4) respectively.
@@ -39,7 +57,8 @@ if __name__ == '__main__':
     vertices_end = sphere.vertices.copy()
     for i in range(3):
         # Clamp vertices in each 3D direction preserving the sign to create a cube from the sphere.
-        vertices_begin[:, i] = np.sign(vertices_end[:, i]) * np.minimum(np.abs(vertices_begin[:, i]), np.full((vertices_begin.shape[0]), 1.7))
+        vertices_begin[:, i] = np.sign(vertices_end[:, i]) * np.minimum(np.abs(vertices_begin[:, i]),
+                                                                        np.full((vertices_begin.shape[0]), 1.7))
     # Linearly interpolate vertex positions.
     vertices = np.linspace(vertices_begin, vertices_end, N)
 
@@ -49,7 +68,8 @@ if __name__ == '__main__':
     vertex_colors = np.linspace(vertex_colors_begin, vertex_colors_end, N)
 
     # Create the node with the vertices and colors we computed.
-    cubesphere = Meshes(vertices, sphere.faces, name='CubeSphere', position=[-5, 2, 0], scale=0.5, vertex_colors=vertex_colors, flat_shading=True)
+    cubesphere = Meshes(vertices, sphere.faces, name='CubeSphere', position=[-5, 2, 0], scale=0.5,
+                        vertex_colors=vertex_colors, flat_shading=True)
 
     # Create a viewer.
     v = Viewer()
