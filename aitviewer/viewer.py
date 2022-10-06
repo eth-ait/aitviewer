@@ -158,6 +158,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._previous_frame_key = self.wnd.keys.COMMA
         self._shadow_key = self.wnd.keys.S
         self._orthographic_camera_key = self.wnd.keys.O
+        self._center_view_on_selection_key = self.wnd.keys.X
         self._dark_mode_key = self.wnd.keys.D
         self._screenshot_key = self.wnd.keys.P
         self._middle_mouse_button = 3  # middle
@@ -180,6 +181,7 @@ class Viewer(moderngl_window.WindowConfig):
                                 self.wnd.keys.P: "P",
                                 self.wnd.keys.S: "S",
                                 self.wnd.keys.T: "T",
+                                self.wnd.keys.X: "X",
                                 self.wnd.keys.Z: "Z"}
 
         # Disable exit on escape key
@@ -502,6 +504,11 @@ class Viewer(moderngl_window.WindowConfig):
                 _, self.show_camera_target = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
                                                     self.show_camera_target, True)
 
+                clicked, _ = imgui.menu_item("Center view on selection", self._shortcut_names[self._center_view_on_selection_key],
+                                             False, isinstance(self.scene.selected_object, Node))
+                if clicked:
+                    self.center_view_on_selection()
+
                 is_ortho = False if self._using_temp_camera else self.scene.camera.is_ortho
                 _, is_ortho = imgui.menu_item("Orthographic Camera",
                                                                 self._shortcut_names[self._orthographic_camera_key],
@@ -821,6 +828,12 @@ class Viewer(moderngl_window.WindowConfig):
 
         return False
 
+    def center_view_on_selection(self):
+        if isinstance(self.scene.selected_object, Node):
+            if self._using_temp_camera:
+                self.reset_camera()
+            self.scene.camera.target = self.scene.selected_object.position
+
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
         self.imgui.resize(width, height)
@@ -873,6 +886,9 @@ class Viewer(moderngl_window.WindowConfig):
                 if self._using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
+
+            elif key == self._center_view_on_selection_key:
+                self.center_view_on_selection()
 
             elif key == self._mode_view_key:
                 self.selected_mode = 'view'
