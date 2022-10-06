@@ -49,6 +49,26 @@ from typing import Tuple, Union
 
 MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')
 
+SHORTCUTS = {
+    "SPACE": "Start/stop playing animation.",
+    ".": "Go to next frame.",
+    ",": "Go to previous frame.",
+    "X": "Center view on the selected object.",
+    "O": "Enable/disable orthographic camera.",
+    "T": "Show the camera target in the scene.",
+    "C": "Save the camera position and orientation to disk.",
+    "L": "Load the camera position and orientation from disk.",
+    "K": "Lock the selection to the currently selected object.",
+    "S": "Show/hide shadows.",
+    "D": "Enabled/disable dark mode.",
+    "P": "Save a screenshot to the the 'export/screenshots' directory.",
+    "I": "Change the viewer mode to 'inspect'",
+    "V": "Change the viewer mode to 'view'",
+    "E": "If a mesh is selected, show the edges of the mesh.",
+    "F": "If a mesh is selected, switch between flat and smooth shading.",
+    "Z": "Show a debug visualization of the object IDs.",
+    "ESC": "Exit the viewer.",
+}
 
 class Viewer(moderngl_window.WindowConfig):
     resource_dir = Path(__file__).parent / 'shaders'
@@ -140,6 +160,7 @@ class Viewer(moderngl_window.WindowConfig):
             'scene': self.gui_scene,
             'playback': self.gui_playback,
             'inspect': self.gui_inspect,
+            'shortcuts': self.gui_shortcuts,
             'exit': self.gui_exit,
         }
 
@@ -186,7 +207,10 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Disable exit on escape key
         self.window.exit_key = None
+
+        # GUI
         self._exit_popup_open = False
+        self._show_shortcuts_window = False
 
     def create_framebuffers(self):
         """
@@ -541,6 +565,10 @@ class Viewer(moderngl_window.WindowConfig):
 
                 imgui.end_menu()
 
+            if imgui.begin_menu("Help", True):
+                clicked, self._show_shortcuts_window = imgui.menu_item("Keyboard shortcuts", None, self._show_shortcuts_window)
+                imgui.end_menu()
+
             if imgui.begin_menu("Debug", True):
                 _, self.visualize = imgui.menu_item("Visualize debug texture", self._shortcut_names[self._visualize_key],
                                                     self.visualize, True)
@@ -738,6 +766,15 @@ class Viewer(moderngl_window.WindowConfig):
                                                           min_value=0, max_value=n_frames - 1)
         self.prevent_background_interactions()
         imgui.end()
+
+    def gui_shortcuts(self):
+        if self._show_shortcuts_window:
+            imgui.set_next_window_position(self.window_size[0] * 0.6, 200, imgui.FIRST_USE_EVER)
+            imgui.set_next_window_size(self.window_size[0] * 0.35, 350, imgui.FIRST_USE_EVER)
+            imgui.begin("Keyboard shortcuts", True)
+            for k, v in SHORTCUTS.items():
+                imgui.bullet_text(f"{k:5} - {v}")
+            imgui.end()
 
     def gui_inspect(self):
         """GUI to control playback settings."""
