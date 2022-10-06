@@ -56,3 +56,18 @@ def get_screen_texture_program():
 @functools.lru_cache()
 def get_chessboard_program():
     return _load('chessboard.glsl')
+
+def clear_shader_cache():
+    """Clear all cached shaders."""
+    funcs =  [
+        get_smooth_lit_with_edges_program,
+        get_flat_lit_with_edges_program,
+        get_smooth_lit_texturized_program,
+        get_simple_unlit_program,
+        get_cylinder_program,
+        get_screen_texture_program,
+        get_chessboard_program,
+    ]
+    for f in funcs:
+        f.cache_clear()
+

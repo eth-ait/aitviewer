@@ -30,6 +30,7 @@ from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.scene import Scene
 from aitviewer.scene.node import Node
+from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
 from aitviewer.utils import PerfTimer
 from aitviewer.utils.utils import get_video_paths, video_to_gif
@@ -283,6 +284,8 @@ class Viewer(moderngl_window.WindowConfig):
             self.window.swap_buffers()
         _, duration = self.timer.stop()
         self.on_close()
+        # Necessary for pyglet window, otherwise the window is not closed.
+        self.window.close()
         self.window.destroy()
         if duration > 0 and log:
             print("Duration: {0:.2f}s @ {1:.2f} FPS".format(duration, self.window.frames / duration))
@@ -1051,6 +1054,11 @@ class Viewer(moderngl_window.WindowConfig):
         # Shut down all streams
         for s in self.scene.collect_nodes(obj_type=Streamable):
             s.stop()
+
+        # Clear the lru_cache on all shaders, we do this so that future instances of the viewer
+        # have to recompile shaders with the current moderngl context.
+        # See issue #12 https://github.com/eth-ait/aitviewer/issues/12
+        clear_shader_cache()
 
     def take_screenshot(self):
         """Save the current frame to an image in the screenshots directory inside the export directory"""
