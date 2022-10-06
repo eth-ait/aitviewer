@@ -317,15 +317,13 @@ class Viewer(moderngl_window.WindowConfig):
 
     def render(self, time, frame_time, export=False):
         """The main drawing function."""
-        # Advance up to 100 frames to avoid looping for too long if the playback speed is too high
-        for _ in range(100):
-            # Check if we need to advance the sequences.
-            if self.run_animations and time - self._last_frame_rendered_at > 1.0 / self.playback_fps:
-                self.scene.next_frame()
-                self._last_frame_rendered_at += 1.0 / self.playback_fps
-            else:
-                break
 
+        if self.run_animations:
+            # Compute number of frames to advance by.
+            frames = (int)((time - self._last_frame_rendered_at) * self.playback_fps)
+            if frames > 0:
+                self.scene.current_frame_id = (self.scene.current_frame_id + frames) % self.scene.n_frames
+                self._last_frame_rendered_at += frames * (1.0 / self.playback_fps)
 
         #Update camera matrices that will be used for rendering
         self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
