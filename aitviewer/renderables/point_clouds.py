@@ -89,17 +89,22 @@ class PointClouds(Node):
 
     @Node.color.setter
     def color(self, color):
-        # Take any point to check if the alpha changed.
-        alpha_changed = abs(color[-1] - self.colors[self.current_frame_id][0, -1]) > 0
+        """Update the color of the point cloud."""
+        # This is a bit ill-defined because point clouds can have per-point colors, in which case we probably do
+        # not want to override them with a single uniform color. We disallow this for now. The function is still useful
+        # though to change the alpha, even if a point cloud has per-point colors.
         self.material.color = color
         if self.is_renderable:
-            # If alpha changed, don't update all colors
-            if alpha_changed:
-                for i in range(self.n_frames):
-                    self.colors[i][..., -1] = color[-1]
+            single_color = isinstance(self.colors[0], tuple) and len(self.colors[0]) == 4
+            if single_color:
+                self.colors = tuple(color)
             else:
-                self.colors = color
-
+                # Only update the colors if the alpha changed. Take any frame and any point to check if the alpha
+                # changed because we always change every frame and every point.
+                alpha_changed = abs(color[-1] - self.colors[0][0, -1]) > 0
+                if alpha_changed:
+                    for i in range(self.n_frames):
+                        self.colors[i][..., -1] = color[-1]
         self.redraw()
 
     @property

@@ -1076,7 +1076,6 @@ class Viewer(moderngl_window.WindowConfig):
         z = b / (a + depth)
         return Image.fromarray(z, mode='F').transpose(Image.FLIP_TOP_BOTTOM)
 
-
     def get_current_mask_image(self):
         """
         Render and return a color mask as a 'RGB' PIL image. Each object in the mask
