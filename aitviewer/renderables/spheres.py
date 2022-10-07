@@ -115,6 +115,20 @@ class Spheres(Node):
         self.add(self.mesh, show_in_hierarchy=False)
 
     @property
+    def bounds(self):
+        bounds = self.get_bounds(self.sphere_positions)
+        bounds[:, 0] -= self.radius
+        bounds[:, 1] += self.radius
+        return bounds
+
+    @property
+    def current_bounds(self):
+        bounds = self.get_bounds(self.current_sphere_positions)
+        bounds[:, 0] -= self.radius
+        bounds[:, 1] += self.radius
+        return bounds
+
+    @property
     def vertex_colors(self):
         return np.full((self.n_spheres * self.n_vertices, 4), self.color)
 

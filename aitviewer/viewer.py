@@ -27,7 +27,7 @@ import trimesh
 from array import array
 from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.billboard import Billboard
-from aitviewer.renderables.meshes import Meshes
+from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.renderables.point_clouds import PointClouds
 from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.scene import Scene
@@ -842,7 +842,7 @@ class Viewer(moderngl_window.WindowConfig):
             # Camera space to world space
             point_world = np.array(np.linalg.inv(self.scene.camera.get_view_matrix()) @ np.array((x, y, z, 1.0)))[:-1]
             point_local = (np.linalg.inv(node.model_matrix) @ np.append(point_world, 1.0))[:-1]
-            if isinstance(node, Meshes) or isinstance(node, Billboard):
+            if isinstance(node, Meshes) or isinstance(node, Billboard) or isinstance(node, VariableTopologyMeshes):
                 vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
                 bc_coords = node.get_bc_coords_from_points(tri_id, [point_local])
             elif isinstance(node, PointClouds):
@@ -879,7 +879,7 @@ class Viewer(moderngl_window.WindowConfig):
         if isinstance(self.scene.selected_object, Node):
             if self._using_temp_camera:
                 self.reset_camera()
-            self.scene.camera.target = self.scene.selected_object.position.copy()
+            self.scene.camera.target = self.scene.selected_object.center
 
     def resize(self, width: int, height: int):
         self.window_size = (width, height)

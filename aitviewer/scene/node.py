@@ -252,7 +252,19 @@ class Node(object):
     @property
     def bounds(self):
         """ The bounds in the format ((x_min, x_max), (y_min, y_max), (z_min, z_max)) """
-        return None
+        return np.array([[0, 0], [0, 0], [0, 0]])
+
+    @property
+    def current_bounds(self):
+        return np.array([[0, 0], [0, 0], [0, 0]])
+
+    @property
+    def current_center(self):
+        return self.current_bounds.mean(-1)
+
+    @property
+    def center(self):
+        return self.bounds.mean(-1)
 
     def get_bounds(self, points):
         if len(points.shape) == 2 and points.shape[-1] == 3:

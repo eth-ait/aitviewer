@@ -149,32 +149,39 @@ class Scene(Node):
         for r in rs:
             r.make_renderable(self.ctx)
 
+    @property
+    def bounds(self):
+        bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
+        for n in self.nodes:
+            child = n.bounds
+            bounds[:, 0] = np.minimum(bounds[:, 0], child[:, 0])
+            bounds[:, 1] = np.maximum(bounds[:, 1], child[:, 1])
+        return bounds
+
+    @property
+    def current_bounds(self):
+        bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
+        for n in self.nodes:
+            child = n.current_bounds
+            bounds[:, 0] = np.minimum(bounds[:, 0], child[:, 0])
+            bounds[:, 1] = np.maximum(bounds[:, 1], child[:, 1])
+        return bounds
+
     def auto_set_floor(self):
         """Finds the minimum lower bound in the y coordinate from all the children bounds and uses that as the floor"""
-        rs = self.collect_nodes()
-        collected_bounds = []
-        for r in rs:
-            bounds = r.bounds
-            if bounds is not None:
-                collected_bounds.append(bounds)
-
-        if len(collected_bounds) > 0:
-            self.floor.position[1] = np.array(collected_bounds)[:, 1, 0].min()
+        if self.floor is not None and len(self.nodes) > 0:
+            self.floor.position[1] = self.bounds[1, 0]
             self.floor.update_transform()
 
     def auto_set_camera_target(self):
         """Sets the camera target to the average of the center of all objects in the scene"""
-        rs = self.collect_nodes()
         centers = []
-        for r in rs:
-            bounds = r.bounds
-            if bounds is not None:
-                center = bounds.mean(-1)
-                if center.sum() != 0.0:
-                    centers.append(center)
+        for n in self.nodes:
+            centers.append(n.center)
 
-        if len(centers) > 0:
+        if isinstance(self.camera, ViewerCamera) and len(centers) > 0:
             self.camera.target = np.array(centers).mean(0)
+
 
     def set_lights(self, is_dark_mode=False):
         if is_dark_mode:

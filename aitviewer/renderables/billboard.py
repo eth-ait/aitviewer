@@ -205,17 +205,27 @@ class Billboard(Node):
             if self.texture:
                 self.texture.release()
 
+    @property
+    def current_vertices(self):
+        return self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
+
+    @property
+    def bounds(self):
+        return self.get_bounds(self.vertices)
+
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.current_vertices)
+
     def is_transparent(self):
         return self.texture_alpha < 1.0
 
     def closest_vertex_in_triangle(self, tri_id, point):
-        vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
-        return np.linalg.norm((vertices - point), axis=-1).argmin()
+        return np.linalg.norm((self.current_vertices - point), axis=-1).argmin()
 
     def get_bc_coords_from_points(self, tri_id, points):
-        vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
         indices = np.array([ [0, 1, 2], [1, 2, 3] ])
-        return points_to_barycentric(vertices[indices[[tri_id]]], points)[0]
+        return points_to_barycentric(self.current_vertices[indices[[tri_id]]], points)[0]
 
     def gui_material(self, imgui, show_advanced=True):
         _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name),

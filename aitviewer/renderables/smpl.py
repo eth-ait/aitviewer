@@ -300,6 +300,14 @@ class SMPLSequence(Node):
         )
 
     @property
+    def bounds(self):
+        return self.mesh_seq.bounds
+
+    @property
+    def current_bounds(self):
+        return self.mesh_seq.current_bounds
+
+    @property
     def vertex_normals(self):
         return self.mesh_seq.vertex_normals
 

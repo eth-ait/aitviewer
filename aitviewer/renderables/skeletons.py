@@ -98,6 +98,10 @@ class Skeletons(Node):
     def bounds(self):
         return self.get_bounds(self.joint_positions)
 
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.current_joint_positions)
+
     @Node.color.setter
     def color(self, color):
         self.material.color = color

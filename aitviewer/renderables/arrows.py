@@ -67,6 +67,14 @@ class Arrows(Node):
         self._add_nodes(self.bases_r, self.arrows_r, show_in_hierarchy=False)
 
     @property
+    def bounds(self):
+        return self.arrows_r.bounds
+
+    @property
+    def current_bounds(self):
+        return self.arrows_r.current_bounds
+
+    @property
     def current_origins(self):
         idx = self.current_frame_id if self.origins.shape[0] > 1 else 0
         return self.origins[idx]

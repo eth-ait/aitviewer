@@ -201,6 +201,10 @@ class ChessboardPlane(Node):
     def bounds(self):
         return self.get_bounds(self.vertices)
 
+    @property
+    def current_bounds(self):
+        return self.bounds
+
     def gui(self, imgui):
         _, self.c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
         _, self.c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True)

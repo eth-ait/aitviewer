@@ -129,6 +129,10 @@ class PointClouds(Node):
     def bounds(self):
         return self.get_bounds(self.current_points)
 
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.current_points)
+
     def on_frame_update(self):
         """Called whenever a new frame must be displayed."""
         super().on_frame_update()
