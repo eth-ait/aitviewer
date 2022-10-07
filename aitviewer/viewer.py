@@ -868,7 +868,7 @@ class Viewer(moderngl_window.WindowConfig):
         if isinstance(self.scene.selected_object, Node):
             if self._using_temp_camera:
                 self.reset_camera()
-            self.scene.camera.target = self.scene.selected_object.position
+            self.scene.camera.target = self.scene.selected_object.position.copy()
 
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
