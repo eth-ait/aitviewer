@@ -761,7 +761,6 @@ class VariableTopologyMeshes(Node):
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
-
     def gui_affine(self, imgui):
         """ Render GUI for affine transformations"""
         # Position controls
@@ -777,7 +776,7 @@ class VariableTopologyMeshes(Node):
 
         # Scale controls
         us, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
-                                    max_value=10.0, format='%.3f')
+                                     max_value=10.0, format='%.3f')
         if us:
             self.scale = scale
 
