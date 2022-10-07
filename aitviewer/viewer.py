@@ -26,7 +26,9 @@ import trimesh
 
 from array import array
 from aitviewer.configuration import CONFIG as C
-from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
+from aitviewer.renderables.billboard import Billboard
+from aitviewer.renderables.meshes import Meshes
+from aitviewer.renderables.point_clouds import PointClouds
 from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.scene import Scene
 from aitviewer.scene.node import Node
@@ -840,8 +842,16 @@ class Viewer(moderngl_window.WindowConfig):
             # Camera space to world space
             point_world = np.array(np.linalg.inv(self.scene.camera.get_view_matrix()) @ np.array((x, y, z, 1.0)))[:-1]
             point_local = (np.linalg.inv(node.model_matrix) @ np.append(point_world, 1.0))[:-1]
-            vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
-            bc_coords = node.get_bc_coords_from_points(tri_id, [point_local])
+            if isinstance(node, Meshes) or isinstance(node, Billboard):
+                vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
+                bc_coords = node.get_bc_coords_from_points(tri_id, [point_local])
+            elif isinstance(node, PointClouds):
+                vert_id = tri_id
+                bc_coords = np.array([1, 0, 0])
+            else:
+                vert_id = 0
+                bc_coords = np.array(0, 0, 0)
+
             return MeshMouseIntersection(node, tri_id, vert_id, point_world, point_local, bc_coords)
 
         return None

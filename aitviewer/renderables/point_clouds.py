@@ -35,6 +35,7 @@ class PointClouds(Node):
                  color=(0.0, 0.0, 1.0, 1.0),
                  z_up=False,
                  icon="\u008c",
+                 pickable = True,
                  **kwargs):
         """
         A sequence of point clouds. Each point cloud can have a varying number of points.
@@ -49,6 +50,9 @@ class PointClouds(Node):
 
         self.points = points
         super(PointClouds, self).__init__(n_frames=len(self.points), color=color, icon=icon, **kwargs)
+
+        self.fragmap = pickable
+        self.outline = True
 
         self.colors = colors
         self.point_size = point_size
@@ -162,12 +166,20 @@ class PointClouds(Node):
         self.vao.buffer(self.vbo_points, '3f', ['in_position'])
         self.vao.buffer(self.vbo_colors, '4f', ['in_color'])
 
+        self.positions_vao = VAO('{}:positions'.format(self.unique_name), mode=moderngl.POINTS)
+        self.positions_vao.buffer(self.vbo_points, '3f', ['in_position'])
+
     def render(self, camera, **kwargs):
         self.set_camera_matrices(self.prog, camera, **kwargs)
         # Draw only as many points as we have set in the buffer.
         self.vao.render(self.prog, vertices=len(self.current_points))
 
+    def render_positions(self, prog):
+        if self.is_renderable:
+            self.positions_vao.render(prog, vertices=len(self.current_points))
+
     @hooked
     def release(self):
         if self.is_renderable:
             self.vao.release()
+            self.positions_vao.release(buffer=False)
