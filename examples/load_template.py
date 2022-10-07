@@ -21,6 +21,7 @@ from aitviewer.models.smpl import SMPLLayer
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
 
+
 if __name__ == '__main__':
     # Create a neutral SMPL T Pose.
     # This also works with `smplh` or `smplx` model type (but there's no neutral model for SMPL-H).

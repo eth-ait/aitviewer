@@ -8,6 +8,7 @@ A set of tools to visualize and interact with sequences of 3D data with cross-pl
 ## Features
 * Easy to use Python interface.
 * Load [SMPL[-H | -X]](https://smpl.is.tue.mpg.de/) / [MANO](https://mano.is.tue.mpg.de/) / [FLAME](https://flame.is.tue.mpg.de/) sequences and display them in an interactive viewer.
+* Support for the [STAR model](https://github.com/ahmedosman/STAR).
 * Manually editable SMPL sequences.
 * Render 3D data on top of images via weak-perspective or OpenCV camera models.
 * Built-in extensible GUI (based on Dear ImGui).
@@ -68,6 +69,7 @@ v.run()
 ## Examples
 
 Check out the [examples](examples/) for a few examples how to use the viewer:
+ * [`animation.py`](examples/animation.py): Example of how 3D primitives can be animated.
 
  * [`camera_path.py`](examples/camera_path.py): Example how to use camera paths.
 
@@ -88,6 +90,8 @@ Check out the [examples](examples/) for a few examples how to use the viewer:
  * [`load_template.py`](examples/load_template.py): Loads the template meshes of SMPL-H, MANO, and FLAME.
 
  * [`load_VIBE.py`](examples/load_VIBE.py): Loads the result of [VIBE](https://github.com/mkocabas/VIBE) and overlays it on top of the input image.
+
+ * [`missing_frames.py`](examples/missing_frames.py): Example how sequences with intermittent missing frames can be visualized.
 
  * [`quickstart.py`](examples/quickstart.py): The above quickstart example.
 
