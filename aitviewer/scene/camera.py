@@ -738,6 +738,14 @@ class ViewerCamera(CameraInterface):
         self.name = 'Camera'
         self.icon = '\u0084'
 
+        self.animating = False
+        self._animation_t = 0.0
+        self._animation_time = 0.0
+        self._animation_start_position = None
+        self._animation_end_position = None
+        self._animation_start_target = None
+        self._animation_end_target = None
+
     @property
     def position(self):
         return self._position
@@ -915,6 +923,31 @@ class ViewerCamera(CameraInterface):
         ray_dir = ray_dir / np.linalg.norm(ray_dir)
 
         return ray_origin, ray_dir
+
+    def move_with_animation(self, end_position, end_target, time=0.5):
+        self._animation_start_position = self.position.copy()
+        self._animation_end_position = np.array(end_position)
+        self._animation_start_target = self.target.copy()
+        self._animation_end_target = np.array(end_target)
+        self._animation_total_time = time
+        self._animation_t = 0.0
+        self.animating = True
+
+    def update_animation(self, dt):
+        if not self.animating:
+            return
+
+        self._animation_t += dt
+        if self._animation_t >= self._animation_total_time:
+            self.position = self._animation_end_position
+            self.target = self._animation_end_target
+            self.animating = False
+        else:
+            t = self._animation_t / self._animation_total_time
+            # Smootherstep interpolation (this polynomial has 0 first and second derivative at 0 and 1)
+            t = t * t * t * (t * (t * 6 - 15) + 10)
+            self.position = self._animation_start_position * (1 - t) + self._animation_end_position * t
+            self.target = self._animation_start_target * (1 - t) + self._animation_end_target * t
 
     def gui(self, imgui):
         _, self.is_ortho = imgui.checkbox('Orthographic Camera', self.is_ortho)

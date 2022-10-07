@@ -331,6 +331,8 @@ class Viewer(moderngl_window.WindowConfig):
                 self._last_frame_rendered_at += frames * (1.0 / self.playback_fps)
 
         #Update camera matrices that will be used for rendering
+        if isinstance(self.scene.camera, ViewerCamera):
+            self.scene.camera.update_animation(frame_time)
         self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
 
         if not export:
@@ -879,7 +881,13 @@ class Viewer(moderngl_window.WindowConfig):
         if isinstance(self.scene.selected_object, Node):
             if self._using_temp_camera:
                 self.reset_camera()
-            self.scene.camera.target = self.scene.selected_object.center
+            forward = self.scene.camera.forward
+            bounds = self.scene.selected_object.current_bounds
+            diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
+            dist = max(0.01, diag * 1.3)
+
+            center = bounds.mean(-1)
+            self.scene.camera.move_with_animation(center - forward * dist, center)
 
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
