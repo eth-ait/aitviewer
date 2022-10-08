@@ -42,6 +42,8 @@ class Billboard(Node):
             A np array of 4 billboard vertices in world space coordinates of shape (4, 3)
             or an array of shape (N, 4, 3) containing 4 vertices for each frame of the sequence
         :param texture_paths: A list of length N containing paths to the textures as image files.
+        :param img_process_fn: A function with signature f(img, current_frame_id) -> img. This function is called
+            once per image before it is displayed so it can be used to process the image in any way.
         """
         super(Billboard, self).__init__(n_frames=len(texture_paths), icon=icon, **kwargs)
 
@@ -53,7 +55,7 @@ class Billboard(Node):
         center = np.mean(vertices, axis=(0, 1))
         self.vertices = vertices - center
         self.position = center
-        self.img_process_fn = (lambda img: img) if img_process_fn is None else img_process_fn
+        self.img_process_fn = (lambda img, _: img) if img_process_fn is None else img_process_fn
 
         # Tile the uv buffer to match the size of the vertices buffer,
         # we do this so that we can use the same vertex array for all draws
@@ -142,7 +144,7 @@ class Billboard(Node):
 
         if image_process_fn is None:
             if isinstance(camera, OpenCVCamera) and (camera.dist_coeffs is not None):
-                def undistort(img):
+                def undistort(img, current_frame_id):
                     return cv2.undistort(img, camera.current_K, camera.dist_coeffs)
                 image_process_fn = undistort
 
@@ -173,7 +175,7 @@ class Billboard(Node):
                 img = pickle.load(open(path, "rb"))
             else:
                 img = cv2.cvtColor(cv2.flip(cv2.imread(path), 0), cv2.COLOR_BGR2RGB)
-            img = self.img_process_fn(img)
+            img = self.img_process_fn(img, self.current_frame_id)
             self.texture = self.ctx.texture((img.shape[1], img.shape[0]), img.shape[2], img.tobytes())
             self._current_texture_id = self.current_frame_id
 
