@@ -492,8 +492,9 @@ class Viewer(moderngl_window.WindowConfig):
         # Render scene GUI
         imgui.set_next_window_position(50, 50, imgui.FIRST_USE_EVER)
         imgui.set_next_window_size(self.window_size[0] * 0.25, self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
-        imgui.begin("Editor", True)
-        self.scene.gui_editor(imgui)
+        expanded, _ = imgui.begin("Editor", None)
+        if expanded:
+            self.scene.gui_editor(imgui)
         imgui.end()
 
     def gui_menu(self):
@@ -740,44 +741,46 @@ class Viewer(moderngl_window.WindowConfig):
         """GUI to control playback settings."""
         imgui.set_next_window_position(50, 100 + self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
         imgui.set_next_window_size(self.window_size[0] * 0.4, self.window_size[1] * 0.15, imgui.FIRST_USE_EVER)
-        imgui.begin("Playback", True)
-        u, run_animations = imgui.checkbox("Run animations [{}]".format(self._shortcut_names[self._pause_key]),
-                                                self.run_animations)
-        if u:
-            self.toggle_animation(run_animations)
+        expanded, _ = imgui.begin("Playback", None)
+        if expanded:
+            u, run_animations = imgui.checkbox("Run animations [{}]".format(self._shortcut_names[self._pause_key]),
+                                                    self.run_animations)
+            if u:
+                self.toggle_animation(run_animations)
 
-        # Plot FPS
-        frametime_avg = np.mean(self._past_frametimes[self._past_frametimes > 0.0])
-        fps_avg = 1 / frametime_avg
-        ms_avg = frametime_avg * 1000.0
-        ms_last = self._past_frametimes[-1] * 1000.0
+            # Plot FPS
+            frametime_avg = np.mean(self._past_frametimes[self._past_frametimes > 0.0])
+            fps_avg = 1 / frametime_avg
+            ms_avg = frametime_avg * 1000.0
+            ms_last = self._past_frametimes[-1] * 1000.0
 
-        imgui.plot_lines("Internal {:.1f} fps @ {:.2f} ms/frame [{:.2f}ms]".format(fps_avg, ms_avg, ms_last),
-                         array('f', (1.0 / self._past_frametimes).tolist()),
-                         scale_min=0, scale_max=100.0, graph_size=(100, 20))
+            imgui.plot_lines("Internal {:.1f} fps @ {:.2f} ms/frame [{:.2f}ms]".format(fps_avg, ms_avg, ms_last),
+                            array('f', (1.0 / self._past_frametimes).tolist()),
+                            scale_min=0, scale_max=100.0, graph_size=(100, 20))
 
-        _, self.playback_fps = imgui.drag_float(f'Playback fps', self.playback_fps, 0.1,
-                                                min_value=1.0, max_value=120.0, format='%.1f')
-        imgui.same_line(spacing=10)
-        speedup = self.playback_fps / self.scene.fps
-        imgui.text(f'({speedup:.2f}x speed)')
+            _, self.playback_fps = imgui.drag_float(f'Playback fps', self.playback_fps, 0.1,
+                                                    min_value=1.0, max_value=120.0, format='%.1f')
+            imgui.same_line(spacing=10)
+            speedup = self.playback_fps / self.scene.fps
+            imgui.text(f'({speedup:.2f}x speed)')
 
-        # Sequence Control
-        # For simplicity, we allow the global sequence slider to only go as far as the shortest known sequence.
-        n_frames = self.scene.n_frames
+            # Sequence Control
+            # For simplicity, we allow the global sequence slider to only go as far as the shortest known sequence.
+            n_frames = self.scene.n_frames
 
-        _, self.scene.current_frame_id = imgui.slider_int('Frame##r_global_seq_control', self.scene.current_frame_id,
-                                                          min_value=0, max_value=n_frames - 1)
-        self.prevent_background_interactions()
+            _, self.scene.current_frame_id = imgui.slider_int('Frame##r_global_seq_control', self.scene.current_frame_id,
+                                                            min_value=0, max_value=n_frames - 1)
+            self.prevent_background_interactions()
         imgui.end()
 
     def gui_shortcuts(self):
         if self._show_shortcuts_window:
             imgui.set_next_window_position(self.window_size[0] * 0.6, 200, imgui.FIRST_USE_EVER)
             imgui.set_next_window_size(self.window_size[0] * 0.35, 350, imgui.FIRST_USE_EVER)
-            imgui.begin("Keyboard shortcuts", True)
-            for k, v in SHORTCUTS.items():
-                imgui.bullet_text(f"{k:5} - {v}")
+            expanded, self._show_shortcuts_window = imgui.begin("Keyboard shortcuts", self._show_shortcuts_window)
+            if expanded:
+                for k, v in SHORTCUTS.items():
+                    imgui.bullet_text(f"{k:5} - {v}")
             imgui.end()
 
     def gui_inspect(self):
@@ -785,13 +788,13 @@ class Viewer(moderngl_window.WindowConfig):
         if self.selected_mode == 'inspect':
             imgui.set_next_window_position(self.window_size[0] * 0.6, 50, imgui.FIRST_USE_EVER)
             imgui.set_next_window_size(self.window_size[0] * 0.35, 140, imgui.FIRST_USE_EVER)
-            imgui.begin("Inspect", True)
+            expanded, _ = imgui.begin("Inspect", None)
+            if expanded:
+                if self.mmi is not None:
+                    for k, v in zip(self.mmi._fields, self.mmi):
+                        imgui.text("{}: {}".format(k, v))
 
-            if self.mmi is not None:
-                for k, v in zip(self.mmi._fields, self.mmi):
-                    imgui.text("{}: {}".format(k, v))
-
-            self.prevent_background_interactions()
+                self.prevent_background_interactions()
             imgui.end()
 
     def gui_exit(self):
