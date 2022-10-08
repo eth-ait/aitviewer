@@ -154,8 +154,7 @@ class Node(object):
     def position(self, position):
         idx = self.current_frame_id if self._positions.shape[0] > 1 else 0
         self._positions[idx] = np.array(position, dtype=np.float32).copy()
-        if self.parent is not None:
-            self.update_transform(self.parent.model_matrix)
+        self.update_transform(None if self.parent is None else self.parent.model_matrix)
 
     @property
     def positions(self):
@@ -164,8 +163,7 @@ class Node(object):
     @positions.setter
     def positions(self, positions):
         self._positions = positions
-        if self.parent is not None:
-            self.update_transform(self.parent.model_matrix)
+        self.update_transform(None if self.parent is None else self.parent.model_matrix)
 
     @property
     def rotation(self):
@@ -176,8 +174,7 @@ class Node(object):
     def rotation(self, rotation):
         idx = self.current_frame_id if self._rotations.shape[0] > 1 else 0
         self._rotations[idx] = rotation
-        if self.parent is not None:
-            self.update_transform(self.parent.model_matrix)
+        self.update_transform(None if self.parent is None else self.parent.model_matrix)
 
     @property
     def rotations(self):
@@ -186,8 +183,7 @@ class Node(object):
     @rotations.setter
     def rotations(self, rotations):
         self._rotations = rotations
-        if self.parent is not None:
-            self.update_transform(self.parent.model_matrix)
+        self.update_transform(None if self.parent is None else self.parent.model_matrix)
 
     @property
     def scale(self):
@@ -198,8 +194,7 @@ class Node(object):
     def scale(self, scale):
         idx = self.current_frame_id if self._scales.shape[0] > 1 else 0
         self._scales[idx] = scale
-        if self.parent is not None:
-            self.update_transform(self.parent.model_matrix)
+        self.update_transform(None if self.parent is None else self.parent.model_matrix)
 
     @property
     def scales(self):
@@ -208,8 +203,7 @@ class Node(object):
     @scales.setter
     def scales(self, scales):
         self._scales = scales
-        if self.parent is not None:
-            self.update_transform(self.parent.model_matrix)
+        self.update_transform(None if self.parent is None else self.parent.model_matrix)
 
     @staticmethod
     @lru_cache()
