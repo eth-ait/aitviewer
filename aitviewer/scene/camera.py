@@ -924,7 +924,7 @@ class ViewerCamera(CameraInterface):
 
         return ray_origin, ray_dir
 
-    def move_with_animation(self, end_position, end_target, time=0.5):
+    def move_with_animation(self, end_position, end_target, time=0.25):
         self._animation_start_position = self.position.copy()
         self._animation_end_position = np.array(end_position)
         self._animation_start_target = self.target.copy()
