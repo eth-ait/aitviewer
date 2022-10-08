@@ -54,15 +54,13 @@ class Node(object):
          the number of ones in the mask must match the number of frames of the object.
         :param n_frames: How many frames this renderable has.
         """
-
-
         # Transform & Animation
-        position = np.array([0.0, 0.0, 0.0]) if position is None else np.array(position)
-        rotation = np.eye(3) if rotation is None else np.array(rotation)
+        position = np.zeros(3, dtype=np.float32) if position is None else np.array(position, dtype=np.float32)
+        rotation = np.eye(3, dtype=np.float32) if rotation is None else np.array(rotation, dtype=np.float32)
 
         self._positions = position if len(position.shape) != 1 else position[np.newaxis]
         self._rotations = rotation if len(rotation.shape) != 2 else rotation[np.newaxis]
-        self._scales = scale if isinstance(scale, np.ndarray) else np.array([scale])
+        self._scales = (scale if isinstance(scale, np.ndarray) else np.array([scale])).astype(np.float32)
 
         n_positions = self._positions.shape[0]
         n_rotations = self._rotations.shape[0]
@@ -155,7 +153,7 @@ class Node(object):
     @position.setter
     def position(self, position):
         idx = self.current_frame_id if self._positions.shape[0] > 1 else 0
-        self._positions[idx] = np.array(position)
+        self._positions[idx] = np.array(position, dtype=np.float32).copy()
         if self.parent is not None:
             self.update_transform(self.parent.model_matrix)
 
@@ -254,7 +252,19 @@ class Node(object):
     @property
     def bounds(self):
         """ The bounds in the format ((x_min, x_max), (y_min, y_max), (z_min, z_max)) """
-        return None
+        return np.array([[0, 0], [0, 0], [0, 0]])
+
+    @property
+    def current_bounds(self):
+        return np.array([[0, 0], [0, 0], [0, 0]])
+
+    @property
+    def current_center(self):
+        return self.current_bounds.mean(-1)
+
+    @property
+    def center(self):
+        return self.bounds.mean(-1)
 
     def get_bounds(self, points):
         if len(points.shape) == 2 and points.shape[-1] == 3:

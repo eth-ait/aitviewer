@@ -247,6 +247,14 @@ class Lines(Node):
         self.add(self.mesh, show_in_hierarchy=False)
 
     @property
+    def bounds(self):
+        return self.mesh.current_bounds
+
+    @property
+    def current_bounds(self):
+        return self.mesh.current_bounds
+
+    @property
     def lines(self):
         return self._lines
 

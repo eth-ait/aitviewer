@@ -290,6 +290,10 @@ class Meshes(Node):
     def bounds(self):
         return self.get_bounds(self.vertices)
 
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.current_vertices)
+
     def is_transparent(self):
         return self.color[3] < 1.0
 
@@ -713,7 +717,11 @@ class VariableTopologyMeshes(Node):
 
     @property
     def bounds(self):
-        return self.current_mesh.get_bounds(self.current_mesh.vertices)
+        return self.current_mesh.bounds
+
+    @property
+    def current_bounds(self):
+        return self.current_mesh.current_bounds
 
     def closest_vertex_in_triangle(self, tri_id, point):
         return self.current_mesh.closest_vertex_in_triangle(tri_id, point)

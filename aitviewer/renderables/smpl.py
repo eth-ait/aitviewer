@@ -97,7 +97,7 @@ class SMPLSequence(Node):
         elif smpl_layer.model_type == 'flame':
             icon = "\u0091"
 
-        super(SMPLSequence, self).__init__(n_frames=poses_body.shape[0], icon=icon, **kwargs)
+        super(SMPLSequence, self).__init__(n_frames=poses_body.shape[0], icon=icon, gui_material=False, **kwargs)
 
         self.smpl_layer = smpl_layer
         self.post_fk_func = post_fk_func
@@ -298,6 +298,14 @@ class SMPLSequence(Node):
             betas=c2c(self.betas),
             trans=c2c(self.trans),
         )
+
+    @property
+    def bounds(self):
+        return self.mesh_seq.bounds
+
+    @property
+    def current_bounds(self):
+        return self.mesh_seq.current_bounds
 
     @property
     def vertex_normals(self):

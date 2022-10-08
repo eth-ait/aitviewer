@@ -92,6 +92,14 @@ class RigidBodies(Node):
         idx = self.current_frame_id if self.rb_ori.shape[0] > 1 else 0
         self.rb_ori[idx] = ori
 
+    @property
+    def bounds(self):
+        return self.get_bounds(self.rb_pos)
+
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.current_rb_pos)
+
     def redraw(self, **kwargs):
         if kwargs.get('current_frame_only', False):
             self.spheres.current_sphere_positions = self.current_rb_pos

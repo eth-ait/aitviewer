@@ -20,7 +20,7 @@ from aitviewer.scene.node import Node
 from aitviewer.renderables.rigid_bodies import RigidBodies
 
 
-class CoordinateSystem(Node):
+class CoordinateSystem(RigidBodies):
     """
     Render a coordinate system using shaded cylinders.
     """
@@ -29,10 +29,6 @@ class CoordinateSystem(Node):
                  length=1.0,
                  icon="\u008a",
                  **kwargs):
-        super(CoordinateSystem, self).__init__(icon=icon, **kwargs)
-
         r = length / 50
         l = length
-
-        self.rb = RigidBodies(np.array([[[0.0, 0.0, 0.0]]]), np.eye(3)[np.newaxis, np.newaxis], radius=r, length=l)
-        self.add(self.rb, show_in_hierarchy=False)
+        super(CoordinateSystem, self).__init__(np.array([[[0.0, 0.0, 0.0]]]), np.eye(3)[np.newaxis, np.newaxis], radius=r, length=l, icon=icon, **kwargs)
