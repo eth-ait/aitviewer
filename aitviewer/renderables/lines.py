@@ -248,7 +248,7 @@ class Lines(Node):
 
     @property
     def bounds(self):
-        return self.mesh.current_bounds
+        return self.mesh.bounds
 
     @property
     def current_bounds(self):
