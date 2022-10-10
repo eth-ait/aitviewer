@@ -124,7 +124,7 @@ class Viewer(moderngl_window.WindowConfig):
         super().__init__(self.ctx, self.window, self.timer)
 
         # Create GUI context
-        imgui.create_context()
+        self.imgui_ctx = imgui.create_context()
         self.imgui = ModernglWindowRenderer(self.wnd)
         self.imgui_user_interacting = False
 
@@ -314,6 +314,7 @@ class Viewer(moderngl_window.WindowConfig):
             self.window.swap_buffers()
         _, duration = self.timer.stop()
         self.on_close()
+        imgui.destroy_context(self.imgui_ctx)
         # Necessary for pyglet window, otherwise the window is not closed.
         self.window.close()
         self.window.destroy()
