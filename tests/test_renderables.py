@@ -59,7 +59,7 @@ def test_obj(viewer: Viewer):
     texture_image = os.path.join(RESOURCE_DIR, 'drill/drill_uv.png')
     drill_mesh = Meshes(drill.vertices, drill.faces, drill.vertex_normals,
                         uv_coords=drill.visual.uv, path_to_texture=texture_image, scale=50.0,
-                        texture_alpha=0.5)
+                        color=(1, 1, 1, 0.5))
 
     viewer.scene.camera.dolly_zoom(-100.0)
     viewer.scene.add(planet_mesh, drill_mesh, cube_mesh)
@@ -72,11 +72,7 @@ def test_smplh(viewer: Viewer):
                                                position=np.array((-1, 0.0, 0.0)))
     smplh_female = SMPLSequence.t_pose(SMPLLayer(model_type='smplh', gender='female', device=C.device), name='SMPL',
                                                  position=np.array((1, 0.0, 0.0)))
-    mano = SMPLSequence.t_pose(SMPLLayer(model_type='mano', gender='neutral', device=C.device),
-                                         position=np.array((-1.5, 0.0, 0.0)), name='MANO')
-    flame = SMPLSequence.t_pose(SMPLLayer(model_type='flame', gender='neutral', device=C.device),
-                                          position=np.array((1.5, 0.0, 0.0)), name='FLAME')
-    viewer.scene.add(smplh_male, smplh_female, mano, flame)
+    viewer.scene.add(smplh_male, smplh_female)
 
 
 @reference()

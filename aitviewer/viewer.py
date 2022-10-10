@@ -26,12 +26,15 @@ import trimesh
 
 from array import array
 from aitviewer.configuration import CONFIG as C
+from aitviewer.renderables.billboard import Billboard
 from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
-from aitviewer.scene.camera import ViewerCamera
+from aitviewer.renderables.point_clouds import PointClouds
+from aitviewer.scene.camera import PinholeCamera, ViewerCamera
 from aitviewer.scene.scene import Scene
 from aitviewer.scene.node import Node
+from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
-from aitviewer.utils import PerfTimer
+from aitviewer.utils import PerfTimer, path
 from aitviewer.utils.utils import get_video_paths, video_to_gif
 from collections import namedtuple
 from moderngl_window import activate_context
@@ -48,13 +51,34 @@ from typing import Tuple, Union
 
 MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')
 
+SHORTCUTS = {
+    "SPACE": "Start/stop playing animation.",
+    ".": "Go to next frame.",
+    ",": "Go to previous frame.",
+    "X": "Center view on the selected object.",
+    "O": "Enable/disable orthographic camera.",
+    "T": "Show the camera target in the scene.",
+    "C": "Save the camera position and orientation to disk.",
+    "L": "Load the camera position and orientation from disk.",
+    "K": "Lock the selection to the currently selected object.",
+    "S": "Show/hide shadows.",
+    "D": "Enabled/disable dark mode.",
+    "P": "Save a screenshot to the the 'export/screenshots' directory.",
+    "I": "Change the viewer mode to 'inspect'",
+    "V": "Change the viewer mode to 'view'",
+    "E": "If a mesh is selected, show the edges of the mesh.",
+    "F": "If a mesh is selected, switch between flat and smooth shading.",
+    "Z": "Show a debug visualization of the object IDs.",
+    "ESC": "Exit the viewer.",
+}
+
 
 class Viewer(moderngl_window.WindowConfig):
     resource_dir = Path(__file__).parent / 'shaders'
-    window_type = 'pyqt5'
     size_mult = 1.0
     samples = 4
     gl_version = (4, 0)
+    window_type = C.window_type
 
     def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, **kwargs):
         """
@@ -69,6 +93,8 @@ class Viewer(moderngl_window.WindowConfig):
             C.update_conf(config)
 
         # Window Setup (Following `moderngl_window.run_window_config`).
+        if self.window_type != 'headless':
+            self.window_type = C.window_type
         base_window_cls = get_local_window_cls(self.window_type)
 
         # If no size is provided use the size from the configuration file
@@ -99,7 +125,7 @@ class Viewer(moderngl_window.WindowConfig):
         super().__init__(self.ctx, self.window, self.timer)
 
         # Create GUI context
-        imgui.create_context()
+        self.imgui_ctx = imgui.create_context()
         self.imgui = ModernglWindowRenderer(self.wnd)
         self.imgui_user_interacting = False
 
@@ -139,6 +165,7 @@ class Viewer(moderngl_window.WindowConfig):
             'scene': self.gui_scene,
             'playback': self.gui_playback,
             'inspect': self.gui_inspect,
+            'shortcuts': self.gui_shortcuts,
             'exit': self.gui_exit,
         }
 
@@ -157,6 +184,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._previous_frame_key = self.wnd.keys.COMMA
         self._shadow_key = self.wnd.keys.S
         self._orthographic_camera_key = self.wnd.keys.O
+        self._center_view_on_selection_key = self.wnd.keys.X
         self._dark_mode_key = self.wnd.keys.D
         self._screenshot_key = self.wnd.keys.P
         self._middle_mouse_button = 3  # middle
@@ -166,8 +194,6 @@ class Viewer(moderngl_window.WindowConfig):
         self._load_cam_key = self.wnd.keys.L
         self._show_camera_target_key = self.wnd.keys.T
         self._visualize_key = self.wnd.keys.Z
-        self._flat_shading_key = self.wnd.keys.F
-        self._draw_edges_key = self.wnd.keys.E
         self._lock_selection_key = self.wnd.keys.K
         self._mode_inspect_key = self.wnd.keys.I
         self._mode_view_key = self.wnd.keys.V
@@ -181,12 +207,17 @@ class Viewer(moderngl_window.WindowConfig):
                                 self.wnd.keys.P: "P",
                                 self.wnd.keys.S: "S",
                                 self.wnd.keys.T: "T",
+                                self.wnd.keys.X: "X",
                                 self.wnd.keys.Z: "Z"}
 
         # Disable exit on escape key
         self.window.exit_key = None
-        self._exit_popup_open = False
 
+        # GUI
+        self._exit_popup_open = False
+        self._show_shortcuts_window = False
+
+    # noinspection PyAttributeOutsideInit
     def create_framebuffers(self):
         """
         Create all framebuffers which depend on the window size.
@@ -209,6 +240,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
         self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
 
+    # noinspection PyAttributeOutsideInit
     def reset(self):
         if self.scene is not None:
             self.scene.release()
@@ -285,29 +317,31 @@ class Viewer(moderngl_window.WindowConfig):
             self.window.swap_buffers()
         _, duration = self.timer.stop()
         self.on_close()
+        imgui.destroy_context(self.imgui_ctx)
+        # Necessary for pyglet window, otherwise the window is not closed.
+        self.window.close()
         self.window.destroy()
         if duration > 0 and log:
             print("Duration: {0:.2f}s @ {1:.2f} FPS".format(duration, self.window.frames / duration))
 
     def render(self, time, frame_time, export=False):
         """The main drawing function."""
-        # Advance up to 100 frames to avoid looping for too long if the playback speed is too high
-        for _ in range(100):
-            # Check if we need to advance the sequences.
-            if self.run_animations and time - self._last_frame_rendered_at > 1.0 / self.playback_fps:
-                self.scene.next_frame()
-                self._last_frame_rendered_at += 1.0 / self.playback_fps
-            else:
-                break
+        if self.run_animations:
+            # Compute number of frames to advance by.
+            frames = (int)((time - self._last_frame_rendered_at) * self.playback_fps)
+            if frames > 0:
+                self.scene.current_frame_id = (self.scene.current_frame_id + frames) % self.scene.n_frames
+                self._last_frame_rendered_at += frames * (1.0 / self.playback_fps)
 
-
-        #Update camera matrices that will be used for rendering
+        # Update camera matrices that will be used for rendering
+        if isinstance(self.scene.camera, ViewerCamera):
+            self.scene.camera.update_animation(frame_time)
         self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
 
         if not export:
             self.streamable_capture()
-            self.render_fragmap()
 
+        self.render_fragmap()
         self.render_shadowmap()
         self.render_prepare()
         self.render_scene()
@@ -424,6 +458,19 @@ class Viewer(moderngl_window.WindowConfig):
         self.scene.camera = camera
         self._using_temp_camera = True
 
+    def lock_to_node(self, node: Node, relative_position, smooth_sigma=None):
+        """
+        Create and return a PinholeCamera that follows a node, the target of the camera is the center
+        of the node at each frame and the camera is positioned with a constant offset (relative_position)
+        from its target. See aitviewer.utils.path.lock_to_node for more details about parameters.
+        The camera is set as the current viewer camera.
+        """
+        pos, tar = path.lock_to_node(node, relative_position, smooth_sigma=smooth_sigma)
+        cam = PinholeCamera(pos, tar, self.window_size[0], self.window_size[1], viewer=self)
+        self.scene.add(cam)
+        self.set_temp_camera(cam)
+        return cam
+
     def gui(self):
         imgui.new_frame()
 
@@ -459,8 +506,11 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_scene(self):
         # Render scene GUI
-        imgui.begin("Editor", True)
-        self.scene.gui_editor(imgui)
+        imgui.set_next_window_position(50, 50, imgui.FIRST_USE_EVER)
+        imgui.set_next_window_size(self.window_size[0] * 0.25, self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
+        expanded, _ = imgui.begin("Editor", None)
+        if expanded:
+            self.scene.gui_editor(imgui)
         imgui.end()
 
     def gui_menu(self):
@@ -499,6 +549,11 @@ class Viewer(moderngl_window.WindowConfig):
                 _, self.show_camera_target = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
                                                     self.show_camera_target, True)
 
+                clicked, _ = imgui.menu_item("Center view on selection", self._shortcut_names[self._center_view_on_selection_key],
+                                             False, isinstance(self.scene.selected_object, Node))
+                if clicked:
+                    self.center_view_on_selection()
+
                 is_ortho = False if self._using_temp_camera else self.scene.camera.is_ortho
                 _, is_ortho = imgui.menu_item("Orthographic Camera",
                                                                 self._shortcut_names[self._orthographic_camera_key],
@@ -529,6 +584,10 @@ class Viewer(moderngl_window.WindowConfig):
                     if mode_clicked:
                         self.selected_mode = id
 
+                imgui.end_menu()
+
+            if imgui.begin_menu("Help", True):
+                clicked, self._show_shortcuts_window = imgui.menu_item("Keyboard shortcuts", None, self._show_shortcuts_window)
                 imgui.end_menu()
 
             if imgui.begin_menu("Debug", True):
@@ -696,47 +755,62 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_playback(self):
         """GUI to control playback settings."""
-        imgui.begin("Playback", True)
-        u, run_animations = imgui.checkbox("Run animations [{}]".format(self._shortcut_names[self._pause_key]),
-                                                self.run_animations)
-        if u:
-            self.toggle_animation(run_animations)
+        imgui.set_next_window_position(50, 100 + self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
+        imgui.set_next_window_size(self.window_size[0] * 0.4, self.window_size[1] * 0.15, imgui.FIRST_USE_EVER)
+        expanded, _ = imgui.begin("Playback", None)
+        if expanded:
+            u, run_animations = imgui.checkbox("Run animations [{}]".format(self._shortcut_names[self._pause_key]),
+                                                    self.run_animations)
+            if u:
+                self.toggle_animation(run_animations)
 
-        # Plot FPS
-        frametime_avg = np.mean(self._past_frametimes[self._past_frametimes > 0.0])
-        fps_avg = 1 / frametime_avg
-        ms_avg = frametime_avg * 1000.0
-        ms_last = self._past_frametimes[-1] * 1000.0
+            # Plot FPS
+            frametime_avg = np.mean(self._past_frametimes[self._past_frametimes > 0.0])
+            fps_avg = 1 / frametime_avg
+            ms_avg = frametime_avg * 1000.0
+            ms_last = self._past_frametimes[-1] * 1000.0
 
-        imgui.plot_lines("Internal {:.1f} fps @ {:.2f} ms/frame [{:.2f}ms]".format(fps_avg, ms_avg, ms_last),
-                         array('f', (1.0 / self._past_frametimes).tolist()),
-                         scale_min=0, scale_max=100.0, graph_size=(100, 20))
+            imgui.plot_lines("Internal {:.1f} fps @ {:.2f} ms/frame [{:.2f}ms]".format(fps_avg, ms_avg, ms_last),
+                            array('f', (1.0 / self._past_frametimes).tolist()),
+                            scale_min=0, scale_max=100.0, graph_size=(100, 20))
 
-        _, self.playback_fps = imgui.drag_float(f'Playback fps', self.playback_fps, 0.1,
-                                                min_value=1.0, max_value=120.0, format='%.1f')
-        imgui.same_line(spacing=10)
-        speedup = self.playback_fps / self.scene.fps
-        imgui.text(f'({speedup:.2f}x speed)')
+            _, self.playback_fps = imgui.drag_float(f'Playback fps', self.playback_fps, 0.1,
+                                                    min_value=1.0, max_value=120.0, format='%.1f')
+            imgui.same_line(spacing=10)
+            speedup = self.playback_fps / self.scene.fps
+            imgui.text(f'({speedup:.2f}x speed)')
 
-        # Sequence Control
-        # For simplicity, we allow the global sequence slider to only go as far as the shortest known sequence.
-        n_frames = self.scene.n_frames
+            # Sequence Control
+            # For simplicity, we allow the global sequence slider to only go as far as the shortest known sequence.
+            n_frames = self.scene.n_frames
 
-        _, self.scene.current_frame_id = imgui.slider_int('Frame##r_global_seq_control', self.scene.current_frame_id,
-                                                          min_value=0, max_value=n_frames - 1)
-        self.prevent_background_interactions()
+            _, self.scene.current_frame_id = imgui.slider_int('Frame##r_global_seq_control', self.scene.current_frame_id,
+                                                            min_value=0, max_value=n_frames - 1)
+            self.prevent_background_interactions()
         imgui.end()
+
+    def gui_shortcuts(self):
+        if self._show_shortcuts_window:
+            imgui.set_next_window_position(self.window_size[0] * 0.6, 200, imgui.FIRST_USE_EVER)
+            imgui.set_next_window_size(self.window_size[0] * 0.35, 350, imgui.FIRST_USE_EVER)
+            expanded, self._show_shortcuts_window = imgui.begin("Keyboard shortcuts", self._show_shortcuts_window)
+            if expanded:
+                for k, v in SHORTCUTS.items():
+                    imgui.bullet_text(f"{k:5} - {v}")
+            imgui.end()
 
     def gui_inspect(self):
         """GUI to control playback settings."""
         if self.selected_mode == 'inspect':
-            imgui.begin("Inspect", True)
+            imgui.set_next_window_position(self.window_size[0] * 0.6, 50, imgui.FIRST_USE_EVER)
+            imgui.set_next_window_size(self.window_size[0] * 0.35, 140, imgui.FIRST_USE_EVER)
+            expanded, _ = imgui.begin("Inspect", None)
+            if expanded:
+                if self.mmi is not None:
+                    for k, v in zip(self.mmi._fields, self.mmi):
+                        imgui.text("{}: {}".format(k, v))
 
-            if self.mmi is not None:
-                for k, v in zip(self.mmi._fields, self.mmi):
-                    imgui.text("{}: {}".format(k, v))
-
-            self.prevent_background_interactions()
+                self.prevent_background_interactions()
             imgui.end()
 
     def gui_exit(self):
@@ -788,9 +862,17 @@ class Viewer(moderngl_window.WindowConfig):
             node = self.scene.get_node_by_uid(obj_id)
             # Camera space to world space
             point_world = np.array(np.linalg.inv(self.scene.camera.get_view_matrix()) @ np.array((x, y, z, 1.0)))[:-1]
-            point_local = (np.linalg.inv(node.model_matrix()) @ np.append(point_world, 1.0))[:-1]
-            vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
-            bc_coords = node.get_bc_coords_from_points(tri_id, [point_local])
+            point_local = (np.linalg.inv(node.model_matrix) @ np.append(point_world, 1.0))[:-1]
+            if isinstance(node, Meshes) or isinstance(node, Billboard) or isinstance(node, VariableTopologyMeshes):
+                vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
+                bc_coords = node.get_bc_coords_from_points(tri_id, [point_local])
+            elif isinstance(node, PointClouds):
+                vert_id = tri_id
+                bc_coords = np.array([1, 0, 0])
+            else:
+                vert_id = 0
+                bc_coords = np.array(0, 0, 0)
+
             return MeshMouseIntersection(node, tri_id, vert_id, point_world, point_local, bc_coords)
 
         return None
@@ -813,6 +895,18 @@ class Viewer(moderngl_window.WindowConfig):
                 node = node.parent
 
         return False
+
+    def center_view_on_selection(self):
+        if isinstance(self.scene.selected_object, Node):
+            if self._using_temp_camera:
+                self.reset_camera()
+            forward = self.scene.camera.forward
+            bounds = self.scene.selected_object.current_bounds
+            diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
+            dist = max(0.01, diag * 1.3)
+
+            center = bounds.mean(-1)
+            self.scene.camera.move_with_animation(center - forward * dist, center)
 
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
@@ -867,6 +961,9 @@ class Viewer(moderngl_window.WindowConfig):
                     self.reset_camera()
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
 
+            elif key == self._center_view_on_selection_key:
+                self.center_view_on_selection()
+
             elif key == self._mode_view_key:
                 self.selected_mode = 'view'
 
@@ -891,18 +988,12 @@ class Viewer(moderngl_window.WindowConfig):
             elif key == self._visualize_key:
                 self.visualize = not self.visualize
 
-            elif key == self._flat_shading_key:
-                selected = self.scene.selected_object
-                if isinstance(selected, Meshes) or isinstance(selected, VariableTopologyMeshes):
-                    selected.flat_shading = not selected.flat_shading
-
-            elif key == self._draw_edges_key:
-                selected = self.scene.selected_object
-                if isinstance(selected, Meshes) or isinstance(selected, VariableTopologyMeshes):
-                    selected.draw_edges = not selected.draw_edges
-
             elif key == self._lock_selection_key:
                 self.lock_selection = not self.lock_selection
+
+            # Pass onto selected object
+            if isinstance(self.scene.gui_selected_object, Node):
+                self.scene.gui_selected_object.key_event(key, self.wnd.keys)
 
         if action == self.wnd.keys.ACTION_RELEASE:
             pass
@@ -991,8 +1082,65 @@ class Viewer(moderngl_window.WindowConfig):
                                 (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
                                  self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
                                 self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1))
-        image = image.transpose(Image.FLIP_TOP_BOTTOM)
-        return image
+        return image.transpose(Image.FLIP_TOP_BOTTOM)
+
+    def get_current_depth_image(self):
+        """
+        Return the depth buffer as a 'F' PIL image.
+        Depth is stored as the z coordinate in eye (view) space.
+        Therefore values in the depth image represent the distance from the pixel to
+        the plane passing through the camera and orthogonal to the view direction.
+        Values are between the near and far plane distances of the camera used for rendering,
+        everything outside this range is clipped by OpenGL.
+        """
+        # Get depth image from depth buffer.
+        depth = Image.frombytes('F',
+                                (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
+                                 self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
+                                self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype='f4'))
+
+        # Convert from [0, 1] range to [-1, 1] range.
+        # This is necessary because our projection matrix computes NDC
+        # from [-1, 1], but depth is then stored normalized from 0 to 1.
+        depth = np.array(depth) * 2.0 - 1.0
+
+        # Extract projection matrix parameters used for mapping Z coordinates.
+        P = self.scene.camera.get_projection_matrix()
+        a, b = P[2, 2], P[2, 3]
+
+        # Linearize depth values. This converts from [-1, 1] range to the
+        # view space Z coordinate value, with positive z in front of the camera.
+        z = b / (a + depth)
+        return Image.fromarray(z, mode='F').transpose(Image.FLIP_TOP_BOTTOM)
+
+    def get_current_mask_image(self):
+        """
+        Render and return a color mask as a 'RGB' PIL image. Each object in the mask
+        has a uniform color computed as an hash of the Node uid.
+        """
+        # Get object ids as floating point numbers from the first channel of
+        # the first attachment of the picking framebuffer.
+        id = Image.frombytes('F',
+                             (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
+                              self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
+                             self.offscreen_p.read(viewport=self.wnd.fbo.viewport, alignment=1, components=1, attachment=1, dtype='f4'))
+
+        # Convert the id to integer values.
+        id_int = np.asarray(id).astype(dtype=np.int32)
+
+        # Hash the ids.
+        def hash(h):
+            h ^= h >> 16
+            h *= 0x85ebca6b
+            h ^= h >> 13
+            h *= 0xc2b2ae35
+            h ^= h >> 16
+            return h
+        hashed = hash(id_int.copy())
+
+        # Convert the hashed ids to an RGBA image and then throw away the alpha channel.
+        img = Image.frombytes('RGBA', id.size, hashed.tobytes()).convert('RGB')
+        return img.transpose(Image.FLIP_TOP_BOTTOM)
 
     def on_close(self):
         """
@@ -1002,11 +1150,16 @@ class Viewer(moderngl_window.WindowConfig):
         for s in self.scene.collect_nodes(obj_type=Streamable):
             s.stop()
 
+        # Clear the lru_cache on all shaders, we do this so that future instances of the viewer
+        # have to recompile shaders with the current moderngl context.
+        # See issue #12 https://github.com/eth-ait/aitviewer/issues/12
+        clear_shader_cache()
+
     def take_screenshot(self):
         """Save the current frame to an image in the screenshots directory inside the export directory"""
         file_path = os.path.join(C.export_dir, 'screenshots', 'frame_{:0>6}.png'.format(self.scene.current_frame_id))
         self.export_frame(file_path)
-        print(f"Saved screenshot to {file_path}")
+        print(f"Screenshot saved to {file_path}")
 
     def export_frame(self, file_path, scale_factor:float=None):
         """Save the current frame to an image.
@@ -1061,7 +1214,6 @@ class Viewer(moderngl_window.WindowConfig):
 
             # The frame dir does not yet exist (we've made sure of it).
             os.makedirs(frame_dir)
-            print("Saving frames to {}".format(frame_dir))
 
         # Store the current camera and create a copy of it if required.
         saved_camera = self.scene.camera
@@ -1156,15 +1308,18 @@ class Viewer(moderngl_window.WindowConfig):
         # Save the video.
         if output_path is not None:
             writer.close()
-
-            # Convert to gif if required.
             if is_gif:
+                # Convert to gif.
                 video_to_gif(path_mp4, path_gif, remove=True)
+
+                print(f"GIF saved to {os.path.abspath(path_gif)}")
+            else:
+                print(f"Video saved to {os.path.abspath(output_path)}")
+        else:
+            print(f"Frames saved to {os.path.abspath(frame_dir)}")
 
         # Reset viewer data.
         self.scene.camera = saved_camera
         self.scene.current_frame_id = saved_curr_frame
         self.run_animations = saved_run_animations
         self._last_frame_rendered_at = self.timer.time
-
-        print("Done.")

@@ -58,7 +58,6 @@ def get_video_paths(video_path):
         counter += 1
         video_path_candidate = video_path.replace(suffix, f'_{counter}{suffix}')
 
-
     if is_mp4:
         return video_path_candidate, None, is_gif
     else:
@@ -68,10 +67,10 @@ def get_video_paths(video_path):
 
 def video_to_gif(path_mp4, path_gif, remove=False):
     command = ['ffmpeg',
-                '-i', path_mp4,
-                '-y',
-                '-filter_complex', f"[0:v] split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
-                path_gif]
+               '-i', path_mp4,
+               '-y',
+               '-filter_complex', f"[0:v] split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
+               path_gif]
 
     with open(os.devnull, 'w') as FNULL:
         subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
@@ -198,7 +197,7 @@ def compute_vertex_and_face_normals(vertices, faces, vertex_faces, normalize=Fal
 def set_lights_in_program(prog, lights, shadows_enabled):
     """Set program lighting from scene lights"""
     for i, light in enumerate(lights):
-        prog[f'dirLights[{i}].pos'].value = light.position
+        prog[f'dirLights[{i}].pos'].value = tuple(light.position)
         prog[f'dirLights[{i}].color'].value = light.color[:3]
         prog[f'dirLights[{i}].intensity_ambient'].value = light.intensity_ambient
         prog[f'dirLights[{i}].intensity_diffuse'].value = light.intensity_diffuse

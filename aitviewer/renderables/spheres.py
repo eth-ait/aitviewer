@@ -111,10 +111,22 @@ class Spheres(Node):
         # A mesh representing the spheres for a single frame
         self.mesh = Meshes(self.sphere_vertices, self.sphere_faces, self.sphere_normals, material=self.material,
                            cast_shadow=False, is_selectable=False)
-        self.mesh.position = self.position
-        self.mesh.rotation = self.rotation
 
         self.add(self.mesh, show_in_hierarchy=False)
+
+    @property
+    def bounds(self):
+        bounds = self.get_bounds(self.sphere_positions)
+        bounds[:, 0] -= self.radius
+        bounds[:, 1] += self.radius
+        return bounds
+
+    @property
+    def current_bounds(self):
+        bounds = self.get_bounds(self.current_sphere_positions)
+        bounds[:, 0] -= self.radius
+        bounds[:, 1] += self.radius
+        return bounds
 
     @property
     def vertex_colors(self):
@@ -126,12 +138,14 @@ class Spheres(Node):
 
     @property
     def current_sphere_positions(self):
-        return self.sphere_positions[self.current_frame_id]
+        idx = self.current_frame_id if self.sphere_positions.shape[0] > 1 else 0
+        return self.sphere_positions[idx]
 
     @current_sphere_positions.setter
     def current_sphere_positions(self, positions):
         assert len(positions.shape) == 2
-        self.sphere_positions[self.current_frame_id] = positions
+        idx = self.current_frame_id if self.sphere_positions.shape[0] > 1 else 0
+        self.sphere_positions[idx] = positions
 
     def on_frame_update(self):
         self.redraw()
@@ -139,7 +153,7 @@ class Spheres(Node):
     def redraw(self, **kwargs):
         current_pos = self.sphere_positions[self.current_frame_id]
         vertices = np.reshape(self.sphere_vertices, [-1, self.n_vertices, 3]) * self.radius + current_pos[:, np.newaxis]
-        self.mesh._vertices =np.reshape(vertices, [-1, 3])[np.newaxis]
+        self.mesh._vertices = np.reshape(vertices, [-1, 3])[np.newaxis]
         super().redraw(**kwargs)
 
     @Node.once

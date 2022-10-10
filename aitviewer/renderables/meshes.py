@@ -14,10 +14,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import os
-
 import moderngl
 import numpy as np
+import os
 import trimesh
 import tqdm
 import re
@@ -27,14 +26,15 @@ from aitviewer.scene.node import Node
 from aitviewer.shaders import get_smooth_lit_with_edges_program
 from aitviewer.shaders import get_flat_lit_with_edges_program
 from aitviewer.shaders import get_smooth_lit_texturized_program
-from aitviewer.utils.decorators import hooked
-from aitviewer.utils.utils import compute_vertex_and_face_normals
 from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
+from aitviewer.utils.decorators import hooked
+from aitviewer.utils.so3 import euler2rot_numpy, rot2euler_numpy
+from aitviewer.utils.utils import compute_vertex_and_face_normals
 from functools import lru_cache
 from moderngl_window.opengl.vao import VAO
-from trimesh.triangles import points_to_barycentric
 from PIL import Image
+from trimesh.triangles import points_to_barycentric
 
 
 class Meshes(Node):
@@ -49,12 +49,12 @@ class Meshes(Node):
                  face_colors=None,
                  uv_coords=None,
                  path_to_texture=None,
-                 texture_alpha=1.0,
                  cast_shadow=True,
                  pickable=True,
                  flat_shading=False,
                  draw_edges=False,
                  draw_outline=False,
+                 icon="\u008d",
                  **kwargs):
         """
         Initializer.
@@ -68,13 +68,12 @@ class Meshes(Node):
         :param face_colors: A np array of shape (N, F, 4) overriding the uniform or vertex colors.
         :param uv_coords: A np array of shape (V, 2) if the mesh is to be textured.
         :param path_to_texture: Path to an image file that serves as the texture.
-        :param texture_alpha: Set transparency for texture.
         """
         if len(vertices.shape) == 2 and vertices.shape[-1] == 3:
             vertices = vertices[np.newaxis]
         assert len(vertices.shape) == 3
         assert len(faces.shape) == 2
-        super(Meshes, self).__init__(n_frames=vertices.shape[0], **kwargs)
+        super(Meshes, self).__init__(n_frames=vertices.shape[0], icon=icon, **kwargs)
 
         self._vertices = vertices
         self.faces = faces.astype(np.int32)
@@ -99,7 +98,6 @@ class Meshes(Node):
                 self.texture_image = Image.open(path_to_texture).transpose(method=Image.FLIP_TOP_BOTTOM).convert("RGB")
         else:
             self.texture_image = None
-        self.texture_alpha = texture_alpha
 
         # Enable rendering passes
         self.cast_shadow = cast_shadow
@@ -115,7 +113,7 @@ class Meshes(Node):
         self.norm_coloring = False
         self.normals_r = None
         self.need_upload = True
-        self._use_uniform_color = self.vertex_colors is None
+        self._use_uniform_color = self._vertex_colors is None
 
     @property
     def vertices(self):
@@ -137,11 +135,13 @@ class Meshes(Node):
 
     @property
     def current_vertices(self):
-        return self.vertices[self.current_frame_id]
+        idx = self.current_frame_id if self.vertices.shape[0] > 1 else 0
+        return self.vertices[idx]
 
     @current_vertices.setter
     def current_vertices(self, vertices):
-        self._vertices[self.current_frame_id] = vertices
+        idx = self.current_frame_id if self.vertices.shape[0] > 1 else 0
+        self._vertices[idx] = vertices
         self.compute_vertex_and_face_normals.cache_clear()
         self.redraw()
 
@@ -230,7 +230,8 @@ class Meshes(Node):
         if self._use_uniform_color:
             return np.full((self.n_vertices, 4), self.material.color)
         else:
-            return self.vertex_colors[self.current_frame_id]
+            idx = self.current_frame_id if self.vertex_colors.shape[0] > 1 else 0
+            return self.vertex_colors[idx]
 
     @property
     def face_colors(self):
@@ -280,7 +281,7 @@ class Meshes(Node):
           enforce unit length of normals anyway.
         :return: The vertex and face normals as a np arrays of shape (V, 3) and (F, 3) respectively.
         """
-        vs = self.vertices[frame_id:frame_id + 1]
+        vs = self.vertices[frame_id:frame_id + 1] if self.vertices.shape[0] > 1 else self.vertices
         vn, fn = compute_vertex_and_face_normals(vs, self.faces, self.vertex_faces, normalize)
         return vn.squeeze(0), fn.squeeze(0)
 
@@ -288,11 +289,12 @@ class Meshes(Node):
     def bounds(self):
         return self.get_bounds(self.vertices)
 
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.current_vertices)
+
     def is_transparent(self):
-        if self.has_texture and self.show_texture:
-            return self.texture_alpha < 1.0
-        else:
-            return self.color[3] < 1.0
+        return self.color[3] < 1.0
 
     def on_frame_update(self):
         """Called whenever a new frame must be displayed."""
@@ -381,6 +383,7 @@ class Meshes(Node):
             self.texture_vao = ctx.vertex_array(self.texture_prog,
                                                 [(self.vbo_vertices, '3f4 /v', 'in_position'),
                                                  (self.vbo_normals, '3f4 /v', 'in_normal'),
+                                                 (self.vbo_colors, '4f4 /v', 'in_color'),
                                                  (self.vbo_uvs, '2f4 /v', 'in_uv')],
                                                 self.vbo_indices)
 
@@ -404,8 +407,6 @@ class Meshes(Node):
 
     def render(self, camera, **kwargs):
         # Check if flat shading changed, in which case we need to update the VBOs.
-        if self.has_texture:
-            self.texture_prog['texture_alpha'].value = self.texture_alpha
         vao = self._prepare_vao(camera, **kwargs)
         vao.render(moderngl.TRIANGLES)
 
@@ -425,9 +426,9 @@ class Meshes(Node):
         else:
             prog, vao = (self.flat_prog, self.flat_vao) if self.flat_shading else (self.smooth_prog, self.smooth_vao)
             prog['norm_coloring'].value = self.norm_coloring
-            prog['use_uniform_color'] = self._use_uniform_color
-            prog['uniform_color'] = self.material.color
 
+        prog['use_uniform_color'] = self._use_uniform_color
+        prog['uniform_color'] = self.material.color
         prog['draw_edges'].value = 1.0 if self.draw_edges else 0.0
         prog['win_size'].value = kwargs['window_size']
 
@@ -444,41 +445,31 @@ class Meshes(Node):
         bounds = self.bounds
         diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
 
-        length = 0.005 * max(diag, 1)
+        length = 0.005 * max(diag, 1) / self.scale
         vn = vn / np.linalg.norm(vn, axis=-1, keepdims=True) * length
 
         # Must import here because if we do it at the top we create a circular dependency.
         from aitviewer.renderables.arrows import Arrows
 
-        positions = self.vertices * self.scale
+        positions = self.vertices
         self.normals_r = Arrows(positions, positions + vn,
                                 r_base=length / 10, r_head=2 * length / 10, p=0.25, name='Normals')
-        self.normals_r.position = self.position
-        self.normals_r.rotation = self.rotation
         self.normals_r.current_frame_id = self.current_frame_id
-        self.add(self.normals_r, gui_elements=['material'])
+        self.add(self.normals_r)
 
     def gui(self, imgui):
         super(Meshes, self).gui(imgui)
 
-        if self.has_texture:
-            _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name),
-                                                       self.texture_alpha, 0.0, 1.0, '%.2f')
         _, self.show_texture = imgui.checkbox('Render Texture##render_texture{}'.format(self.unique_name),
                                               self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
                                                self.norm_coloring)
         _, self.flat_shading = imgui.checkbox('Flat shading [F]##flat_shading{}'.format(self.unique_name),
-                                               self.flat_shading)
+                                              self.flat_shading)
         _, self.draw_edges = imgui.checkbox('Draw edges [E]##draw_edges{}'.format(self.unique_name),
-                                               self.draw_edges)
+                                            self.draw_edges)
         _, self.draw_outline = imgui.checkbox('Draw outline##draw_outline{}'.format(self.unique_name),
-                                               self.draw_outline)
-
-        # TODO: Add  export workflow for all nodes
-        if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
-            mesh = trimesh.Trimesh(vertices=self.current_vertices, faces=self.faces, process=False)
-            mesh.export('../export/' + self.name + '.obj')
+                                              self.draw_outline)
 
         if self.normals_r is None:
             if imgui.button('Show Normals ##show_normals{}'.format(self.unique_name)):
@@ -488,6 +479,17 @@ class Meshes(Node):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
+
+    def gui_io(self, imgui):
+        if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
+            mesh = trimesh.Trimesh(vertices=self.current_vertices, faces=self.faces, process=False)
+            mesh.export('../export/' + self.name + '.obj')
+
+    def key_event(self, key, wnd_keys):
+        if key == wnd_keys.F:
+            self.flat_shading = not self.flat_shading
+        elif key == wnd_keys.E:
+            self.draw_edges = not self.draw_edges
 
 
 class VariableTopologyMeshes(Node):
@@ -513,8 +515,10 @@ class VariableTopologyMeshes(Node):
         :param faces: A list of length N with np arrays of shape (F_n, 3).
         :param vertex_normals: An optional list of length N with np arrays of shape (V_n, 3).
         :param face_normals: An optional list of length N with np arrays of shape (F_n, 3).
-        :param vertex_colors: An optional list of length N with np arrays of shape (V_n, 4) overriding the uniform color.
-        :param face_colors: An optional list of length N with np arrays of shape (F_n, 4) overriding the uniform or vertex colors.
+        :param vertex_colors: An optional list of length N with np arrays of shape (V_n, 4) overriding the
+          uniform color.
+        :param face_colors: An optional list of length N with np arrays of shape (F_n, 4) overriding the uniform
+          or vertex colors.
         :param uv_coords: An optional list of length N with np arrays of shape (V_n, 2) if the mesh is to be textured.
         :param texture_paths: An optional list of length N containing paths to the texture as an image file.
         :param preload: Whether or not to pre-load all the meshes. This increases loading time and memory consumption,
@@ -695,8 +699,7 @@ class VariableTopologyMeshes(Node):
                 m = self._construct_mesh_at_frame(self.current_frame_id)
 
                 # Set mesh position and scale
-                m.position = self.position
-                m.scale = self.scale
+                m.update_transform(self.model_matrix)
 
                 # Set mesh material
                 m.material = self.material
@@ -715,7 +718,12 @@ class VariableTopologyMeshes(Node):
 
     @property
     def bounds(self):
-        return self.current_mesh.get_bounds(self.current_mesh.vertices)
+        # TODO: this currently only returns the current mesh bounds for performance/simplicity.
+        return self.current_mesh.bounds
+
+    @property
+    def current_bounds(self):
+        return self.current_mesh.current_bounds
 
     def closest_vertex_in_triangle(self, tri_id, point):
         return self.current_mesh.closest_vertex_in_triangle(tri_id, point)
@@ -763,32 +771,32 @@ class VariableTopologyMeshes(Node):
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
-    def gui_position(self, imgui):
+    def gui_affine(self, imgui):
+        """ Render GUI for affine transformations"""
         # Position controls
-        u, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
-        if u:
+        up, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
+        if up:
             self.position = pos
-            # If meshes are already loaded go through all and update the positions
-            if self.preload:
-                for m in self._all_meshes:
-                    m.position = pos
-            # Otherwise only update the current mesh, other meshes will be updated when loaded
-            else:
-                self.current_mesh.position = pos
 
-    def gui_scale(self, imgui):
+        # Rotation controls
+        euler_angles = rot2euler_numpy(self.rotation[np.newaxis], degrees=True)[0]
+        ur, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1,
+                                             format='%.2f')
+        if ur:
+            self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
+
         # Scale controls
-        u, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
-                                    max_value=10.0, format='%.3f')
-        if u:
+        us, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
+                                     max_value=10.0, format='%.3f')
+        if us:
             self.scale = scale
-            # If meshes are already loaded go through all and update the scale factors
+
+        if up or ur or us:
             if self.preload:
                 for m in self._all_meshes:
-                    m.scale = scale
-            # Otherwise only update the current mesh, other meshes will be updated when loaded
+                    m.update_transform(self.model_matrix)
             else:
-                self.current_mesh.scale = scale
+                self.current_mesh.update_transform((self.model_matrix))
 
     def gui_material(self, imgui, show_advanced=True):
         # Color Control
@@ -804,7 +812,7 @@ class VariableTopologyMeshes(Node):
                 self.current_mesh.color = color
                 self._override_color = True
 
-        _, self.show_texture  = imgui.checkbox('Render Texture', self.show_texture)
+        _, self.show_texture = imgui.checkbox('Render Texture', self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring', self.norm_coloring)
         _, self.flat_shading = imgui.checkbox('Flat shading [F]', self.flat_shading)
         _, self.draw_edges = imgui.checkbox('Draw edges [E]', self.draw_edges)
@@ -842,6 +850,12 @@ class VariableTopologyMeshes(Node):
                         self.current_mesh.material.ambient = ambient
 
                 imgui.tree_pop()
+
+    def key_event(self, key, wnd_keys):
+        if key == wnd_keys.F:
+            self.flat_shading = not self.flat_shading
+        elif key == wnd_keys.E:
+            self.draw_edges = not self.draw_edges
 
     @hooked
     def release(self):

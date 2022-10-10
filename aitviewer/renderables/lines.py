@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -244,9 +244,15 @@ class Lines(Node):
         vs, fs, ns = self.get_mesh()
         material = kwargs.get('material', Material(color=color, ambient=0.2))
         self.mesh = Meshes(vs, fs, ns, color=color, material=material, cast_shadow=cast_shadow, is_selectable=False)
-        self.mesh.position = self.position
-        self.mesh.rotation = self.rotation
-        self.add(self.mesh, has_gui=True, show_in_hierarchy=False)
+        self.add(self.mesh, show_in_hierarchy=False)
+
+    @property
+    def bounds(self):
+        return self.mesh.bounds
+
+    @property
+    def current_bounds(self):
+        return self.mesh.current_bounds
 
     @property
     def lines(self):
@@ -258,12 +264,14 @@ class Lines(Node):
 
     @property
     def current_lines(self):
-        return self._lines[self.current_frame_id]
+        idx = self.current_frame_id if self._lines.shape[0] > 1 else 0
+        return self._lines[idx]
 
     @current_lines.setter
     def current_lines(self, lines):
         assert len(lines.shape) == 2
-        self._lines[self.current_frame_id] = lines
+        idx = self.current_frame_id if self._lines.shape[0] > 1 else 0
+        self._lines[idx] = lines
 
     def gui(self, imgui):
         self.mesh.gui(imgui)

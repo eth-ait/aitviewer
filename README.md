@@ -8,6 +8,7 @@ A set of tools to visualize and interact with sequences of 3D data with cross-pl
 ## Features
 * Easy to use Python interface.
 * Load [SMPL[-H | -X]](https://smpl.is.tue.mpg.de/) / [MANO](https://mano.is.tue.mpg.de/) / [FLAME](https://flame.is.tue.mpg.de/) sequences and display them in an interactive viewer.
+* Support for the [STAR model](https://github.com/ahmedosman/STAR).
 * Manually editable SMPL sequences.
 * Render 3D data on top of images via weak-perspective or OpenCV camera models.
 * Built-in extensible GUI (based on Dear ImGui).
@@ -57,17 +58,16 @@ View an SMPL template
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
 
-smpl_template = SMPLSequence.t_pose()
-
-# Display in viewer.
-v = Viewer()
-v.scene.add(smpl_template)
-v.run()
+if __name__ == '__main__':
+    v = Viewer()
+    v.scene.add(SMPLSequence.t_pose())
+    v.run()
 ```
 
 ## Examples
 
 Check out the [examples](examples/) for a few examples how to use the viewer:
+ * [`animation.py`](examples/animation.py): Example of how 3D primitives can be animated.
 
  * [`camera_path.py`](examples/camera_path.py): Example how to use camera paths.
 
@@ -89,6 +89,8 @@ Check out the [examples](examples/) for a few examples how to use the viewer:
 
  * [`load_VIBE.py`](examples/load_VIBE.py): Loads the result of [VIBE](https://github.com/mkocabas/VIBE) and overlays it on top of the input image.
 
+ * [`missing_frames.py`](examples/missing_frames.py): Example how sequences with intermittent missing frames can be visualized.
+
  * [`quickstart.py`](examples/quickstart.py): The above quickstart example.
 
  * [`render_primitives.py`](examples/render_primitives.py): Renders a bunch of spheres and lines.
@@ -96,6 +98,30 @@ Check out the [examples](examples/) for a few examples how to use the viewer:
  * [`stream.py`](examples/stream.py): Streams your webcam into the viewer.
 
  * [`vertex_clicking.py`](examples/vertex_clicking.py): An example how to subclass the basic Viewer class for custom interaction.
+
+## Keyboard shortcuts
+
+The viewer supports the following keyboard shortcuts, all of this functionality is also accessible from the menus and windows in the GUI.
+This list can be shown directly in the viewer by clicking on the `Help -> Keyboard shortcuts` menu.
+
+- `SPACE` Start/stop playing animation.
+- `.` Go to next frame.
+- `,` Go to previous frame.
+- `X` Center view on the selected object.
+- `O` Enable/disable orthographic camera.
+- `T` Show the camera target in the scene.
+- `C` Save the camera position and orientation to disk.
+- `L` Load the camera position and orientation from disk.
+- `K` Lock the selection to the currently selected object.
+- `S` Show/hide shadows.
+- `D` Enabled/disable dark mode.
+- `P` Save a screenshot to the the `export/screenshots` directory.
+- `I` Change the viewer mode to `inspect`.
+- `V` Change the viewer mode to `view`.
+- `E` If a mesh is selected, show the edges of the mesh.
+- `F` If a mesh is selected, switch between flat and smooth shading.
+- `Z` Show a debug visualization of the object IDs.
+- `ESC` Exit the viewer.
 
 ## Projects using the AITViewer
 The following projects have used the AITViewer:

@@ -101,7 +101,7 @@ class Camera(Node, CameraInterface):
         :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this
          camera in the viewer
         """
-        super(Camera, self).__init__(icon='\u0084', **kwargs)
+        super(Camera, self).__init__(icon='\u0084', gui_material=False, **kwargs)
 
         # Camera object geometry
         vertices = np.array([
@@ -112,7 +112,12 @@ class Camera(Node, CameraInterface):
             [ 1, -1, 1],
             [ 1,  1, 1],
 
-            # Triangle
+            # Triangle front
+            [ 0.5,  1.1, 1],
+            [-0.5,  1.1, 1],
+            [   0,    2, 1],
+
+            # Triangle back
             [ 0.5,  1.1, 1],
             [-0.5,  1.1, 1],
             [   0,    2, 1],
@@ -140,14 +145,14 @@ class Camera(Node, CameraInterface):
             [ 1, 3, 2],
             [ 4, 2, 3],
             [ 5, 6, 7],
-            [ 5, 7, 6],
+            [ 8, 10, 9],
         ])
 
         self._active = False
         self.active_color = active_color
         self.inactive_color = inactive_color
 
-        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True, position=kwargs.get('position'),
+        self.mesh = Meshes(vertices, faces, cast_shadow=False, flat_shading=True,
                            rotation=kwargs.get('rotation'), is_selectable=False)
         self.mesh.color = self.inactive_color
         self.add(self.mesh, show_in_hierarchy=False)
@@ -170,6 +175,19 @@ class Camera(Node, CameraInterface):
             self.mesh.color = self.active_color
         else:
             self.mesh.color = self.inactive_color
+
+    @Node.enabled.setter
+    def enabled(self, enabled):
+        # Call setter of the parent (Node) class.
+        super(Camera, self.__class__).enabled.fset(self, enabled)
+
+        # Also set the enabled property of the path if it exists.
+        # We must do this here because the path is not a child of the camera node,
+        # since it's position/rotation should not be updated together with the camera.
+        if self.path:
+            self.path[0].enabled = enabled
+            if self.path[1] is not None:
+                self.path[1].enabled = enabled
 
     def hide_frustum(self):
         if self.frustum:
@@ -228,14 +246,12 @@ class Camera(Node, CameraInterface):
             lines = np.apply_along_axis(transform, 1, lines)
             all_lines[i] = lines
 
-        self.frustum = Lines(all_lines, r_base=0.005, mode='lines', color=(0.1, 0.1, 0.1, 1), cast_shadow=False,
-                             position=self.position, rotation=self.rotation)
+        self.frustum = Lines(all_lines, r_base=0.005, mode='lines', color=(0.1, 0.1, 0.1, 1), cast_shadow=False)
         self.add(self.frustum, show_in_hierarchy=False)
 
         ori = np.eye(3, dtype=np.float)
         ori[:, 2] *= -1
-        self.origin = RigidBodies(np.array([0.0, 0.0, 0.0])[np.newaxis], ori[np.newaxis],
-                                  position=self.position, rotation=self.rotation)
+        self.origin = RigidBodies(np.array([0.0, 0.0, 0.0])[np.newaxis], ori[np.newaxis])
         self.add(self.origin, show_in_hierarchy=False)
 
         self.current_frame_id = frame_id
@@ -243,7 +259,9 @@ class Camera(Node, CameraInterface):
     def hide_path(self):
         if self.path is not None:
             self.parent.remove(self.path[0])
-            self.parent.remove(self.path[1])
+            # The Lines part of the path may be None if the path is a single point.
+            if self.path[1] is not None:
+                self.parent.remove(self.path[1])
             self.path = None
 
     def show_path(self):
@@ -263,13 +281,20 @@ class Camera(Node, CameraInterface):
             all_oris[i] = self.rotation @ np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])
 
         path_spheres = RigidBodies(all_points, all_oris, radius=0.01, length=0.1, color=(0.92, 0.68, 0.2, 1.0))
-        path_lines = Lines(all_points, color=(0, 0, 0, 1), r_base=0.003, mode='line_strip', cast_shadow=False)
+        # Create lines only if there is more than one frame in the sequence.
+        if self.n_frames > 1:
+            path_lines = Lines(all_points, color=(0, 0, 0, 1), r_base=0.003, mode='line_strip', cast_shadow=False)
+        else:
+            path_lines = None
 
-        # We add the the path to the parent node of the camera because we don't want the camera position and rotation to be applied to it.
+        # We add the the path to the parent node of the camera because we don't want the camera position and rotation
+        # to be applied to it.
         assert self.parent is not None, "Camera node must be added to the scene before showing the camera path."
-        self.parent.add(path_spheres, path_lines, show_in_hierarchy=False)
-        self.path = (path_spheres, path_lines)
+        self.parent.add(path_spheres, show_in_hierarchy=False, enabled=self.enabled)
+        if path_lines is not None:
+            self.parent.add(path_lines, show_in_hierarchy=False, enabled=self.enabled)
 
+        self.path = (path_spheres, path_lines)
         self.current_frame_id = frame_id
 
     def render_outline(self, ctx, camera, prog):
@@ -312,17 +337,22 @@ class Camera(Node, CameraInterface):
 class WeakPerspectiveCamera(Camera):
     """
     A sequence of weak perspective cameras.
-    The camera is positioned at (0,0,1) axis aligned and looks towards the negative z direction following the OpenGL conventions.
+    The camera is positioned at (0,0,1) axis aligned and looks towards the negative z direction following the OpenGL
+    conventions.
     """
     def __init__(self, scale, translation, cols, rows, near=C.znear, far=C.zfar, viewer=None, **kwargs):
         """ Initializer.
         :param scale: A np array of scale parameters [sx, sy] of shape (2) or a sequence of parameters of shape (N, 2)
-        :param translation: A np array of translation parameters [tx, ty] of shape (2) or a sequence of parameters of shape (N, 2)
-        :param cols: Number of columns in an image captured by this camera, used for computing the aspect ratio of the camera
-        :param rows: Number of rows in an image captured by this camera, used for computing the aspect ratio of the camera
-        :param near: Distance of the near plane from the camera
-        :param far: Distance of the far plane from the camera
-        :param viewer: the current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
+        :param translation: A np array of translation parameters [tx, ty] of shape (2) or a sequence of parameters of
+          shape (N, 2).
+        :param cols: Number of columns in an image captured by this camera, used for computing the aspect ratio of
+          the camera.
+        :param rows: Number of rows in an image captured by this camera, used for computing the aspect ratio of
+          the camera.
+        :param near: Distance of the near plane from the camera.
+        :param far: Distance of the far plane from the camera.
+        :param viewer: the current viewer, if not None the gui for this object will show a button for viewing from
+          this camera in the viewer.
          """
         if len(scale.shape) == 1:
             scale = scale[np.newaxis]
@@ -334,7 +364,7 @@ class WeakPerspectiveCamera(Camera):
 
         super(WeakPerspectiveCamera, self).__init__(n_frames=scale.shape[0], viewer=viewer, **kwargs)
 
-        self.scale = scale
+        self.scale_factor = scale
         self.translation = translation
 
         self.cols = cols
@@ -361,7 +391,7 @@ class WeakPerspectiveCamera(Camera):
         return self._right
 
     def update_matrices(self, width, height):
-        sx, sy = self.scale[self.current_frame_id]
+        sx, sy = self.scale_factor[self.current_frame_id]
         tx, ty = self.translation[self.current_frame_id]
 
         window_ar = width / height
@@ -410,14 +440,15 @@ class OpenCVCamera(Camera):
 
     def __init__(self, K, Rt, cols, rows, dist_coeffs=None, near=C.znear, far=C.zfar, viewer=None, **kwargs):
         """ Initializer.
-        :param K:  A np array of camera intrinsics in the format used by OpenCV (3, 3) or (N, 3, 3), one for each frame
-        :param Rt: A np array of camera extrinsics in the format used by OpenCV (3, 4) or (N, 3, 4), one for each frame
-        :param dist_coeffs: Lens distortion coefficients in the format used by OpenCV (5)
-        :param cols: Width  of the image in pixels, matching the size of the image expected by the intrinsics matrix
-        :param rows: Height of the image in pixels, matching the size of the image expected by the intrinsics matrix
-        :param near: Distance of the near plane from the camera
-        :param far: Distance of the far plane from the camera
-        :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
+        :param K:  A np array of camera intrinsics in the format used by OpenCV (3, 3) or (N, 3, 3), one for each frame.
+        :param Rt: A np array of camera extrinsics in the format used by OpenCV (3, 4) or (N, 3, 4), one for each frame.
+        :param dist_coeffs: Lens distortion coefficients in the format used by OpenCV (5).
+        :param cols: Width  of the image in pixels, matching the size of the image expected by the intrinsics matrix.
+        :param rows: Height of the image in pixels, matching the size of the image expected by the intrinsics matrix.
+        :param near: Distance of the near plane from the camera.
+        :param far: Distance of the far plane from the camera.
+        :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this
+          camera in the viewer.
          """
         self.K = K if len(K.shape) == 3 else K[np.newaxis]
         self.Rt = Rt if len(Rt.shape) == 3 else Rt[np.newaxis]
@@ -529,6 +560,40 @@ class OpenCVCamera(Camera):
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
 
+    def to_pinhole_camera(self, target_distance=5, **kwargs) -> 'PinholeCamera':
+        """
+        Returns a PinholeCamera object with positions and targets computed from this camera.
+        :param target_distance: distance from the camera at which the target of the PinholeCamera is placed.
+
+        Remarks:
+         The Pinhole camera does not currently support skew, offset from the center and non vertical up vectors.
+         Also the fov from the first intrinsic matrix is used for all frames because the PinholeCamera does not
+         support sequences of fov values.
+        """
+        # Save current frame id.
+        current_frame_id = self.current_frame_id
+
+        # Compute position and target for each frame.
+        # Pinhole camera currently does not support custom up direction.
+        positions = np.zeros((self.n_frames, 3))
+        targets = np.zeros((self.n_frames, 3))
+        for i in range(self.n_frames):
+            self.current_frame_id = i
+            positions[i] = self.position
+            targets[i] = self.position + self.forward * target_distance
+
+        # Restore current frame id.
+        self.current_frame_id = current_frame_id
+
+        # Compute intrinsics, the Pinhole camera does not currently support
+        # skew and offset from the center, so we throw away this information.
+        # Also we use the fov from the first intrinsic matrix if there is more than one
+        # because the PiholeCamera does not support sequences of fov values.
+        fov = np.rad2deg(2 * np.arctan(self.K[0, 1, 2] / self.K[0, 1, 1]))
+
+        return PinholeCamera(positions, targets, self.cols, self.rows, fov=fov,
+                             near=self.near, far=self.far, viewer=self.viewer, **kwargs)
+
     @hooked
     def gui(self, imgui):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
@@ -553,15 +618,14 @@ class PinholeCamera(Camera):
     Your classic pinhole camera.
     """
     def __init__(self, position, target, cols, rows, fov=45, near=C.znear, far=C.zfar, viewer=None, **kwargs):
-        self._positions = position if len(position.shape) == 2 else position[np.newaxis]
-        self._targets = target if len(target.shape) == 2 else target[np.newaxis]
-        assert self._positions.shape[0] == 1 or self._targets.shape[0] == 1 or self._positions.shape[0] == self._targets.shape[0], (
-            f"position and target array shape mismatch: {self._positions.shape} and {self._targets.shape}")
+        positions = position if len(position.shape) == 2 else position[np.newaxis]
+        targets = target if len(target.shape) == 2 else target[np.newaxis]
+        assert positions.shape[0] == 1 or targets.shape[0] == 1 or positions.shape[0] == targets.shape[0], (
+            f"position and target array shape mismatch: {positions.shape} and {targets.shape}")
 
-        super(PinholeCamera, self).__init__(n_frames=self._positions.shape[0], viewer=viewer, **kwargs)
         self._world_up = np.array([0.0, 1.0, 0.0])
-        self.position = self.current_position
-        self.rotation = self.current_rotation
+        self._targets = targets
+        super(PinholeCamera, self).__init__(position=position, n_frames=targets.shape[0], viewer=viewer, **kwargs)
 
         self.cols = cols
         self.rows = rows
@@ -570,14 +634,9 @@ class PinholeCamera(Camera):
         self.far = far
         self.fov = fov
 
-    @hooked
-    def on_frame_update(self):
-        self.position = self.current_position
-        self.rotation = self.current_rotation
-
     @property
     def forward(self):
-        forward = self.current_target - self.current_position
+        forward = self.current_target - self.position
         forward = forward / np.linalg.norm(forward)
         return forward / np.linalg.norm(forward)
 
@@ -596,11 +655,7 @@ class PinholeCamera(Camera):
         return self._targets[0] if self._targets.shape[0] == 1 else self._targets[self.current_frame_id]
 
     @property
-    def current_position(self):
-        return self._positions[0] if self._positions.shape[0] == 1 else self._positions[self.current_frame_id]
-
-    @property
-    def current_rotation(self):
+    def rotation(self):
         return np.array([-self.right, self.up, -self.forward]).T
 
     def update_matrices(self, width, height):
@@ -608,12 +663,40 @@ class PinholeCamera(Camera):
         P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
 
         # Compute view matrix.
-        V = look_at(self.current_position, self.current_target, self._world_up)
+        V = look_at(self.position, self.current_target, self._world_up)
 
         # Update camera matrices.
         self.projection_matrix = P.astype('f4')
         self.view_matrix = V.astype('f4')
         self.view_projection_matrix = np.matmul(P, V).astype('f4')
+
+    def to_opencv_camera(self, **kwargs) -> OpenCVCamera:
+        """
+        Returns a OpenCVCamera object with extrinsics and intrinsics computed from this camera.
+        """
+        # Save current frame id.
+        current_frame_id = self.current_frame_id
+
+        cols, rows = self.cols, self.rows
+        # Compute extrinsics for each frame.
+        Rts = np.zeros((self.n_frames, 3, 4))
+        for i in range(self.n_frames):
+            self.current_frame_id = i
+            self.update_matrices(cols, rows)
+            Rts[i] = self.get_view_matrix()[:3]
+
+        # Restore current frame id.
+        self.current_frame_id = current_frame_id
+
+        # Invert Y and Z to meet OpenCV conventions.
+        Rts[:, 1:3, :] *= -1.0
+
+        # Compute intrinsics.
+        f = 1. / np.tan(np.radians(self.fov / 2))
+        c0 = np.array([cols / 2.0, rows / 2.0])
+        K = np.array([[f * 0.5 * rows, 0., c0[0]], [0., f * 0.5 * rows, c0[1]], [0., 0., 1.]])
+
+        return OpenCVCamera(K, Rts, cols, rows, near=self.near, far=self.far, viewer=self.viewer, **kwargs)
 
     @hooked
     def gui(self, imgui):
@@ -662,13 +745,21 @@ class ViewerCamera(CameraInterface):
         self.name = 'Camera'
         self.icon = '\u0084'
 
+        self.animating = False
+        self._animation_t = 0.0
+        self._animation_time = 0.0
+        self._animation_start_position = None
+        self._animation_end_position = None
+        self._animation_start_target = None
+        self._animation_end_target = None
+
     @property
     def position(self):
         return self._position
 
     @position.setter
     def position(self, position):
-        self._position = position
+        self._position = np.array(position, dtype=np.float32).copy()
 
     @property
     def forward(self):
@@ -839,6 +930,31 @@ class ViewerCamera(CameraInterface):
         ray_dir = ray_dir / np.linalg.norm(ray_dir)
 
         return ray_origin, ray_dir
+
+    def move_with_animation(self, end_position, end_target, time=0.25):
+        self._animation_start_position = self.position.copy()
+        self._animation_end_position = np.array(end_position)
+        self._animation_start_target = self.target.copy()
+        self._animation_end_target = np.array(end_target)
+        self._animation_total_time = time
+        self._animation_t = 0.0
+        self.animating = True
+
+    def update_animation(self, dt):
+        if not self.animating:
+            return
+
+        self._animation_t += dt
+        if self._animation_t >= self._animation_total_time:
+            self.position = self._animation_end_position
+            self.target = self._animation_end_target
+            self.animating = False
+        else:
+            t = self._animation_t / self._animation_total_time
+            # Smootherstep interpolation (this polynomial has 0 first and second derivative at 0 and 1)
+            t = t * t * t * (t * (t * 6 - 15) + 10)
+            self.position = self._animation_start_position * (1 - t) + self._animation_end_position * t
+            self.target = self._animation_start_target * (1 - t) + self._animation_end_target * t
 
     def gui(self, imgui):
         _, self.is_ortho = imgui.checkbox('Orthographic Camera', self.is_ortho)

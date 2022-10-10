@@ -35,14 +35,17 @@ class Billboard(Node):
                  vertices,
                  texture_paths,
                  img_process_fn=None,
+                 icon="\u0096",
                  **kwargs):
         """ Initializer.
         :param vertices:
             A np array of 4 billboard vertices in world space coordinates of shape (4, 3)
             or an array of shape (N, 4, 3) containing 4 vertices for each frame of the sequence
         :param texture_paths: A list of length N containing paths to the textures as image files.
+        :param img_process_fn: A function with signature f(img, current_frame_id) -> img. This function is called
+            once per image before it is displayed so it can be used to process the image in any way.
         """
-        super(Billboard, self).__init__(n_frames=len(texture_paths), **kwargs)
+        super(Billboard, self).__init__(n_frames=len(texture_paths), icon=icon, **kwargs)
 
         if len(vertices.shape) == 2:
             vertices = vertices[np.newaxis]
@@ -52,7 +55,7 @@ class Billboard(Node):
         center = np.mean(vertices, axis=(0, 1))
         self.vertices = vertices - center
         self.position = center
-        self.img_process_fn = (lambda img: img) if img_process_fn is None else img_process_fn
+        self.img_process_fn = (lambda img, _: img) if img_process_fn is None else img_process_fn
 
         # Tile the uv buffer to match the size of the vertices buffer,
         # we do this so that we can use the same vertex array for all draws
@@ -141,7 +144,7 @@ class Billboard(Node):
 
         if image_process_fn is None:
             if isinstance(camera, OpenCVCamera) and (camera.dist_coeffs is not None):
-                def undistort(img):
+                def undistort(img, current_frame_id):
                     return cv2.undistort(img, camera.current_K, camera.dist_coeffs)
                 image_process_fn = undistort
 
@@ -172,7 +175,7 @@ class Billboard(Node):
                 img = pickle.load(open(path, "rb"))
             else:
                 img = cv2.cvtColor(cv2.flip(cv2.imread(path), 0), cv2.COLOR_BGR2RGB)
-            img = self.img_process_fn(img)
+            img = self.img_process_fn(img, self.current_frame_id)
             self.texture = self.ctx.texture((img.shape[1], img.shape[0]), img.shape[2], img.tobytes())
             self._current_texture_id = self.current_frame_id
 
@@ -180,7 +183,7 @@ class Billboard(Node):
         self.prog['texture0'].value = 0
         self.texture.use(0)
 
-        mvp = camera.get_view_projection_matrix() @ self.model_matrix()
+        mvp = camera.get_view_projection_matrix() @ self.model_matrix
         self.prog['mvp'].write(mvp.T.astype("f4").tobytes())
 
         # Compute the index of the first vertex to use if we have a sequence of vertices of length > 1
@@ -204,17 +207,27 @@ class Billboard(Node):
             if self.texture:
                 self.texture.release()
 
+    @property
+    def current_vertices(self):
+        return self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
+
+    @property
+    def bounds(self):
+        return self.get_bounds(self.vertices)
+
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.current_vertices)
+
     def is_transparent(self):
         return self.texture_alpha < 1.0
 
     def closest_vertex_in_triangle(self, tri_id, point):
-        vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
-        return np.linalg.norm((vertices - point), axis=-1).argmin()
+        return np.linalg.norm((self.current_vertices - point), axis=-1).argmin()
 
     def get_bc_coords_from_points(self, tri_id, points):
-        vertices = self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
         indices = np.array([ [0, 1, 2], [1, 2, 3] ])
-        return points_to_barycentric(vertices[indices[[tri_id]]], points)[0]
+        return points_to_barycentric(self.current_vertices[indices[[tri_id]]], points)[0]
 
     def gui_material(self, imgui, show_advanced=True):
         _, self.texture_alpha = imgui.slider_float('Texture alpha##texture_alpha{}'.format(self.unique_name),

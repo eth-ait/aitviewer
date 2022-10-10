@@ -14,13 +14,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from functools import lru_cache
 import numpy as np
-from aitviewer.renderables.lines import Lines
 
+from aitviewer.renderables.lines import Lines
 from aitviewer.scene.node import Node
 from aitviewer.scene.camera_utils import look_at
 from aitviewer.scene.camera_utils import orthographic_projection
+from functools import lru_cache
 
 
 class Light(Node):
@@ -94,7 +94,7 @@ class Light(Node):
         lines = np.apply_along_axis(lambda x: (world_from_ndc @ np.append(x, 1.0))[:3] - self.position, 1, lines)
 
         if self._debug_lines is None:
-            self._debug_lines = Lines(lines, position=self.position, r_base=0.2, mode='lines', cast_shadow=False)
+            self._debug_lines = Lines(lines, r_base=0.2, mode='lines', cast_shadow=False)
             self.add(self._debug_lines)
         else:
             self._debug_lines.lines = lines
@@ -102,9 +102,7 @@ class Light(Node):
 
     @Node.position.setter
     def position(self, position):
-        self._position = position
-        for n in self.nodes:
-            n.position = position
+        super(Light, self.__class__).position.fset(self, position)
         self._update_debug_lines()
 
     def redraw(self, **kwargs):
@@ -112,10 +110,7 @@ class Light(Node):
             self._debug_lines.redraw(**kwargs)
 
     def gui(self, imgui):
-        self.gui_position(imgui)
-        self.gui_material(imgui, show_advanced=False)
-
-        # Light controls
+        # Custom Light controls
         _, self.intensity_ambient = imgui.drag_float('Ambient##ambient', self.intensity_ambient, 0.01, min_value=0.0, max_value=1.0,
                                            format='%.2f')
         _, self.intensity_diffuse = imgui.drag_float('Diffuse##diffuse', self.intensity_diffuse, 0.01, min_value=0.0, max_value=1.0,

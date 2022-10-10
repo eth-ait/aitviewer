@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -50,8 +50,7 @@ class BoundingBoxes(Node):
 
         self.vertices = vertices
 
-        self.lines = Lines(lines=self._get_line_coords(), mode='lines', r_base=thickness, color=self.color,
-                           position=self.position)
+        self.lines = Lines(lines=self._get_line_coords(), mode='lines', r_base=thickness, color=self.color)
         self.spheres = Spheres(positions=self.vertices, radius=thickness, color=self.color)
         self._add_nodes(self.lines, self.spheres, show_in_hierarchy=False)
 

@@ -31,6 +31,7 @@ class Skeletons(Node):
                  joint_connections,
                  radius=0.01,
                  color=(1.0, 177 / 255, 1 / 255, 1.0),
+                 icon="\u0089",
                  **kwargs):
         """
         Initializer.
@@ -44,7 +45,7 @@ class Skeletons(Node):
         if not isinstance(joint_connections, np.ndarray):
             joint_connections = np.array(joint_connections)
 
-        super(Skeletons, self).__init__(n_frames=joint_positions.shape[0], color=color, **kwargs)
+        super(Skeletons, self).__init__(n_frames=joint_positions.shape[0], color=color, icon=icon, **kwargs)
 
         self._joint_positions = joint_positions
         self.joint_connections = joint_connections
@@ -58,7 +59,7 @@ class Skeletons(Node):
         material = Material(color=color)
         self.spheres = Spheres(joint_positions, radius=radius, material=material, is_selectable=False)
         self.lines = Lines(lines=self.joint_positions[:, self.skeleton].reshape(len(self), -1, 3),
-                           mode='lines', r_base=radius, r_tip=radius / 10.0,material=material, is_selectable=False)
+                           mode='lines', r_base=radius, r_tip=radius / 10.0, material=material, is_selectable=False)
         self._add_nodes(self.spheres, self.lines, show_in_hierarchy=False)
 
     @property
@@ -75,12 +76,14 @@ class Skeletons(Node):
 
     @property
     def current_joint_positions(self):
-        return self._joint_positions[self.current_frame_id]
+        idx = self.current_frame_id if self._joint_positions.shape[0] > 1 else 0
+        return self._joint_positions[idx]
 
     @current_joint_positions.setter
     def current_joint_positions(self, positions):
         assert len(positions.shape) == 2
-        self._joint_positions[self.current_frame_id] = positions
+        idx = self.current_frame_id if self._joint_positions.shape[0] > 1 else 0
+        self._joint_positions[idx] = positions
 
     def redraw(self, **kwargs):
         if kwargs.get('current_frame_only', False):
@@ -94,6 +97,10 @@ class Skeletons(Node):
     @property
     def bounds(self):
         return self.get_bounds(self.joint_positions)
+
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.current_joint_positions)
 
     @Node.color.setter
     def color(self, color):

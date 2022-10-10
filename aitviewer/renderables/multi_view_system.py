@@ -72,7 +72,8 @@ class MultiViewSystem(Node):
             extrinsics = camera_info['extrinsics'][i]
             dist_coeffs = camera_info['dist_coeffs'][i]
 
-            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs, viewer=viewer, is_selectable=False)
+            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs, viewer=viewer,
+                                  is_selectable=False)
             self.add(camera, show_in_hierarchy=False)
             self.cameras.append(camera)
 
@@ -84,6 +85,7 @@ class MultiViewSystem(Node):
         camera_center = np.mean(positions, 0)
         max_dist = np.max(np.apply_along_axis(lambda x: np.linalg.norm(x - camera_center), 1, positions))
         self.billboard_distance = max_dist * 2
+        self.camera_positions = positions
 
         self.viewer = viewer
         self.camera_info = camera_info
@@ -122,7 +124,8 @@ class MultiViewSystem(Node):
             return
 
         # Create a new billboard for the currently active camera.
-        billboard = Billboard.from_camera_and_distance(self.cameras[camera_index], self.billboard_distance, self.cols, self.rows, paths)
+        billboard = Billboard.from_camera_and_distance(self.cameras[camera_index], self.billboard_distance, self.cols,
+                                                       self.rows, paths)
 
         # Set the current frame index if we have an image for it.
         if self.current_frame_id < len(paths):
@@ -233,6 +236,14 @@ class MultiViewSystem(Node):
         # Update all cameras.
         for c in self.cameras:
             c.enabled = enabled
+
+    @property
+    def bounds(self):
+        return self.get_bounds(self.camera_positions)
+
+    @property
+    def current_bounds(self):
+        return self.bounds
 
     def _gui_checkboxes(self, imgui):
         _, self.cameras_enabled = imgui.checkbox("Show cameras", self.cameras_enabled)

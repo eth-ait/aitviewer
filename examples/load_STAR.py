@@ -15,26 +15,25 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import os
-import numpy as np
 
 from aitviewer.configuration import CONFIG as C
-from aitviewer.renderables.smpl import SMPLSequence
-from aitviewer.headless import HeadlessRenderer
+from aitviewer.models.star import STARLayer
+from aitviewer.renderables.star import STARSequence
+from aitviewer.viewer import Viewer
 
 
 if __name__ == '__main__':
-    # Load an AMASS sequence.
-    smpl_seq = SMPLSequence.from_amass(
+    # Instantiate a STAR layer. This requires that the respective repo has been installed via
+    # pip install git+https://github.com/ahmedosman/STAR.git and that the model files are available on the path
+    # specified in `C.star_models`.
+    star_layer = STARLayer(device=C.device)
+
+    # Load a STAR Sequence from AMASS data. BETAs will not be loaded by default and need to be converted.
+    star_seq = STARSequence.from_amass(
         npz_data_path=os.path.join(C.datasets.amass, "ACCAD/Female1Running_c3d/C2 - Run to stand_poses.npz"),
-        fps_out=60.0, name="AMASS Running", show_joint_angles=True)
-    smpl_seq.color = smpl_seq.color[:3] + (0.75,)  # Make the sequence a bit transparent.
+        fps_out=60.0, name="AMASS Running", show_joint_angles=False)
 
-    # Create the headless renderer and add the sequence.
-    v = HeadlessRenderer()
-    v.scene.add(smpl_seq)
-
-    # Have the camera automatically follow the SMPL sequence. For every frame, the camera points to the center of the
-    # bounding box of the SMPL mesh while keeping a fixed relative distance. The smoothing is optional but ensures that
-    # the view is not too jittery.
-    v.lock_to_node(smpl_seq, (2, 2, 2), smooth_sigma=5.0)
-    v.save_video(video_dir=os.path.join(C.export_dir, 'headless/test.mp4'))
+    # Add to scene and render
+    v = Viewer()
+    v.scene.add(star_seq)
+    v.run()

@@ -25,11 +25,13 @@ setup(name='aitviewer',
               'imgui>=1.3.0',
               'tqdm>=4.60.0',
               'trimesh>=3.9.15,<4',
-              'rtree>=0.9.7',
               'scipy>=1.5.2,<1.8',
               'omegaconf>=2.1.1',
               'roma>=1.2.3',
               'joblib',
               'scikit-video',
               'Pillow'
-          ])
+          ],
+        extras_require = {
+            "star": ["star @ git+https://github.com/ahmedosman/STAR.git"]
+        })

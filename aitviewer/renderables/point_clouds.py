@@ -28,7 +28,15 @@ class PointClouds(Node):
     Draw a point clouds man!
     """
 
-    def __init__(self, points, colors=None, point_size=5.0, color=(0.0, 0.0, 1.0, 1.0), z_up=False, **kwargs):
+    def __init__(self,
+                 points,
+                 colors=None,
+                 point_size=5.0,
+                 color=(0.0, 0.0, 1.0, 1.0),
+                 z_up=False,
+                 icon="\u008c",
+                 pickable=True,
+                 **kwargs):
         """
         A sequence of point clouds. Each point cloud can have a varying number of points.
         :param points: Sequence of points (F, P, 3)
@@ -41,14 +49,17 @@ class PointClouds(Node):
             assert len(colors) == len(points)
 
         self.points = points
-        super(PointClouds, self).__init__(n_frames=len(self.points), color=color, **kwargs)
+        super(PointClouds, self).__init__(n_frames=len(self.points), color=color, icon=icon, **kwargs)
+
+        self.fragmap = pickable
+        self.outline = True
 
         self.colors = colors
         self.point_size = point_size
         self.max_n_points = max([p.shape[0] for p in self.points])
 
         self.vao = VAO("points", mode=moderngl.POINTS)
-        
+
         if z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
@@ -82,21 +93,28 @@ class PointClouds(Node):
 
     @Node.color.setter
     def color(self, color):
-        alpha_changed = np.abs((np.array(color) - np.array(self._colors[0])))[-1] > 0
+        """Update the color of the point cloud."""
+        # This is a bit ill-defined because point clouds can have per-point colors, in which case we probably do
+        # not want to override them with a single uniform color. We disallow this for now. The function is still useful
+        # though to change the alpha, even if a point cloud has per-point colors.
         self.material.color = color
         if self.is_renderable:
-            # If alpha changed, don't update all colors
-            if alpha_changed:
-                for i in range(self.n_frames):
-                    self.colors[i][..., -1] = color[-1]
+            single_color = isinstance(self.colors[0], tuple) and len(self.colors[0]) == 4
+            if single_color:
+                self.colors = tuple(color)
             else:
-                self.colors = color
-
+                # Only update the colors if the alpha changed. Take any frame and any point to check if the alpha
+                # changed because we always change every frame and every point.
+                alpha_changed = abs(color[-1] - self.colors[0][0, -1]) > 0
+                if alpha_changed:
+                    for i in range(self.n_frames):
+                        self.colors[i][..., -1] = color[-1]
         self.redraw()
 
     @property
     def current_points(self):
-        return self.points[self.current_frame_id]
+        idx = self.current_frame_id if len(self.points) > 1 else 0
+        return self.points[idx]
 
     @property
     def current_colors(self):
@@ -104,10 +122,23 @@ class PointClouds(Node):
             n_points = self.current_points.shape[0]
             return np.full((n_points, 4), self.colors[0])
         else:
-            return self.colors[self.current_frame_id]
+            idx = self.current_frame_id if len(self.colors) > 1 else 0
+            return self.colors[idx]
 
     @property
     def bounds(self):
+        if len(self.points) == 0:
+            return np.array([[0, 0], [0, 0], [0, 0]])
+
+        bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
+        for i in range(len(self.points)):
+            b = self.get_bounds(self.points[i])
+            bounds[:, 0] = np.minimum(bounds[:, 0], b[:, 0])
+            bounds[:, 1] = np.maximum(bounds[:, 1], b[:, 1])
+        return bounds
+
+    @property
+    def current_bounds(self):
         return self.get_bounds(self.current_points)
 
     def on_frame_update(self):
@@ -136,6 +167,7 @@ class PointClouds(Node):
         self.vbo_points.clear()
         self.vbo_colors.clear()
 
+    # noinspection PyAttributeOutsideInit
     @Node.once
     def make_renderable(self, ctx):
         ctx.point_size = self.point_size
@@ -147,12 +179,20 @@ class PointClouds(Node):
         self.vao.buffer(self.vbo_points, '3f', ['in_position'])
         self.vao.buffer(self.vbo_colors, '4f', ['in_color'])
 
+        self.positions_vao = VAO('{}:positions'.format(self.unique_name), mode=moderngl.POINTS)
+        self.positions_vao.buffer(self.vbo_points, '3f', ['in_position'])
+
     def render(self, camera, **kwargs):
         self.set_camera_matrices(self.prog, camera, **kwargs)
         # Draw only as many points as we have set in the buffer.
         self.vao.render(self.prog, vertices=len(self.current_points))
 
+    def render_positions(self, prog):
+        if self.is_renderable:
+            self.positions_vao.render(prog, vertices=len(self.current_points))
+
     @hooked
     def release(self):
         if self.is_renderable:
             self.vao.release()
+            self.positions_vao.release(buffer=False)

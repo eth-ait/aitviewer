@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,6 +32,7 @@ class RigidBodies(Node):
                  length=0.2,
                  radius_cylinder=None,
                  color=(0.0, 1.0, 0.5, 1.0),
+                 icon="\u0086",
                  **kwargs):
         """
         Initializer.
@@ -44,13 +45,13 @@ class RigidBodies(Node):
         """
         self.rb_pos = rb_pos[np.newaxis] if rb_pos.ndim == 2 else rb_pos
         self.rb_ori = rb_ori[np.newaxis] if rb_ori.ndim == 3 else rb_ori
-        super(RigidBodies, self).__init__(n_frames=self.rb_pos.shape[0], color=color, **kwargs)
+        super(RigidBodies, self).__init__(n_frames=self.rb_pos.shape[0], color=color, icon=icon, **kwargs)
 
         self.radius = radius
         self.length = length
 
-        self.spheres = Spheres(rb_pos, radius=radius, color=color, position=self.position, is_selectable=False)
-        self._add_node(self.spheres, has_gui=False, show_in_hierarchy=False)
+        self.spheres = Spheres(rb_pos, radius=radius, color=color, is_selectable=False)
+        self._add_node(self.spheres, show_in_hierarchy=False)
 
         self.coords = []
         r_base = radius_cylinder or length / 50
@@ -63,9 +64,7 @@ class RigidBodies(Node):
             color[i] = 1.0
             axs = Arrows(self.rb_pos, self.rb_pos + line, r_base=r_base, r_head=r_head, color=tuple(color),
                          is_selectable=False)
-            axs.position = self.position
-            axs.rotation = self.rotation
-            self._add_node(axs, has_gui=False, show_in_hierarchy=False)
+            self._add_node(axs, show_in_hierarchy=False)
             self.coords.append(axs)
 
     @Node.color.setter
@@ -75,19 +74,31 @@ class RigidBodies(Node):
 
     @property
     def current_rb_pos(self):
-        return self.rb_pos[self.current_frame_id]
+        idx = self.current_frame_id if self.rb_pos.shape[0] > 1 else 0
+        return self.rb_pos[idx]
 
     @current_rb_pos.setter
     def current_rb_pos(self, pos):
-        self.rb_pos[self.current_frame_id] = pos
+        idx = self.current_frame_id if self.rb_pos.shape[0] > 1 else 0
+        self.rb_pos[idx] = pos
 
     @property
     def current_rb_ori(self):
-        return self.rb_ori[self.current_frame_id]
+        idx = self.current_frame_id if self.rb_ori.shape[0] > 1 else 0
+        return self.rb_ori[idx]
 
     @current_rb_ori.setter
     def current_rb_ori(self, ori):
-        self.rb_ori[self.current_frame_id] = ori
+        idx = self.current_frame_id if self.rb_ori.shape[0] > 1 else 0
+        self.rb_ori[idx] = ori
+
+    @property
+    def bounds(self):
+        return self.get_bounds(self.rb_pos)
+
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.current_rb_pos)
 
     def redraw(self, **kwargs):
         if kwargs.get('current_frame_only', False):
@@ -97,7 +108,6 @@ class RigidBodies(Node):
                 line = self.rb_ori[..., :, i][self.current_frame_id]
                 line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
                 axs = self.coords[i]
-                axs.position = self.position
                 axs.current_origins = self.current_rb_pos
                 axs.current_tips = self.current_rb_pos + line
         else:
@@ -107,7 +117,6 @@ class RigidBodies(Node):
                 line = self.rb_ori[..., :, i]
                 line = line / np.linalg.norm(line, axis=-1, keepdims=True) * self.length
                 axs = self.coords[i]
-                axs.position = self.position
                 axs.origins = self.rb_pos
                 axs.tips = self.rb_pos + line
 

@@ -61,8 +61,7 @@ if __name__ == '__main__':
 
     # The OpenCVCamera class expects extrinsics with Y pointing down, so we flip both Y and Z axis to keep a
     # positive determinant.
-    cam_extrinsics[1, 1] = -1.0
-    cam_extrinsics[2, 2] = -1.0
+    cam_extrinsics[1:3, :3] *= -1.0
 
     # Create an OpenCV camera.
     cameras = OpenCVCamera(cam_intrinsics, cam_extrinsics[:3], cols, rows, viewer=viewer)

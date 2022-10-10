@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@ class Plane(Node):
                  v2,
                  size=10.0,
                  color=(0.5, 0.5, 0.5, 1.0),
+                 icon="\u008b",
                  **kwargs):
         """
         Initializer.
@@ -44,11 +45,11 @@ class Plane(Node):
         :param size: Size of the plane.
         :param color: Color of the plane.
         """
-        super(Plane, self).__init__(color=color, **kwargs)
+        super(Plane, self).__init__(color=color, icon=icon, **kwargs)
         if np.dot(v1, v2) > 0.00001:
             raise ValueError('v1 and v2 are not orthogonal.')
 
-        self.center = center
+        self.plane_center = center
         self.v1 = v1 / np.linalg.norm(v1)
         self.v2 = v2 / np.linalg.norm(v2)
         self.size = size
@@ -59,10 +60,10 @@ class Plane(Node):
         self.backface_culling = False
 
     def _get_renderable_data(self):
-        p0 = self.center + self.v1 * self.size - self.v2 * self.size
-        p1 = self.center + self.v1 * self.size + self.v2 * self.size
-        p2 = self.center - self.v1 * self.size + self.v2 * self.size
-        p3 = self.center - self.v1 * self.size - self.v2 * self.size
+        p0 = self.plane_center + self.v1 * self.size - self.v2 * self.size
+        p1 = self.plane_center + self.v1 * self.size + self.v2 * self.size
+        p2 = self.plane_center - self.v1 * self.size + self.v2 * self.size
+        p3 = self.plane_center - self.v1 * self.size - self.v2 * self.size
         normal = np.cross(self.v2, self.v1)
         normal = np.tile(normal[np.newaxis], (4, 1))
         return np.row_stack([p1, p0, p2, p3]), normal
@@ -116,6 +117,7 @@ class ChessboardPlane(Node):
                  plane='xz',
                  height=0.0,
                  tiling=True,
+                 icon="\u008b",
                  **kwargs):
         """
         Initializer.
@@ -128,7 +130,7 @@ class ChessboardPlane(Node):
         :param kwargs: Remaining kwargs.
         """
         assert plane in ['xz', 'xy', 'yz']
-        super(ChessboardPlane, self).__init__(**kwargs)
+        super(ChessboardPlane, self).__init__(icon=icon, **kwargs)
         self.side_length = side_length
         self.n_tiles = n_tiles
         self.c1 = np.array(color1)
@@ -199,15 +201,16 @@ class ChessboardPlane(Node):
     def bounds(self):
         return self.get_bounds(self.vertices)
 
-    def gui(self, imgui):
-        self.gui_position(imgui)
-        self.gui_rotation(imgui)
-        self.gui_scale(imgui)
+    @property
+    def current_bounds(self):
+        return self.bounds
 
+    def gui(self, imgui):
         _, self.c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
         _, self.c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True)
         _, self.tiling = imgui.checkbox('Toggle Tiling', self.tiling)
         _, self.n_tiles = imgui.drag_int('Number of tiles', self.n_tiles, 1.0, 1, 200)
+
 
 class Chessboard(Node):
     """A plane that is textured like a chessboard."""
@@ -246,9 +249,8 @@ class Chessboard(Node):
         self.c2_idxs = c2_idxs
 
         self.mesh = Meshes(vs, fs, face_colors=fc)
-        self.mesh.position = self.position
         self.mesh.backface_culling = False
-        self.add(self.mesh, has_gui=False, show_in_hierarchy=False)
+        self.add(self.mesh, show_in_hierarchy=False)
 
     # noinspection PyAttributeOutsideInit
     def _construct_board(self):
@@ -317,10 +319,6 @@ class Chessboard(Node):
         self.mesh.face_colors = self.fcs_tiled
 
     def gui(self, imgui):
-        self.gui_position(imgui)
-        self.gui_rotation(imgui)
-        self.gui_scale(imgui)
-
         u, c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
         if u:
             self.c1 = c1
@@ -334,4 +332,3 @@ class Chessboard(Node):
         u, self.tiling = imgui.checkbox('Toggle Tiling', self.tiling)
         if u:
             self._update_colors()
-
