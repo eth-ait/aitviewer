@@ -717,6 +717,7 @@ class VariableTopologyMeshes(Node):
 
     @property
     def bounds(self):
+        # TODO: this currently only returns the current mesh bounds for performance/simplicity.
         return self.current_mesh.bounds
 
     @property

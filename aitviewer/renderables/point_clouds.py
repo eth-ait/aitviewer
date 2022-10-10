@@ -127,7 +127,15 @@ class PointClouds(Node):
 
     @property
     def bounds(self):
-        return self.get_bounds(self.current_points)
+        if len(self.points) == 0:
+            return np.array([[0, 0], [0, 0], [0, 0]])
+
+        bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
+        for i in range(len(self.points)):
+            b = self.get_bounds(self.points[i])
+            bounds[:, 0] = np.minimum(bounds[:, 0], b[:, 0])
+            bounds[:, 1] = np.maximum(bounds[:, 1], b[:, 1])
+        return bounds
 
     @property
     def current_bounds(self):
