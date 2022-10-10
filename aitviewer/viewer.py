@@ -29,12 +29,12 @@ from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.billboard import Billboard
 from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.renderables.point_clouds import PointClouds
-from aitviewer.scene.camera import ViewerCamera
+from aitviewer.scene.camera import PinholeCamera, ViewerCamera
 from aitviewer.scene.scene import Scene
 from aitviewer.scene.node import Node
 from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
-from aitviewer.utils import PerfTimer
+from aitviewer.utils import PerfTimer, path
 from aitviewer.utils.utils import get_video_paths, video_to_gif
 from collections import namedtuple
 from moderngl_window import activate_context
@@ -455,6 +455,19 @@ class Viewer(moderngl_window.WindowConfig):
     def set_temp_camera(self, camera):
         self.scene.camera = camera
         self._using_temp_camera = True
+
+    def lock_to_node(self, node: Node, relative_position, smooth_sigma=None):
+        """
+        Create and return a PinholeCamera that follows a node, the target of the camera is the center
+        of the node at each frame and the camera is positioned with a constant offset (relative_position)
+        from its target. See aitviewer.utils.path.lock_to_node for more details about parameters.
+        The camera is set as the current viewer camera.
+        """
+        pos, tar = path.lock_to_node(node, relative_position, smooth_sigma=smooth_sigma)
+        cam = PinholeCamera(pos, tar, self.window_size[0], self.window_size[1], viewer=self)
+        self.scene.add(cam)
+        self.set_temp_camera(cam)
+        return cam
 
     def gui(self):
         imgui.new_frame()

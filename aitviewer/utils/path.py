@@ -52,7 +52,7 @@ def lock_to_node(node: Node, relative_position, smooth_sigma=None):
 
     :param node: the Node to follow.
     :param relative_position: A position added to the node position to compute the positions array.
-    :smooth_sigma: if not None and greater than 0 the position and target arrays are smoothed.
+    :param smooth_sigma: if not None and greater than 0 the position and target arrays are smoothed.
       with a 1D gaussian kernel of standard deviation equal to this value.
     """
     assert isinstance(node, Node), "Node parameter must be a node"
