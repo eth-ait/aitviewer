@@ -14,10 +14,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from aitviewer.viewer import Viewer
-
-from PIL.Image import Image
 import os
+
+from aitviewer.viewer import Viewer
+from PIL.Image import Image
+
 
 class HeadlessRenderer(Viewer):
     gl_version = (4, 0)

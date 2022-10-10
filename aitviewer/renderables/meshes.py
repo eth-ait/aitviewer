@@ -14,10 +14,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import os
-
 import moderngl
 import numpy as np
+import os
 import trimesh
 import tqdm
 import re
@@ -27,15 +26,15 @@ from aitviewer.scene.node import Node
 from aitviewer.shaders import get_smooth_lit_with_edges_program
 from aitviewer.shaders import get_flat_lit_with_edges_program
 from aitviewer.shaders import get_smooth_lit_texturized_program
-from aitviewer.utils.decorators import hooked
-from aitviewer.utils.utils import compute_vertex_and_face_normals
 from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
+from aitviewer.utils.decorators import hooked
+from aitviewer.utils.so3 import euler2rot_numpy, rot2euler_numpy
+from aitviewer.utils.utils import compute_vertex_and_face_normals
 from functools import lru_cache
 from moderngl_window.opengl.vao import VAO
-from trimesh.triangles import points_to_barycentric
 from PIL import Image
-from aitviewer.utils.so3 import euler2rot_numpy, rot2euler_numpy
+from trimesh.triangles import points_to_barycentric
 
 
 class Meshes(Node):
@@ -466,11 +465,11 @@ class Meshes(Node):
         _, self.norm_coloring = imgui.checkbox('Norm Coloring##norm_coloring{}'.format(self.unique_name),
                                                self.norm_coloring)
         _, self.flat_shading = imgui.checkbox('Flat shading [F]##flat_shading{}'.format(self.unique_name),
-                                               self.flat_shading)
+                                              self.flat_shading)
         _, self.draw_edges = imgui.checkbox('Draw edges [E]##draw_edges{}'.format(self.unique_name),
-                                               self.draw_edges)
+                                            self.draw_edges)
         _, self.draw_outline = imgui.checkbox('Draw outline##draw_outline{}'.format(self.unique_name),
-                                               self.draw_outline)
+                                              self.draw_outline)
 
         if self.normals_r is None:
             if imgui.button('Show Normals ##show_normals{}'.format(self.unique_name)):
@@ -516,8 +515,10 @@ class VariableTopologyMeshes(Node):
         :param faces: A list of length N with np arrays of shape (F_n, 3).
         :param vertex_normals: An optional list of length N with np arrays of shape (V_n, 3).
         :param face_normals: An optional list of length N with np arrays of shape (F_n, 3).
-        :param vertex_colors: An optional list of length N with np arrays of shape (V_n, 4) overriding the uniform color.
-        :param face_colors: An optional list of length N with np arrays of shape (F_n, 4) overriding the uniform or vertex colors.
+        :param vertex_colors: An optional list of length N with np arrays of shape (V_n, 4) overriding the
+          uniform color.
+        :param face_colors: An optional list of length N with np arrays of shape (F_n, 4) overriding the uniform
+          or vertex colors.
         :param uv_coords: An optional list of length N with np arrays of shape (V_n, 2) if the mesh is to be textured.
         :param texture_paths: An optional list of length N containing paths to the texture as an image file.
         :param preload: Whether or not to pre-load all the meshes. This increases loading time and memory consumption,
@@ -779,7 +780,8 @@ class VariableTopologyMeshes(Node):
 
         # Rotation controls
         euler_angles = rot2euler_numpy(self.rotation[np.newaxis], degrees=True)[0]
-        ur, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1, format='%.2f')
+        ur, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1,
+                                             format='%.2f')
         if ur:
             self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
 
@@ -810,7 +812,7 @@ class VariableTopologyMeshes(Node):
                 self.current_mesh.color = color
                 self._override_color = True
 
-        _, self.show_texture  = imgui.checkbox('Render Texture', self.show_texture)
+        _, self.show_texture = imgui.checkbox('Render Texture', self.show_texture)
         _, self.norm_coloring = imgui.checkbox('Norm Coloring', self.norm_coloring)
         _, self.flat_shading = imgui.checkbox('Flat shading [F]', self.flat_shading)
         _, self.draw_edges = imgui.checkbox('Draw edges [E]', self.draw_edges)

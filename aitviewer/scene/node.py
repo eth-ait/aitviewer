@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -69,7 +69,7 @@ class Node(object):
         if n_frames > 1:
             assert n_positions == 1 or n_frames == n_positions, (f"Number of position frames"
                 f" ({n_positions}) must be 1 or match number of Node frames {n_frames}")
-            assert n_rotations== 1 or n_frames == n_rotations, (f"Number of rotations frames"
+            assert n_rotations == 1 or n_frames == n_rotations, (f"Number of rotations frames"
                 f" ({n_rotations}) must be 1 or match number of Node frames {n_frames}")
             assert n_scales == 1 or n_frames == n_scales, (f"Number of scales frames"
                 f" ({n_scales}) must be 1 or match number of Node frames {n_frames}")
@@ -337,7 +337,8 @@ class Node(object):
         self.current_frame_id = self.current_frame_id - 1 if self.current_frame_id > 0 else len(self) - 1
 
     def on_before_frame_update(self):
-        """Called when the current frame is about to change, 'self.current_frame_id' still has the id of the previous frame."""
+        """Called when the current frame is about to change, 'self.current_frame_id' still has the id of the
+           previous frame."""
         pass
 
     def on_frame_update(self):
@@ -432,7 +433,6 @@ class Node(object):
 
     def gui_affine(self, imgui):
         """ Render GUI for affine transformations"""
-
         # Position controls
         u, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
         if u:
@@ -475,7 +475,6 @@ class Node(object):
     def gui_mode_view(self, imgui):
         """ Render custom GUI for view mode """
         pass
-
 
     # Renderable
     @staticmethod

@@ -72,6 +72,7 @@ SHORTCUTS = {
     "ESC": "Exit the viewer.",
 }
 
+
 class Viewer(moderngl_window.WindowConfig):
     resource_dir = Path(__file__).parent / 'shaders'
     size_mult = 1.0
@@ -216,6 +217,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._exit_popup_open = False
         self._show_shortcuts_window = False
 
+    # noinspection PyAttributeOutsideInit
     def create_framebuffers(self):
         """
         Create all framebuffers which depend on the window size.
@@ -238,6 +240,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
         self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
 
+    # noinspection PyAttributeOutsideInit
     def reset(self):
         if self.scene is not None:
             self.scene.release()
@@ -323,7 +326,6 @@ class Viewer(moderngl_window.WindowConfig):
 
     def render(self, time, frame_time, export=False):
         """The main drawing function."""
-
         if self.run_animations:
             # Compute number of frames to advance by.
             frames = (int)((time - self._last_frame_rendered_at) * self.playback_fps)
@@ -331,7 +333,7 @@ class Viewer(moderngl_window.WindowConfig):
                 self.scene.current_frame_id = (self.scene.current_frame_id + frames) % self.scene.n_frames
                 self._last_frame_rendered_at += frames * (1.0 / self.playback_fps)
 
-        #Update camera matrices that will be used for rendering
+        # Update camera matrices that will be used for rendering
         if isinstance(self.scene.camera, ViewerCamera):
             self.scene.camera.update_animation(frame_time)
         self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
@@ -1321,4 +1323,3 @@ class Viewer(moderngl_window.WindowConfig):
         self.scene.current_frame_id = saved_curr_frame
         self.run_animations = saved_run_animations
         self._last_frame_rendered_at = self.timer.time
-

@@ -14,13 +14,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from functools import lru_cache
 import numpy as np
-from aitviewer.renderables.lines import Lines
 
+from aitviewer.renderables.lines import Lines
 from aitviewer.scene.node import Node
 from aitviewer.scene.camera_utils import look_at
 from aitviewer.scene.camera_utils import orthographic_projection
+from functools import lru_cache
 
 
 class Light(Node):

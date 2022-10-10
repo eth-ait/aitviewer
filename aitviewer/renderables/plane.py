@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -49,7 +49,7 @@ class Plane(Node):
         if np.dot(v1, v2) > 0.00001:
             raise ValueError('v1 and v2 are not orthogonal.')
 
-        self.center = center
+        self.plane_center = center
         self.v1 = v1 / np.linalg.norm(v1)
         self.v2 = v2 / np.linalg.norm(v2)
         self.size = size
@@ -60,10 +60,10 @@ class Plane(Node):
         self.backface_culling = False
 
     def _get_renderable_data(self):
-        p0 = self.center + self.v1 * self.size - self.v2 * self.size
-        p1 = self.center + self.v1 * self.size + self.v2 * self.size
-        p2 = self.center - self.v1 * self.size + self.v2 * self.size
-        p3 = self.center - self.v1 * self.size - self.v2 * self.size
+        p0 = self.plane_center + self.v1 * self.size - self.v2 * self.size
+        p1 = self.plane_center + self.v1 * self.size + self.v2 * self.size
+        p2 = self.plane_center - self.v1 * self.size + self.v2 * self.size
+        p3 = self.plane_center - self.v1 * self.size - self.v2 * self.size
         normal = np.cross(self.v2, self.v1)
         normal = np.tile(normal[np.newaxis], (4, 1))
         return np.row_stack([p1, p0, p2, p3]), normal
@@ -211,6 +211,7 @@ class ChessboardPlane(Node):
         _, self.tiling = imgui.checkbox('Toggle Tiling', self.tiling)
         _, self.n_tiles = imgui.drag_int('Number of tiles', self.n_tiles, 1.0, 1, 200)
 
+
 class Chessboard(Node):
     """A plane that is textured like a chessboard."""
     def __init__(self,
@@ -331,4 +332,3 @@ class Chessboard(Node):
         u, self.tiling = imgui.checkbox('Toggle Tiling', self.tiling)
         if u:
             self._update_colors()
-

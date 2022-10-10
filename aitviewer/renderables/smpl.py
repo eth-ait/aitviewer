@@ -148,7 +148,8 @@ class SMPLSequence(Node):
         self.vertices, self.joints, self.faces, self.skeleton = self.fk()
 
         if self._is_rigged:
-            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_affine=False, color=(1.0, 177 / 255, 1 / 255, 1.0), name='Skeleton')
+            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_affine=False,
+                                          color=(1.0, 177 / 255, 1 / 255, 1.0), name='Skeleton')
             self._add_node(self.skeleton_seq)
 
         # First convert the relative joint angles to global joint angles in rotation matrix form.
@@ -165,7 +166,8 @@ class SMPLSequence(Node):
         self.rbs = RigidBodies(self.joints, global_oris, length=0.1, gui_affine=False, name='Joint Angles')
         self._add_node(self.rbs, enabled=self._show_joint_angles)
 
-        self.mesh_seq = Meshes(self.vertices, self.faces, is_selectable=False, gui_affine=False, color=kwargs.get('color', (160 / 255, 160 / 255, 160 / 255, 1.0)), name='Mesh')
+        self.mesh_seq = Meshes(self.vertices, self.faces, is_selectable=False, gui_affine=False,
+                               color=kwargs.get('color', (160 / 255, 160 / 255, 160 / 255, 1.0)), name='Mesh')
         self._add_node(self.mesh_seq)
 
         # Save view mode state to restore when exiting edit mode.
@@ -293,11 +295,18 @@ class SMPLSequence(Node):
 
     def export_to_npz(self, file: Union[IO, str]):
         np.savez(file,
-            poses_body=c2c(self.poses_body),
-            poses_root=c2c(self.poses_root),
-            betas=c2c(self.betas),
-            trans=c2c(self.trans),
-        )
+                 poses_body=c2c(self.poses_body),
+                 poses_root=c2c(self.poses_root),
+                 betas=c2c(self.betas),
+                 trans=c2c(self.trans))
+
+    @property
+    def color(self):
+        return self.mesh_seq.color
+
+    @color.setter
+    def color(self, color):
+        self.mesh_seq.color = color
 
     @property
     def bounds(self):

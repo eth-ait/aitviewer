@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -14,7 +14,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
 import collections
 import os
 import torch
@@ -24,8 +23,7 @@ try:
     from star.pytorch.star import STAR
     from star.config import cfg
 except Exception as e:
-    print(f"{e}. Please run `pip install git+https://github.com/ahmedosman/STAR.git`")
-    raise
+    raise ImportError(f"Cannot import STAR. Please run `pip install git+https://github.com/ahmedosman/STAR.git`\n{e}")
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.utils.so3 import aa2rot_torch as aa2rot
@@ -76,7 +74,6 @@ class STARLayer(STAR):
                     self._children[bone[0]].append(bone[1])
         return self._children
 
-
     def skeletons(self):
         """Return how the joints are connected in the kinematic chain where skeleton[0, i] is the parent of
         joint skeleton[1, i]."""
@@ -93,7 +90,7 @@ class STARLayer(STAR):
         return self.n_joints_body + 1
 
     def forward(self, poses_body, betas=None, poses_root=None, trans=None, normalize_root=False):
-        '''
+        """
         forwards the model
         :param poses_body: Pose parameters.
         :param poses_root: Pose parameters for the root joint.
@@ -101,14 +98,12 @@ class STARLayer(STAR):
         :param trans: Root translation.
         :param normalize_root: Makes poses relative to the root joint (useful for globally rotated captures).
         :return: Deformed surface vertices, transformed joints
-        '''
-
+        """
         poses, betas, trans = self.preprocess(poses_body, betas, poses_root, trans, normalize_root)
 
         v = super().forward(pose=poses, betas=betas, trans=trans)
         J = v.J_transformed
         return v, J
-
 
     def preprocess(self, poses_body, betas=None, poses_root=None, trans=None, normalize_root=False):
         batch_size = poses_body.shape[0]

@@ -16,8 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
-from aitviewer.scene.node import Node
 import scipy.ndimage
+
+from aitviewer.scene.node import Node
+
 
 def line(start, end, num):
     """
@@ -41,6 +43,7 @@ def circle(center, radius, num, start_angle=0.0, end_angle=360.0):
     angles = np.linspace(np.radians(start_angle), np.radians(end_angle), num=num)
     c = np.column_stack((np.cos(angles) * radius, np.zeros(angles.shape), np.sin(angles) * radius))
     return c + center
+
 
 def lock_to_node(node: Node, relative_position, smooth_sigma=None):
     """

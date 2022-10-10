@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -49,7 +49,8 @@ class Scene(Node):
         # directional_lights.glsl as well!
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
         self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
-        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0), shadow_enabled=False))
+        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0),
+                                 shadow_enabled=False))
 
         self.add(*self.lights)
 
@@ -70,7 +71,7 @@ class Scene(Node):
         self.add(self.camera_target, show_in_hierarchy=False)
 
         self.custom_font = None
-        self.properties_icon ="\u0094"
+        self.properties_icon = "\u0094"
 
         # Currently selected object, None if no object is selected
         self.selected_object = None
@@ -182,7 +183,6 @@ class Scene(Node):
         if isinstance(self.camera, ViewerCamera) and len(centers) > 0:
             self.camera.target = np.array(centers).mean(0)
 
-
     def set_lights(self, is_dark_mode=False):
         if is_dark_mode:
             for l in self.lights:
@@ -288,7 +288,6 @@ class Scene(Node):
                     imgui.end_group()
                     imgui.spacing(); imgui.spacing(); imgui.spacing()
 
-
     def gui(self, imgui):
         imgui.text(f"FPS: {self.fps:.1f}")
         # Background color
@@ -299,7 +298,6 @@ class Scene(Node):
     def gui_editor(self, imgui):
         """GUI to control scene settings."""
         # Also include the camera GUI in the scene node.
-
         self.gui_camera(imgui)
         imgui.spacing()
         imgui.separator()

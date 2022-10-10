@@ -35,7 +35,7 @@ class PointClouds(Node):
                  color=(0.0, 0.0, 1.0, 1.0),
                  z_up=False,
                  icon="\u008c",
-                 pickable = True,
+                 pickable=True,
                  **kwargs):
         """
         A sequence of point clouds. Each point cloud can have a varying number of points.
@@ -167,6 +167,7 @@ class PointClouds(Node):
         self.vbo_points.clear()
         self.vbo_colors.clear()
 
+    # noinspection PyAttributeOutsideInit
     @Node.once
     def make_renderable(self, ctx):
         ctx.point_size = self.point_size

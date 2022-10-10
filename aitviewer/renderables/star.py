@@ -1,9 +1,26 @@
+"""
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+import numpy as np
+import torch
+
 from aitviewer.configuration import CONFIG as C
+from aitviewer.models.star import STARLayer
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.utils import to_numpy as c2c
-import torch
-import numpy as np
-from aitviewer.models.star import STARLayer
 
 
 class STARSequence(SMPLSequence):
@@ -91,7 +108,8 @@ class STARSequence(SMPLSequence):
         """Load a sequence downloaded from the AMASS website."""
 
         # User SMPL sequence loader and re-parse data
-        seq = super().from_amass(npz_data_path, start_frame=start_frame, end_frame=end_frame, log=log, fps_out=fps_out, **kwargs)
+        seq = super().from_amass(npz_data_path, start_frame=start_frame, end_frame=end_frame, log=log, fps_out=fps_out,
+                                 **kwargs)
 
         # STAR has no hands, but includes wrists
         poses_body = torch.cat((seq.poses_body, seq.poses_left_hand[:, :3], seq.poses_right_hand[:, :3]), dim=-1)

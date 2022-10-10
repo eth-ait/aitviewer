@@ -287,7 +287,8 @@ class Camera(Node, CameraInterface):
         else:
             path_lines = None
 
-        # We add the the path to the parent node of the camera because we don't want the camera position and rotation to be applied to it.
+        # We add the the path to the parent node of the camera because we don't want the camera position and rotation
+        # to be applied to it.
         assert self.parent is not None, "Camera node must be added to the scene before showing the camera path."
         self.parent.add(path_spheres, show_in_hierarchy=False, enabled=self.enabled)
         if path_lines is not None:
@@ -336,17 +337,22 @@ class Camera(Node, CameraInterface):
 class WeakPerspectiveCamera(Camera):
     """
     A sequence of weak perspective cameras.
-    The camera is positioned at (0,0,1) axis aligned and looks towards the negative z direction following the OpenGL conventions.
+    The camera is positioned at (0,0,1) axis aligned and looks towards the negative z direction following the OpenGL
+    conventions.
     """
     def __init__(self, scale, translation, cols, rows, near=C.znear, far=C.zfar, viewer=None, **kwargs):
         """ Initializer.
         :param scale: A np array of scale parameters [sx, sy] of shape (2) or a sequence of parameters of shape (N, 2)
-        :param translation: A np array of translation parameters [tx, ty] of shape (2) or a sequence of parameters of shape (N, 2)
-        :param cols: Number of columns in an image captured by this camera, used for computing the aspect ratio of the camera
-        :param rows: Number of rows in an image captured by this camera, used for computing the aspect ratio of the camera
-        :param near: Distance of the near plane from the camera
-        :param far: Distance of the far plane from the camera
-        :param viewer: the current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
+        :param translation: A np array of translation parameters [tx, ty] of shape (2) or a sequence of parameters of
+          shape (N, 2).
+        :param cols: Number of columns in an image captured by this camera, used for computing the aspect ratio of
+          the camera.
+        :param rows: Number of rows in an image captured by this camera, used for computing the aspect ratio of
+          the camera.
+        :param near: Distance of the near plane from the camera.
+        :param far: Distance of the far plane from the camera.
+        :param viewer: the current viewer, if not None the gui for this object will show a button for viewing from
+          this camera in the viewer.
          """
         if len(scale.shape) == 1:
             scale = scale[np.newaxis]
@@ -434,14 +440,15 @@ class OpenCVCamera(Camera):
 
     def __init__(self, K, Rt, cols, rows, dist_coeffs=None, near=C.znear, far=C.zfar, viewer=None, **kwargs):
         """ Initializer.
-        :param K:  A np array of camera intrinsics in the format used by OpenCV (3, 3) or (N, 3, 3), one for each frame
-        :param Rt: A np array of camera extrinsics in the format used by OpenCV (3, 4) or (N, 3, 4), one for each frame
-        :param dist_coeffs: Lens distortion coefficients in the format used by OpenCV (5)
-        :param cols: Width  of the image in pixels, matching the size of the image expected by the intrinsics matrix
-        :param rows: Height of the image in pixels, matching the size of the image expected by the intrinsics matrix
-        :param near: Distance of the near plane from the camera
-        :param far: Distance of the far plane from the camera
-        :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this camera in the viewer
+        :param K:  A np array of camera intrinsics in the format used by OpenCV (3, 3) or (N, 3, 3), one for each frame.
+        :param Rt: A np array of camera extrinsics in the format used by OpenCV (3, 4) or (N, 3, 4), one for each frame.
+        :param dist_coeffs: Lens distortion coefficients in the format used by OpenCV (5).
+        :param cols: Width  of the image in pixels, matching the size of the image expected by the intrinsics matrix.
+        :param rows: Height of the image in pixels, matching the size of the image expected by the intrinsics matrix.
+        :param near: Distance of the near plane from the camera.
+        :param far: Distance of the far plane from the camera.
+        :param viewer: The current viewer, if not None the gui for this object will show a button for viewing from this
+          camera in the viewer.
          """
         self.K = K if len(K.shape) == 3 else K[np.newaxis]
         self.Rt = Rt if len(Rt.shape) == 3 else Rt[np.newaxis]
@@ -560,7 +567,7 @@ class OpenCVCamera(Camera):
 
         Remarks:
          The Pinhole camera does not currently support skew, offset from the center and non vertical up vectors.
-         Also the fov from the first intrinsic matrix is used for all frames because the PiholeCamera does not
+         Also the fov from the first intrinsic matrix is used for all frames because the PinholeCamera does not
          support sequences of fov values.
         """
         # Save current frame id.

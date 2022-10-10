@@ -1,5 +1,5 @@
 """
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev
+Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
 
-from aitviewer.scene.node import Node
 from aitviewer.renderables.rigid_bodies import RigidBodies
 
 
@@ -31,4 +30,5 @@ class CoordinateSystem(RigidBodies):
                  **kwargs):
         r = length / 50
         l = length
-        super(CoordinateSystem, self).__init__(np.array([[[0.0, 0.0, 0.0]]]), np.eye(3)[np.newaxis, np.newaxis], radius=r, length=l, icon=icon, **kwargs)
+        super(CoordinateSystem, self).__init__(np.array([[[0.0, 0.0, 0.0]]]), np.eye(3)[np.newaxis, np.newaxis],
+                                               radius=r, length=l, icon=icon, **kwargs)

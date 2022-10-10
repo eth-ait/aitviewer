@@ -19,9 +19,6 @@ from aitviewer.viewer import Viewer
 
 
 if __name__ == '__main__':
-    smpl_template = SMPLSequence.t_pose()
-
-    # Display in viewer.
     v = Viewer()
-    v.scene.add(smpl_template)
+    v.scene.add(SMPLSequence.t_pose())
     v.run()

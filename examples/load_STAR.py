@@ -23,6 +23,9 @@ from aitviewer.viewer import Viewer
 
 
 if __name__ == '__main__':
+    # Instantiate a STAR layer. This requires that the respective repo has been installed via
+    # pip install git+https://github.com/ahmedosman/STAR.git and that the model files are available on the path
+    # specified in `C.star_models`.
     star_layer = STARLayer(device=C.device)
 
     # Load a STAR Sequence from AMASS data. BETAs will not be loaded by default and need to be converted.

@@ -153,7 +153,7 @@ class Spheres(Node):
     def redraw(self, **kwargs):
         current_pos = self.sphere_positions[self.current_frame_id]
         vertices = np.reshape(self.sphere_vertices, [-1, self.n_vertices, 3]) * self.radius + current_pos[:, np.newaxis]
-        self.mesh._vertices =np.reshape(vertices, [-1, 3])[np.newaxis]
+        self.mesh._vertices = np.reshape(vertices, [-1, 3])[np.newaxis]
         super().redraw(**kwargs)
 
     @Node.once

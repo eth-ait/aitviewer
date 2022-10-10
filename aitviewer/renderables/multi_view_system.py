@@ -72,7 +72,8 @@ class MultiViewSystem(Node):
             extrinsics = camera_info['extrinsics'][i]
             dist_coeffs = camera_info['dist_coeffs'][i]
 
-            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs, viewer=viewer, is_selectable=False)
+            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs, viewer=viewer,
+                                  is_selectable=False)
             self.add(camera, show_in_hierarchy=False)
             self.cameras.append(camera)
 
@@ -123,7 +124,8 @@ class MultiViewSystem(Node):
             return
 
         # Create a new billboard for the currently active camera.
-        billboard = Billboard.from_camera_and_distance(self.cameras[camera_index], self.billboard_distance, self.cols, self.rows, paths)
+        billboard = Billboard.from_camera_and_distance(self.cameras[camera_index], self.billboard_distance, self.cols,
+                                                       self.rows, paths)
 
         # Set the current frame index if we have an image for it.
         if self.current_frame_id < len(paths):
