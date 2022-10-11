@@ -37,6 +37,12 @@ pip install -e .
 
 Note that this does not install the GPU-version of PyTorch automatically. If your environment already contains it, you should be good to go, otherwise install it manually.
 
+If you would like to visualize STAR, please install the package manually via
+```commandline
+pip install git+https://github.com/ahmedosman/STAR.git
+```
+and download the respective body models from the official website.
+
 ## Configuration
 The viewer loads default configuration parameters from [`aitvconfig.yaml`](aitviewer/aitvconfig.yaml). There are three ways how to override these parameters:
   - Create a file named `aitvconfig.yaml` and have the environment variable `AITVRC` point to it. Alternatively, you can point `AITVRC` to the directory containing `aitvconfig.yaml`.
