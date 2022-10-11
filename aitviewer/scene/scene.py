@@ -171,14 +171,14 @@ class Scene(Node):
     def auto_set_floor(self):
         """Finds the minimum lower bound in the y coordinate from all the children bounds and uses that as the floor"""
         if self.floor is not None and len(self.nodes) > 0:
-            self.floor.position[1] = self.bounds[1, 0]
+            self.floor.position[1] = self.current_bounds[1, 0]
             self.floor.update_transform()
 
     def auto_set_camera_target(self):
         """Sets the camera target to the average of the center of all objects in the scene"""
         centers = []
         for n in self.nodes:
-            centers.append(n.center)
+            centers.append(n.current_bounds.mean(-1))
 
         if isinstance(self.camera, ViewerCamera) and len(centers) > 0:
             self.camera.target = np.array(centers).mean(0)
