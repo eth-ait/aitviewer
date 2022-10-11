@@ -48,12 +48,12 @@ Note that the configuration files are loaded in this order, i.e. the config file
 The configuration management is using [OmegaConf](https://omegaconf.readthedocs.io/en/2.1_branch/index.html). You will probably want to override the following parameters at your convenience:
 - `datasets.amass`: where [AMASS](https://amass.is.tue.mpg.de/) is stored if you want to load AMASS sequences.
 - `smplx_models`: where SMPLX models are stored, preprocessed as required by the [`smplx` package](https://github.com/vchoutas/smplx).
+- `star_models`: where the [STAR model](https://github.com/ahmedosman/STAR) is stored if you want to use it.
 - `export_dir`: where videos and other outputs are stored by default.
 
 
 ## Quickstart
-View an SMPL template
-
+Display the SMPL T-pose:
 ```py
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
@@ -145,6 +145,6 @@ If you use this software, please cite it as below.
 ```
 
 ## Contact & Contributions
-This software was developed by [Manuel Kaufmann](mailto:manuel.kaufmann@inf.ethz.ch) and [Velko Vechev](mailto:velko.vechev@inf.ethz.ch) and Dario Mylonopoulos.
+This software was developed by [Manuel Kaufmann](mailto:manuel.kaufmann@inf.ethz.ch), [Velko Vechev](mailto:velko.vechev@inf.ethz.ch) and Dario Mylonopoulos.
 For questions please create an issue.
 We welcome and encourage module and feature contributions from the community.
