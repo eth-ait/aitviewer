@@ -29,6 +29,16 @@ def get_smooth_lit_with_edges_program():
 
 
 @functools.lru_cache()
+def get_smooth_lit_with_edges_face_color_program():
+    return _load('lit_with_edges.glsl', defines={ 'SMOOTH_SHADING': 1, 'TEXTURE': 0, 'FACE_COLOR': 1})
+
+
+@functools.lru_cache()
+def get_flat_lit_with_edges_face_color_program():
+    return _load('lit_with_edges.glsl', defines={ 'SMOOTH_SHADING': 0, 'TEXTURE': 0, 'FACE_COLOR': 1})
+
+
+@functools.lru_cache()
 def get_flat_lit_with_edges_program():
     return _load('lit_with_edges.glsl', defines={ 'SMOOTH_SHADING': 0, 'TEXTURE': 0 })
 
@@ -56,6 +66,7 @@ def get_screen_texture_program():
 @functools.lru_cache()
 def get_chessboard_program():
     return _load('chessboard.glsl')
+
 
 def clear_shader_cache():
     """Clear all cached shaders."""
