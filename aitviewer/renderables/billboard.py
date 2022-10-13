@@ -99,7 +99,7 @@ class Billboard(Node):
 
     @classmethod
     def from_camera_and_distance(cls, camera: Camera, distance: float, cols: int, rows: int,
-                                 texture_paths: List[str], image_process_fn=None):
+                                 texture_paths: List[str], image_process_fn=None, **kwargs):
         """
         Initialize a Billboard from a camera object, a distance from the camera, the size of the image in
         pixels and the set of images. `image_process_fn` can be used to apply a function to each image.
@@ -148,7 +148,7 @@ class Billboard(Node):
                     return cv2.undistort(img, camera.current_K, camera.dist_coeffs)
                 image_process_fn = undistort
 
-        return cls(all_corners, texture_paths, image_process_fn)
+        return cls(all_corners, texture_paths, image_process_fn, **kwargs)
 
     # noinspection PyAttributeOutsideInit
     @Node.once
