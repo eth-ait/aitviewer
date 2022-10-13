@@ -113,6 +113,7 @@ This list can be shown directly in the viewer by clicking on the `Help -> Keyboa
 - `SPACE` Start/stop playing animation.
 - `.` Go to next frame.
 - `,` Go to previous frame.
+- `G` Open a window to change frame by typing the frame number.
 - `X` Center view on the selected object.
 - `O` Enable/disable orthographic camera.
 - `T` Show the camera target in the scene.
