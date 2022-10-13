@@ -362,6 +362,7 @@ class WeakPerspectiveCamera(Camera):
 
         assert scale.shape[0] == translation.shape[0], "Number of frames in scale and translation must match"
 
+        kwargs['gui_affine'] = False
         super(WeakPerspectiveCamera, self).__init__(n_frames=scale.shape[0], viewer=viewer, **kwargs)
 
         self.scale_factor = scale
@@ -459,6 +460,7 @@ class OpenCVCamera(Camera):
         assert self.K.shape[0] == 1 or self.Rt.shape[0] == 1 or self.K.shape[0] == self.Rt.shape[0], (
             f"extrinsics and intrinsics array shape mismatch: {self.Rt.shape} and {self.K.shape}")
 
+        kwargs['gui_affine'] = False
         super(OpenCVCamera, self).__init__(viewer=viewer, n_frames=max(self.K.shape[0], self.Rt.shape[0]), **kwargs)
         self.position = self.current_position
         self.rotation = self.current_rotation
@@ -658,6 +660,7 @@ class PinholeCamera(Camera):
     def rotation(self):
         return np.array([-self.right, self.up, -self.forward]).T
 
+
     def update_matrices(self, width, height):
         # Compute projection matrix.
         P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
@@ -697,6 +700,13 @@ class PinholeCamera(Camera):
         K = np.array([[f * 0.5 * rows, 0., c0[0]], [0., f * 0.5 * rows, c0[1]], [0., 0., 1.]])
 
         return OpenCVCamera(K, Rts, cols, rows, near=self.near, far=self.far, viewer=self.viewer, **kwargs)
+
+    def gui_affine(self, imgui):
+        """ Render GUI for affine transformations"""
+        # Position controls
+        u, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
+        if u:
+            self.position = pos
 
     @hooked
     def gui(self, imgui):

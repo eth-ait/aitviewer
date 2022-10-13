@@ -55,6 +55,7 @@ SHORTCUTS = {
     "SPACE": "Start/stop playing animation.",
     ".": "Go to next frame.",
     ",": "Go to previous frame.",
+    "G": "Open a window to change frame by typing the frame number.",
     "X": "Center view on the selected object.",
     "O": "Enable/disable orthographic camera.",
     "T": "Show the camera target in the scene.",
@@ -77,7 +78,7 @@ class Viewer(moderngl_window.WindowConfig):
     resource_dir = Path(__file__).parent / 'shaders'
     size_mult = 1.0
     samples = 4
-    gl_version = (4, 0)
+    gl_version = (4, 3)
     window_type = C.window_type
 
     def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, **kwargs):
@@ -167,6 +168,7 @@ class Viewer(moderngl_window.WindowConfig):
             'inspect': self.gui_inspect,
             'shortcuts': self.gui_shortcuts,
             'exit': self.gui_exit,
+            'go_to_frame': self.gui_go_to_frame
         }
 
         # Debug
@@ -197,6 +199,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._lock_selection_key = self.wnd.keys.K
         self._mode_inspect_key = self.wnd.keys.I
         self._mode_view_key = self.wnd.keys.V
+        self._go_to_frame_key = self.wnd.keys.G
         self._shortcut_names = {self.wnd.keys.SPACE: "Space",
                                 self.wnd.keys.C: "C",
                                 self.wnd.keys.D: "D",
@@ -208,6 +211,7 @@ class Viewer(moderngl_window.WindowConfig):
                                 self.wnd.keys.S: "S",
                                 self.wnd.keys.T: "T",
                                 self.wnd.keys.X: "X",
+                                self.wnd.keys.G: "G",
                                 self.wnd.keys.Z: "Z"}
 
         # Disable exit on escape key
@@ -215,6 +219,8 @@ class Viewer(moderngl_window.WindowConfig):
 
         # GUI
         self._exit_popup_open = False
+        self._go_to_frame_popup_open = False
+        self._go_to_frame_string = ""
         self._show_shortcuts_window = False
 
     # noinspection PyAttributeOutsideInit
@@ -813,6 +819,30 @@ class Viewer(moderngl_window.WindowConfig):
                 self.prevent_background_interactions()
             imgui.end()
 
+    def gui_go_to_frame(self):
+        if self._go_to_frame_popup_open:
+            imgui.open_popup("Go to frame##go-to-frame-popup")
+            self._go_to_frame_string = str(self.scene.current_frame_id)
+
+        imgui.set_next_window_size(300,0)
+        if imgui.begin_popup_modal("Go to frame##go-to-frame-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_TITLE_BAR)[0]:
+            if self._go_to_frame_popup_open:
+                imgui.set_keyboard_focus_here()
+                u, self._go_to_frame_string = imgui.input_text("Go to frame", self._go_to_frame_string, 64, imgui.INPUT_TEXT_CHARS_DECIMAL | imgui.INPUT_TEXT_ENTER_RETURNS_TRUE | imgui.INPUT_TEXT_AUTO_SELECT_ALL)
+                if u:
+                    try:
+                        frame_id =  int(self._go_to_frame_string)
+                    except:
+                        frame_id = -1
+                        pass
+                    if frame_id >= 0:
+                        self.scene.current_frame_id = frame_id
+                    self._go_to_frame_popup_open = False
+                    imgui.close_current_popup()
+            else:
+                imgui.close_current_popup()
+            imgui.end_popup()
+
     def gui_exit(self):
         if self._exit_popup_open:
             imgui.open_popup("Exit##exit-popup")
@@ -932,10 +962,18 @@ class Viewer(moderngl_window.WindowConfig):
                 self._exit_popup_open = False
             return
 
+        if action == self.wnd.keys.ACTION_PRESS and self._go_to_frame_popup_open:
+            if key == self._exit_key:
+                self._go_to_frame_popup_open = False
+            return
+
         if self.imgui.io.want_capture_keyboard:
             return
 
         if action == self.wnd.keys.ACTION_PRESS:
+            if key == self._go_to_frame_key:
+                self._go_to_frame_popup_open = True
+
             if key == self._exit_key:
                 self._exit_popup_open = True
 

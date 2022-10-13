@@ -23,6 +23,8 @@ import re
 import pickle
 
 from aitviewer.scene.node import Node
+from aitviewer.shaders import get_flat_lit_with_edges_face_color_program
+from aitviewer.shaders import get_smooth_lit_with_edges_face_color_program
 from aitviewer.shaders import get_smooth_lit_with_edges_program
 from aitviewer.shaders import get_flat_lit_with_edges_program
 from aitviewer.shaders import get_smooth_lit_texturized_program
@@ -113,7 +115,7 @@ class Meshes(Node):
         self.norm_coloring = False
         self.normals_r = None
         self.need_upload = True
-        self._use_uniform_color = self._vertex_colors is None
+        self._use_uniform_color = self._vertex_colors is None and self._face_colors is None
 
     @property
     def vertices(self):
@@ -241,9 +243,16 @@ class Meshes(Node):
     def face_colors(self, face_colors):
         self._face_colors = face_colors
         if face_colors is not None:
-            self._vertex_colors = np.tile(self.face_colors[:, :, np.newaxis], [1, 1, 3, 1])
             self._use_uniform_color = False
         self.redraw()
+
+    @property
+    def current_face_colors(self):
+        if self._use_uniform_color:
+            return np.full((self.n_faces, 4), self.material.color)
+        else:
+            idx = self.current_frame_id if self.face_colors.shape[0] > 1 else 0
+            return self.face_colors[idx]
 
     @Node.color.setter
     def color(self, color):
@@ -308,24 +317,27 @@ class Meshes(Node):
 
         self._need_upload = False
 
-        # Each write call takes about 1-2 ms
+        # Each write call takes about 1-2 ms.
         vertices = self.current_vertices
         vertex_colors = self.current_vertex_colors
+        face_colors = self.current_face_colors
 
+        # Write positions.
+        self.vbo_vertices.write(vertices.astype('f4').tobytes())
+
+        # Write normals.
         if not self.flat_shading:
             vertex_normals = self.vertex_normals_at(self.current_frame_id)
-            if self.face_colors is not None:
-                vn_for_drawing = vertex_normals[self.faces]
-            else:
-                vn_for_drawing = vertex_normals
-            self.vbo_normals.write(vn_for_drawing.astype('f4').tobytes())
+            self.vbo_normals.write(vertex_normals.astype('f4').tobytes())
 
-        if self.face_colors is not None:
-            vertices = vertices[self.faces]
+        if self.face_colors is None:
+            # Write vertex colors.
+            self.vbo_colors.write(vertex_colors.astype('f4').tobytes())
+        else:
+            # Write face colors
+            self.ssbo_face_colors.write(face_colors.astype('f4').tobytes())
 
-        self.vbo_vertices.write(vertices.astype('f4').tobytes())
-        self.vbo_colors.write(vertex_colors.astype('f4').tobytes())
-
+        # Write uvs.
         if self.has_texture:
             self.vbo_uvs.write(self.uv_coords.astype('f4').tobytes())
 
@@ -334,43 +346,31 @@ class Meshes(Node):
 
     # noinspection PyAttributeOutsideInit
     @Node.once
-    def make_renderable(self, ctx):
+    def make_renderable(self, ctx: moderngl.Context):
         """Prepares this object for rendering. This function must be called before `render` is used."""
         self.smooth_prog = get_smooth_lit_with_edges_program()
         self.flat_prog = get_flat_lit_with_edges_program()
+        self.smooth_face_prog = get_smooth_lit_with_edges_face_color_program()
+        self.flat_face_prog = get_flat_lit_with_edges_face_color_program()
 
         vertices = self.current_vertices
         vertex_normals = self.vertex_normals_at(self.current_frame_id)
         vertex_colors = self.current_vertex_colors
 
-        # Face colors draw 3 distinct vertices per face.
-        if self.face_colors is not None:
-            vertices = vertices[self.faces]
-            vn_for_drawing = vertex_normals[self.faces]
-        else:
-            vn_for_drawing = vertex_normals
-
         self.vbo_vertices = ctx.buffer(vertices.astype('f4').tobytes())
-        self.vbo_normals = ctx.buffer(vn_for_drawing.astype('f4').tobytes())
-        self.vbo_indices = ctx.buffer(self.faces.tobytes()) if self.face_colors is None else None
+        self.vbo_normals = ctx.buffer(vertex_normals.astype('f4').tobytes())
         self.vbo_colors = ctx.buffer(vertex_colors.astype('f4').tobytes())
+        self.vbo_indices = ctx.buffer(self.faces.tobytes())
 
-        self.smooth_vao = ctx.vertex_array(self.smooth_prog,
-                                           [(self.vbo_vertices, '3f4 /v', 'in_position'),
-                                            (self.vbo_normals, '3f4 /v', 'in_normal'),
-                                            (self.vbo_colors, '4f4 /v', 'in_color')],
-                                           self.vbo_indices)
+        self.vao = VAO()
+        self.vao.buffer(self.vbo_vertices, '3f4', 'in_position')
+        self.vao.buffer(self.vbo_normals, '3f4', 'in_normal')
+        self.vao.buffer(self.vbo_colors, '4f4', 'in_color')
+        self.vao.index_buffer(self.vbo_indices)
 
-        self.flat_vao = ctx.vertex_array(self.flat_prog,
-                                         [(self.vbo_vertices, '3f4 /v', 'in_position'),
-                                          (self.vbo_colors, '4f4 /v', 'in_color')],
-                                         self.vbo_indices)
-
-        self.positions_vao = VAO('{}:positions'.format(self.unique_name))
-        self.positions_vao.buffer(self.vbo_vertices, '3f', ['in_position'])
-
-        if self.face_colors is None:
-            self.positions_vao.index_buffer(self.vbo_indices)
+        self.ssbo_face_colors = ctx.buffer(reserve=self.faces.shape[0] * 16)
+        if self.face_colors is not None:
+            self.ssbo_face_colors.write(self.current_face_colors.astype('f4').tobytes())
 
         if self.has_texture:
             img = self.texture_image
@@ -380,51 +380,34 @@ class Meshes(Node):
                 self.texture = ctx.texture(img.size, 3, img.tobytes())
             self.texture_prog = get_smooth_lit_texturized_program()
             self.vbo_uvs = ctx.buffer(self.uv_coords.astype('f4').tobytes())
-            self.texture_vao = ctx.vertex_array(self.texture_prog,
-                                                [(self.vbo_vertices, '3f4 /v', 'in_position'),
-                                                 (self.vbo_normals, '3f4 /v', 'in_normal'),
-                                                 (self.vbo_colors, '4f4 /v', 'in_color'),
-                                                 (self.vbo_uvs, '2f4 /v', 'in_uv')],
-                                                self.vbo_indices)
+            self.vao.buffer(self.vbo_uvs, '2f4', 'in_uv')
 
     @hooked
     def release(self):
         if self.is_renderable:
-            self.smooth_vao.release()
-            self.flat_vao.release()
-            self.positions_vao.release(buffer=False)
-
-            self.vbo_vertices.release()
-            if self.vbo_indices is not None:
-                self.vbo_indices.release()
-            self.vbo_normals.release()
-            self.vbo_colors.release()
-
+            self.vao.release()
             if self.has_texture:
-                self.texture_vao.release()
-                self.vbo_uvs.release()
                 self.texture.release()
 
     def render(self, camera, **kwargs):
-        # Check if flat shading changed, in which case we need to update the VBOs.
-        vao = self._prepare_vao(camera, **kwargs)
-        vao.render(moderngl.TRIANGLES)
-
-    def render_positions(self, prog):
-        if self.is_renderable:
-            self._upload_buffers()
-            self.positions_vao.render(prog)
-
-    def _prepare_vao(self, camera, **kwargs):
-        """Prepare the shader pipeline and the VAO."""
         self._upload_buffers()
 
         if self.has_texture and self.show_texture:
-            prog, vao = self.texture_prog, self.texture_vao
+            prog = self.texture_prog
             prog['diffuse_texture'] = 0
             self.texture.use(0)
         else:
-            prog, vao = (self.flat_prog, self.flat_vao) if self.flat_shading else (self.smooth_prog, self.smooth_vao)
+            if self.face_colors is None:
+                if self.flat_shading:
+                    prog = self.flat_prog
+                else:
+                    prog = self.smooth_prog
+            else:
+                if self.flat_shading:
+                    prog = self.flat_face_prog
+                else:
+                    prog = self.smooth_face_prog
+                self.ssbo_face_colors.bind_to_storage_buffer(0)
             prog['norm_coloring'].value = self.norm_coloring
 
         prog['use_uniform_color'] = self._use_uniform_color
@@ -436,7 +419,12 @@ class Meshes(Node):
         set_lights_in_program(prog, kwargs['lights'], kwargs['shadows_enabled'])
         set_material_properties(prog, self.material)
         self.receive_shadow(prog, **kwargs)
-        return vao
+        self.vao.render(prog, moderngl.TRIANGLES)
+
+    def render_positions(self, prog):
+        if self.is_renderable:
+            self._upload_buffers()
+            self.vao.render(prog, moderngl.TRIANGLES)
 
     def _show_normals(self):
         """Create and add normals at runtime"""
