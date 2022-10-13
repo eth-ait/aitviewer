@@ -463,6 +463,12 @@ class Meshes(Node):
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        super().gui_context_menu(imgui)
+
+
     def gui_io(self, imgui):
         if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
             mesh = trimesh.Trimesh(vertices=self.current_vertices, faces=self.faces, process=False)
@@ -753,6 +759,11 @@ class VariableTopologyMeshes(Node):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
+
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        super().gui_context_menu(imgui)
 
     def gui_affine(self, imgui):
         """ Render GUI for affine transformations"""

@@ -485,12 +485,12 @@ class Viewer(moderngl_window.WindowConfig):
             and imgui.is_mouse_released(button=1)
             and not self._mouse_moved):
             # Select the object under the cursor
-            if self.select_object(*imgui.get_io().mouse_pos) and hasattr(self.scene.selected_object, 'gui_context_menu'):
+            if self.select_object(*imgui.get_io().mouse_pos) or not isinstance(self.scene.selected_object, Node):
                 imgui.open_popup("Context Menu")
 
         # Draw the context menu for the selected object
         if imgui.begin_popup("Context Menu"):
-            if self.scene.selected_object is None or not hasattr(self.scene.selected_object, 'gui_context_menu'):
+            if self.scene.selected_object is None or not isinstance(self.scene.selected_object, Node):
                 imgui.close_current_popup()
             else:
                 self.scene.selected_object.gui_context_menu(imgui)

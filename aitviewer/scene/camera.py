@@ -435,6 +435,11 @@ class WeakPerspectiveCamera(Camera):
             else:
                 self.hide_frustum()
 
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        super(Camera, self).gui_context_menu(imgui)
+
 
 class OpenCVCamera(Camera):
     """ A camera described by extrinsics and intrinsics in the format used by OpenCV """
@@ -614,6 +619,11 @@ class OpenCVCamera(Camera):
             else:
                 self.hide_frustum()
 
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        super(Camera, self).gui_context_menu(imgui)
+
 
 class PinholeCamera(Camera):
     """
@@ -725,6 +735,11 @@ class PinholeCamera(Camera):
                 self.show_frustum(self.cols, self.rows, self.far)
             else:
                 self.hide_frustum()
+
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        super(Camera, self).gui_context_menu(imgui)
 
 
 class ViewerCamera(CameraInterface):
