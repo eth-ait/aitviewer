@@ -78,7 +78,7 @@ class Meshes(Node):
         super(Meshes, self).__init__(n_frames=vertices.shape[0], icon=icon, **kwargs)
 
         self._vertices = vertices
-        self.faces = faces.astype(np.int32)
+        self._faces = faces.astype(np.int32)
 
         def _maybe_unsqueeze(x):
             return x[np.newaxis] if x is not None and x.ndim == 2 else x
@@ -134,6 +134,14 @@ class Meshes(Node):
         self.compute_vertex_and_face_normals.cache_clear()
 
         self.redraw()
+
+    @property
+    def faces(self):
+        return self._faces
+
+    @faces.setter
+    def faces(self, f):
+        self._faces = f.astype(np.int32)
 
     @property
     def current_vertices(self):
@@ -241,9 +249,13 @@ class Meshes(Node):
 
     @face_colors.setter
     def face_colors(self, face_colors):
-        self._face_colors = face_colors
         if face_colors is not None:
+            if len(face_colors.shape) == 2:
+                face_colors = face_colors[np.newaxis]
+            self._face_colors = face_colors
             self._use_uniform_color = False
+        else:
+            self._face_colors = None
         self.redraw()
 
     @property
