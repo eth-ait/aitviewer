@@ -317,13 +317,8 @@ class Meshes(Node):
 
         self._need_upload = False
 
-        # Each write call takes about 1-2 ms.
-        vertices = self.current_vertices
-        vertex_colors = self.current_vertex_colors
-        face_colors = self.current_face_colors
-
         # Write positions.
-        self.vbo_vertices.write(vertices.astype('f4').tobytes())
+        self.vbo_vertices.write(self.current_vertices.astype('f4').tobytes())
 
         # Write normals.
         if not self.flat_shading:
@@ -332,10 +327,10 @@ class Meshes(Node):
 
         if self.face_colors is None:
             # Write vertex colors.
-            self.vbo_colors.write(vertex_colors.astype('f4').tobytes())
+            self.vbo_colors.write(self.current_vertex_colors.astype('f4').tobytes())
         else:
             # Write face colors
-            self.ssbo_face_colors.write(face_colors.astype('f4').tobytes())
+            self.ssbo_face_colors.write(self.current_face_colors.astype('f4').tobytes())
 
         # Write uvs.
         if self.has_texture:
