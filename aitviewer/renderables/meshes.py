@@ -246,6 +246,14 @@ class Meshes(Node):
             self._use_uniform_color = False
         self.redraw()
 
+    @property
+    def current_face_colors(self):
+        if self._use_uniform_color:
+            return np.full((self.n_faces, 4), self.material.color)
+        else:
+            idx = self.current_frame_id if self.face_colors.shape[0] > 1 else 0
+            return self.face_colors[idx]
+
     @Node.color.setter
     def color(self, color):
         self.material.color = color
@@ -312,6 +320,7 @@ class Meshes(Node):
         # Each write call takes about 1-2 ms.
         vertices = self.current_vertices
         vertex_colors = self.current_vertex_colors
+        face_colors = self.current_face_colors
 
         # Write positions.
         self.vbo_vertices.write(vertices.astype('f4').tobytes())
@@ -326,7 +335,7 @@ class Meshes(Node):
             self.vbo_colors.write(vertex_colors.astype('f4').tobytes())
         else:
             # Write face colors
-            self.ssbo_face_colors.write(self.face_colors.astype('f4').tobytes())
+            self.ssbo_face_colors.write(face_colors.astype('f4').tobytes())
 
         # Write uvs.
         if self.has_texture:
@@ -361,7 +370,7 @@ class Meshes(Node):
 
         self.ssbo_face_colors = ctx.buffer(reserve=self.faces.shape[0] * 16)
         if self.face_colors is not None:
-            self.ssbo_face_colors.write(self.face_colors.astype('f4').tobytes())
+            self.ssbo_face_colors.write(self.current_face_colors.astype('f4').tobytes())
 
         if self.has_texture:
             img = self.texture_image
