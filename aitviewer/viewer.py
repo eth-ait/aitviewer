@@ -219,6 +219,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.window.exit_key = None
 
         # GUI
+        self._render_gui = True
         self._exit_popup_open = False
         self._go_to_frame_popup_open = False
         self._go_to_frame_string = ""
@@ -500,8 +501,12 @@ class Viewer(moderngl_window.WindowConfig):
         # Reset user interacting state
         self.imgui_user_interacting = False
 
-        # Render user controls
-        for gc in self.gui_controls.values(): gc()
+        if self._render_gui:
+            # Render user controls.
+            for gc in self.gui_controls.values(): gc()
+        else:
+            # If gui is disabled only render the go to frame window.
+            self.gui_go_to_frame()
 
         # Contains live examples of all possible displays/controls - useful for browsing for new components
         # imgui.show_test_window()
@@ -549,7 +554,7 @@ class Viewer(moderngl_window.WindowConfig):
 
                 _, self.lock_selection = imgui.menu_item("Lock selection", self._shortcut_names[self._lock_selection_key],
                                                          self.lock_selection, True)
-
+                _, self._render_gui = imgui.menu_item("Render GUI", None, self._render_gui, True)
                 imgui.end_menu()
 
             if imgui.begin_menu("Camera", True):
@@ -967,6 +972,11 @@ class Viewer(moderngl_window.WindowConfig):
             if key == self._exit_key:
                 self._go_to_frame_popup_open = False
             return
+
+        if action == self.wnd.keys.ACTION_PRESS and not self._render_gui:
+            if key == self._exit_key:
+                self._render_gui = True
+                return
 
         if self.imgui.io.want_capture_keyboard:
             return
