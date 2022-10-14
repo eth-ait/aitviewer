@@ -605,6 +605,11 @@ class SMPLSequence(Node):
                 self.selected_mode = 'edit'
                 imgui.close_current_popup()
 
+            imgui.spacing()
+            imgui.separator()
+            imgui.spacing()
+            super().gui_context_menu(imgui)
+
     def on_selection(self, node, tri_id):
         if self.edit_mode:
             # Find the index of the joint that is currently being edited.

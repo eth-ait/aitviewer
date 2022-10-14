@@ -476,6 +476,19 @@ class Node(object):
         """ Render custom GUI for view mode """
         pass
 
+    def gui_context_menu(self, imgui):
+        _, self.enabled = imgui.checkbox("Enabled", self.enabled)
+        if any([n._show_in_hierarchy for n in self.nodes]):
+            imgui.spacing()
+            imgui.separator()
+            imgui.spacing()
+            for n in self.nodes:
+                if not n._show_in_hierarchy:
+                    continue
+                if imgui.begin_menu(f"{n.name}##{n.uid}"):
+                    n.gui_context_menu(imgui)
+                    imgui.end_menu()
+
     # Renderable
     @staticmethod
     def once(func):
