@@ -35,6 +35,7 @@ from aitviewer.scene.node import Node
 from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
 from aitviewer.utils import PerfTimer, path
+from aitviewer.utils.imgui_integration import ImGuiRenderer
 from aitviewer.utils.utils import get_video_paths, video_to_gif
 from collections import namedtuple
 from moderngl_window import activate_context
@@ -127,7 +128,7 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Create GUI context
         self.imgui_ctx = imgui.create_context()
-        self.imgui = ModernglWindowRenderer(self.wnd)
+        self.imgui = ImGuiRenderer(self.wnd, self.window_type)
         self.imgui_user_interacting = False
 
         # Shaders for rendering the shadow map
