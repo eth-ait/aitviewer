@@ -780,20 +780,20 @@ class VariableTopologyMeshes(Node):
     def gui_affine(self, imgui):
         """ Render GUI for affine transformations"""
         # Position controls
-        up, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
+        up, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 1e-2, format='%.2f')
         if up:
             self.position = pos
 
         # Rotation controls
         euler_angles = rot2euler_numpy(self.rotation[np.newaxis], degrees=True)[0]
-        ur, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1,
+        ur, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 1e-2,
                                              format='%.2f')
         if ur:
             self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
 
         # Scale controls
-        us, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
-                                     max_value=10.0, format='%.3f')
+        us, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 1e-2, min_value=0.001,
+                                     max_value=100.0, format='%.3f')
         if us:
             self.scale = scale
 
