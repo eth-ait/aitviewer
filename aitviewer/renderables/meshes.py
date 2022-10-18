@@ -32,11 +32,12 @@ from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
 from aitviewer.utils.decorators import hooked
 from aitviewer.utils.so3 import euler2rot_numpy, rot2euler_numpy
-from aitviewer.utils.utils import compute_vertex_and_face_normals
+from aitviewer.utils.utils import compute_vertex_and_face_normals_sparse
 from functools import lru_cache
 from moderngl_window.opengl.vao import VAO
 from PIL import Image
 from trimesh.triangles import points_to_barycentric
+import trimesh.geometry
 
 
 class Meshes(Node):
@@ -116,6 +117,7 @@ class Meshes(Node):
         self.normals_r = None
         self.need_upload = True
         self._use_uniform_color = self._vertex_colors is None and self._face_colors is None
+        self._vertex_faces_sparse = trimesh.geometry.index_sparse(self._vertices.shape[1], self._faces)
 
     @property
     def vertices(self):
@@ -123,12 +125,16 @@ class Meshes(Node):
 
     @vertices.setter
     def vertices(self, vertices):
+        if len(vertices.shape) == 2:
+            vertices = vertices[np.newaxis]
+
         # Update vertices and redraw
         self._vertices = vertices
         self.n_frames = len(vertices)
 
-        # If vertex normals were supplied, they are no longer valid.
+        # If vertex or face normals were supplied, they are no longer valid.
         self._vertex_normals = None
+        self._face_normals = None
 
         # Must clear all LRU caches where the vertices are used.
         self.compute_vertex_and_face_normals.cache_clear()
@@ -142,6 +148,7 @@ class Meshes(Node):
     @faces.setter
     def faces(self, f):
         self._faces = f.astype(np.int32)
+        self._vertex_faces_sparse = trimesh.geometry.index_sparse(self.vertices.shape[1], self._faces)
 
     @property
     def current_vertices(self):
@@ -174,10 +181,8 @@ class Meshes(Node):
     def vertex_normals(self):
         """Get or compute all vertex normals (this might take a while for long sequences)."""
         if self._vertex_normals is None:
-            vertex_normals, _ = compute_vertex_and_face_normals(self.vertices, self.faces, self.vertex_faces,
+            vertex_normals, _ = compute_vertex_and_face_normals_sparse(self.vertices, self.faces, self._vertex_faces_sparse,
                                                                 normalize=True)
-            if vertex_normals.ndim < 3:
-                vertex_normals = vertex_normals.unsqueeze(0)
             self._vertex_normals = vertex_normals
         return self._vertex_normals
 
@@ -185,10 +190,8 @@ class Meshes(Node):
     def face_normals(self):
         """Get or compute all face normals (this might take a while for long sequences)."""
         if self._face_normals is None:
-            _, face_normals = compute_vertex_and_face_normals(self.vertices, self.faces, self.vertex_faces,
+            _, face_normals = compute_vertex_and_face_normals_sparse(self.vertices, self.faces, self._vertex_faces_sparse,
                                                               normalize=True)
-            if face_normals.ndim < 3:
-                face_normals = face_normals.unsqueeze(0)
             self._face_normals = face_normals
         return self._face_normals
 
@@ -303,7 +306,7 @@ class Meshes(Node):
         :return: The vertex and face normals as a np arrays of shape (V, 3) and (F, 3) respectively.
         """
         vs = self.vertices[frame_id:frame_id + 1] if self.vertices.shape[0] > 1 else self.vertices
-        vn, fn = compute_vertex_and_face_normals(vs, self.faces, self.vertex_faces, normalize)
+        vn, fn = compute_vertex_and_face_normals_sparse(vs, self.faces, self._vertex_faces_sparse, normalize)
         return vn.squeeze(0), fn.squeeze(0)
 
     @property

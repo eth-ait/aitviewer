@@ -194,6 +194,36 @@ def compute_vertex_and_face_normals(vertices, faces, vertex_faces, normalize=Fal
     return vertex_normals, face_normals
 
 
+def compute_vertex_and_face_normals_sparse(vertices, faces, vertex_faces_sparse, normalize=False):
+    """
+    Compute (unnormalized) vertex normals for the given vertices. This is a rather expensive operation despite it being
+    fully optimized with numpy. For a typical SMPL mesh this can take 5-10ms per call. Not normalizing the resulting
+    normals speeds things up considerably, so we are omitting this as OpenGL shaders can do this much more efficiently.
+    For more speedup, consider caching the result of this function.
+
+    :param vertices: A numpy array of shape (N, V, 3).
+    :param faces: A numpy array of shape (F, 3) indexing into `vertices`.
+    :param vertex_faces: A scipy sparse adjacency matrix shape (V, F), each row contains a one for all faces
+        that are adjacent to the corresponding vertex and a 0 otherwise.
+    :param normalize: Whether to normalize the normals or not.
+    :return: The vertex and face normals as a np arrays of shape (N, V, 3) and (N, F, 3) respectively.
+    """
+    triangles = vertices[:, faces]
+    vectors = np.diff(triangles, axis=2)
+    crosses = np.cross(vectors[:,:, 0], vectors[:,:, 1])
+
+    normals = np.moveaxis(crosses, 0, 2)
+    normals = normals.reshape((normals.shape[0], -1))
+    vn = vertex_faces_sparse.dot(normals)
+    vn = vn.reshape((vn.shape[0], 3, -1))
+    vn = np.moveaxis(vn, 2, 0)
+
+    if normalize:
+        crosses = crosses / np.linalg.norm(crosses, axis=-1)[..., np.newaxis]
+        vn = vn / np.linalg.norm(vn, axis=-1)[..., np.newaxis]
+
+    return vn, crosses
+
 def set_lights_in_program(prog, lights, shadows_enabled):
     """Set program lighting from scene lights"""
     for i, light in enumerate(lights):
