@@ -31,6 +31,7 @@ class Scene(Node):
 
     def __init__(self, **kwargs):
         """Create a scene with a name."""
+        kwargs["gui_material"] = False
         super(Scene, self).__init__(**kwargs)
 
         # References resources in the scene
@@ -48,11 +49,11 @@ class Scene(Node):
         # If you update the number of lights, make sure to change the respective `define` statement in
         # directional_lights.glsl as well!
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
-        self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
-        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0),
-                                 shadow_enabled=False))
-
+        self.lights.append(Light.facing_origin(light_color=(1.0, 1.0, 1.0), name='Back Light', position=(0.0, 10.0, -15.0), shadow_enabled=False))
+        self.lights.append(Light.facing_origin(light_color=(1.0, 1.0, 1.0), name='Front Light', position=(0.0, 10.0, 15.0)))
         self.add(*self.lights)
+
+        self.ambient_strength = 2.0
 
         # Scene items
         self.origin = CoordinateSystem(name="Origin", length=0.1, gui_affine=False, gui_material=False)
@@ -185,11 +186,9 @@ class Scene(Node):
 
     def set_lights(self, is_dark_mode=False):
         if is_dark_mode:
-            for l in self.lights:
-                l.intensity_ambient = 0.2
+            self.ambient_strength = 0.4
         else:
-            for l in self.lights:
-                l.intensity_ambient = 1.0
+            self.ambient_strength = 2.0
 
     def collect_nodes(self, req_enabled=True, obj_type=Node):
         nodes = []
@@ -294,6 +293,8 @@ class Scene(Node):
         uc, color = imgui.color_edit4("Background", *self.background_color, show_alpha=True)
         if uc:
             self.background_color = color
+
+        _, self.ambient_strength = imgui.drag_float('Ambient strength', self.ambient_strength, 0.01, min_value=0.0, max_value=10.0, format='%.2f')
 
     def gui_editor(self, imgui):
         """GUI to control scene settings."""
