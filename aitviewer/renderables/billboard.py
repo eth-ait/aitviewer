@@ -56,6 +56,7 @@ class Billboard(Node):
         self.vertices = vertices - center
         self.position = center
         self.img_process_fn = (lambda img, _: img) if img_process_fn is None else img_process_fn
+        self._need_redraw = False
 
         # Tile the uv buffer to match the size of the vertices buffer,
         # we do this so that we can use the same vertex array for all draws
@@ -165,8 +166,13 @@ class Billboard(Node):
 
         self.ctx = ctx
 
+    def redraw(self, **kwargs):
+        self._need_redraw = True
+
     def render(self, camera, **kwargs):
-        if self.current_frame_id != self._current_texture_id:
+        if self.current_frame_id != self._current_texture_id or self._need_redraw:
+            self._need_redraw = False
+
             if self.texture:
                 self.texture.release()
 

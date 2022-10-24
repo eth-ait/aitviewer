@@ -268,7 +268,6 @@ class Viewer(moderngl_window.WindowConfig):
         self.backface_culling = C.backface_culling
         self.lock_selection = False
         self.show_camera_target = False
-        self.selected_mode = 'view'
         self.visualize = False
 
         self._pan_camera = False
@@ -294,6 +293,9 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_seconds_per_rotation = 10
         self.export_fps = self.playback_fps
         self.export_scale_factor = 1.0
+
+        # Set the mode once the viewer has been completely initialized
+        self.selected_mode = 'view'
 
     def _init_scene(self):
         self.scene.make_renderable(self.ctx)
