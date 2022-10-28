@@ -41,7 +41,6 @@ from collections import namedtuple
 from moderngl_window import activate_context
 from moderngl_window import geometry
 from moderngl_window import get_local_window_cls
-from moderngl_window.integrations.imgui import ModernglWindowRenderer
 from moderngl_window.opengl.vao import VAO
 from omegaconf.dictconfig import DictConfig
 from pathlib import Path
@@ -97,7 +96,15 @@ class Viewer(moderngl_window.WindowConfig):
         # Window Setup (Following `moderngl_window.run_window_config`).
         if self.window_type != 'headless':
             self.window_type = C.window_type
-        base_window_cls = get_local_window_cls(self.window_type)
+
+        # HACK: We use our own version of the PyQt5 windows to override
+        # part of the initialization that crashes on Python >= 3.10
+        if self.window_type == 'pyqt5':
+            from aitviewer.utils.pyqt5_window import PyQt5Window
+            base_window_cls = PyQt5Window
+        else:
+            base_window_cls = get_local_window_cls(self.window_type)
+
 
         # If no size is provided use the size from the configuration file
         if size is None:
