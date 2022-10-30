@@ -61,7 +61,9 @@ def test_obj(viewer: Viewer):
                         uv_coords=drill.visual.uv, path_to_texture=texture_image, scale=50.0,
                         color=(1, 1, 1, 0.5))
 
-    viewer.scene.camera.dolly_zoom(-100.0)
+    viewer.scene.camera.position = (0, 5, 15)
+    viewer.scene.camera.target = (0.15, 0.1, 0.33)
+    viewer.auto_set_camera_target = False
     viewer.scene.add(planet_mesh, drill_mesh, cube_mesh)
 
 
