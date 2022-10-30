@@ -105,7 +105,6 @@ class Viewer(moderngl_window.WindowConfig):
         else:
             base_window_cls = get_local_window_cls(self.window_type)
 
-
         # If no size is provided use the size from the configuration file
         if size is None:
             size = C.window_width, C.window_height
@@ -283,6 +282,11 @@ class Viewer(moderngl_window.WindowConfig):
         self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
 
+        # Outline colors
+        self.outline_color = (0.3, 0.7, 1.0, 1)
+        self.light_outline_color = (0.4, 0.4, 0.4, 1)
+        self.selected_outline_color = (1.0, 0.86, 0.35, 1.0)
+
         # Mouse mesh intersection in inspect mode.
         self.mmi = None
 
@@ -362,12 +366,13 @@ class Viewer(moderngl_window.WindowConfig):
         self.render_shadowmap()
         self.render_prepare()
         self.render_scene()
-        self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], (0.3, 0.7, 1, 1))
+        self.render_outline(self.scene.lights, self.light_outline_color)
+        self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], self.outline_color)
 
         if not export:
             # If the selected object is a Node render its outline.
             if isinstance(self.scene.selected_object, Node):
-                self.render_outline([self.scene.selected_object], (1.0, 0.86, 0.35, 1.0))
+                self.render_outline([self.scene.selected_object], self.selected_outline_color)
 
             # If visualize is True draw a texture with the object id to the screen for debugging.
             if self.visualize:

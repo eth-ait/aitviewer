@@ -155,7 +155,6 @@ class Light(Node):
 
     def render_outline(self, ctx, camera, prog):
         self.sphere.render_outline(ctx, camera, prog)
-        self.arrow.render_outline(ctx, camera, prog)
 
     @Node.position.setter
     def position(self, position):
