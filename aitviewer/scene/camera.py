@@ -189,6 +189,14 @@ class Camera(Node, CameraInterface):
             if self.path[1] is not None:
                 self.path[1].enabled = enabled
 
+    @property
+    def bounds(self):
+        return self.mesh.bounds
+
+    @property
+    def current_bounds(self):
+        return self.mesh.current_bounds
+
     def hide_frustum(self):
         if self.frustum:
             self.remove(self.frustum)
