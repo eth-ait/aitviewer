@@ -610,16 +610,16 @@ class SMPLSequence(Node):
             imgui.spacing()
             super().gui_context_menu(imgui)
 
-    def on_selection(self, node, tri_id):
+    def on_selection(self, node, instance_id, tri_id):
         if self.edit_mode:
             # Find the index of the joint that is currently being edited.
-            self._edit_joint = self.rbs.get_index_from_node_and_triangle(node, tri_id)
+            self._edit_joint = self.rbs.get_index_from_node_and_triangle(node, instance_id, tri_id)
             if self._edit_joint is not None:
                 self.rbs.color_one(self._edit_joint, (0.3, 0.4, 1, 1))
             else:
                 # Reset color of all spheres to the default color
                 self.rbs.color = self.rbs.color
 
-    def render_outline(self, ctx, camera, prog):
+    def render_outline(self, *args, **kwargs):
         # Only render outline of the mesh, skipping skeleton and rigid bodies.
-        self.mesh_seq.render_outline(ctx, camera, prog)
+        self.mesh_seq.render_outline(*args, **kwargs)

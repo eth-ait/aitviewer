@@ -23,7 +23,7 @@ import re
 import pickle
 
 from aitviewer.scene.node import Node
-from aitviewer.shaders import get_flat_lit_with_edges_face_color_program
+from aitviewer.shaders import get_depth_only_program, get_flat_lit_with_edges_face_color_program, get_fragmap_program, get_outline_program
 from aitviewer.shaders import get_smooth_lit_with_edges_face_color_program
 from aitviewer.shaders import get_smooth_lit_with_edges_program
 from aitviewer.shaders import get_flat_lit_with_edges_program
@@ -362,6 +362,11 @@ class Meshes(Node):
         self.flat_prog = get_flat_lit_with_edges_program()
         self.smooth_face_prog = get_smooth_lit_with_edges_face_color_program()
         self.flat_face_prog = get_flat_lit_with_edges_face_color_program()
+
+        vs_path = "mesh_positions.vs.glsl"
+        self.depth_only_program = get_depth_only_program(vs_path)
+        self.outline_program = get_outline_program(vs_path)
+        self.fragmap_program = get_fragmap_program(vs_path)
 
         vertices = self.current_vertices
         vertex_normals = self.vertex_normals_at(self.current_frame_id)
@@ -767,8 +772,8 @@ class VariableTopologyMeshes(Node):
         # Therefore we draw to the fragmap using our own id instead of the mesh id.
         self.current_mesh.render_fragmap(ctx, camera, prog, self.uid)
 
-    def render_outline(self, ctx, camera, prog):
-        self.current_mesh.render_outline(ctx, camera, prog)
+    def render_outline(self, *args, **kwargs):
+        self.current_mesh.render_outline(*args, **kwargs)
 
     def gui_context_menu(self, imgui):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)

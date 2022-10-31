@@ -18,7 +18,7 @@ import numpy as np
 import moderngl
 
 from aitviewer.scene.node import Node
-from aitviewer.shaders import get_simple_unlit_program
+from aitviewer.shaders import get_outline_program, get_simple_unlit_program
 from aitviewer.utils.decorators import hooked
 from moderngl_window.opengl.vao import VAO
 
@@ -52,6 +52,8 @@ class PointClouds(Node):
         super(PointClouds, self).__init__(n_frames=len(self.points), color=color, icon=icon, **kwargs)
 
         self.fragmap = pickable
+
+        # Render passes
         self.outline = True
 
         self.colors = colors
@@ -171,7 +173,10 @@ class PointClouds(Node):
     @Node.once
     def make_renderable(self, ctx):
         ctx.point_size = self.point_size
+
         self.prog = get_simple_unlit_program()
+        self.outline_program = get_outline_program("mesh_positions.vs.glsl")
+
         self.vbo_points = ctx.buffer(reserve=self.max_n_points * 3 * 4, dynamic=True)
         self.vbo_colors = ctx.buffer(reserve=self.max_n_points * 4 * 4, dynamic=True)
         self.vbo_points.write(self.current_points.astype('f4').tobytes())

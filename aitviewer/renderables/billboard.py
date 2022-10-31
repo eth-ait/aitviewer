@@ -21,7 +21,7 @@ import pickle
 
 from aitviewer.scene.camera import Camera, OpenCVCamera
 from aitviewer.scene.node import Node
-from aitviewer.shaders import get_screen_texture_program
+from aitviewer.shaders import get_fragmap_program, get_outline_program, get_screen_texture_program
 from aitviewer.utils.decorators import hooked
 from moderngl_window.opengl.vao import VAO
 from trimesh.triangles import points_to_barycentric
@@ -155,6 +155,11 @@ class Billboard(Node):
     @Node.once
     def make_renderable(self, ctx):
         self.prog = get_screen_texture_program()
+
+        vs_path = "mesh_positions.vs.glsl"
+        self.outline_program = get_outline_program(vs_path)
+        self.fragmap_program = get_fragmap_program(vs_path)
+
         self.vbo_vertices = ctx.buffer(self.vertices.astype('f4').tobytes())
         self.vbo_uvs = ctx.buffer(self.uvs.astype('f4').tobytes())
         self.vao = ctx.vertex_array(self.prog,

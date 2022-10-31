@@ -152,8 +152,8 @@ class Light(Node):
             self._debug_lines.lines = lines
             self._debug_lines.redraw()
 
-    def render_outline(self, ctx, camera, prog):
-        self.arrow.render_outline(ctx, camera, prog)
+    def render_outline(self, *args, **kwargs):
+        self.arrow.render_outline(*args, **kwargs)
 
     @Node.position.setter
     def position(self, position):

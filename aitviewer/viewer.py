@@ -49,7 +49,7 @@ from tqdm import tqdm
 from typing import Tuple, Union
 
 
-MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')
+MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node instance_id tri_id vert_id point_world point_local bc_coords')
 
 SHORTCUTS = {
     "SPACE": "Start/stop playing animation.",
@@ -139,18 +139,15 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Shaders for rendering the shadow map
         self.raw_depth_prog = self.load_program('shadow_mapping/raw_depth.glsl')
-        self.depth_only_prog = self.load_program('shadow_mapping/depth_only.glsl')
 
         # Shaders for mesh mouse intersection
-        self.frag_map_prog = self.load_program('fragment_picking/frag_map.glsl')
         self.frag_pick_prog = self.load_program('fragment_picking/frag_pick.glsl')
         self.frag_pick_prog['position_texture'].value = 0  # Read from texture channel 0
         self.frag_pick_prog['obj_info_texture'].value = 1  # Read from texture channel 0
-        self.picker_output = self.ctx.buffer(reserve=5*4)  # 3 floats, 2 ints
+        self.picker_output = self.ctx.buffer(reserve=6*4)  # 3 floats, 3 ints
         self.picker_vao = VAO(mode=moderngl.POINTS)
 
         # Shaders for drawing outlines
-        self.outline_prepare_prog = self.load_program('outline/outline_prepare.glsl')
         self.outline_draw_prog = self.load_program('outline/outline_draw.glsl')
         self.outline_quad = geometry.quad_2d(size=(2.0, 2.0), pos=(0.0, 0.0))
 
@@ -413,7 +410,7 @@ class Viewer(moderngl_window.WindowConfig):
                     light.use(self.ctx)
                     light_matrix = light.mvp()
                     for r in rs:
-                        r.render_shadowmap(light_matrix, self.depth_only_prog)
+                        r.render_shadowmap(light_matrix)
 
     def render_fragmap(self):
         """A pass to render the fragment picking map, i.e. render the scene with world coords as colors."""
@@ -422,7 +419,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.offscreen_p.use()
         rs = self.scene.collect_nodes()
         for r in rs:
-            r.render_fragmap(self.ctx, self.scene.camera, self.frag_map_prog)
+            r.render_fragmap(self.ctx, self.scene.camera)
 
     def render_outline(self, nodes, color):
         # Prepare the outline buffer, all objects rendered to this buffer will be outlined.
@@ -430,7 +427,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.outline_framebuffer.use()
         # Render outline of the nodes with outlining enabled, this potentially also renders their children.
         for n in nodes:
-            n.render_outline(self.ctx, self.scene.camera, self.outline_prepare_prog)
+            n.render_outline(self.ctx, self.scene.camera)
 
         # Render the outline effect to the window.
         self.wnd.use()
@@ -448,7 +445,6 @@ class Viewer(moderngl_window.WindowConfig):
                           lights=self.scene.lights,
                           shadows_enabled=self.shadows_enabled,
                           show_camera_target=self.show_camera_target and not self._using_temp_camera,
-                          depth_prepass_prog=self.depth_only_prog,
                           ambient_strength = self.scene.ambient_strength)
 
     def render_prepare(self, transparent_background=True):
@@ -976,7 +972,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.offscreen_p_viewpos.use(location=0)
         self.offscreen_p_tri_id.use(location=1)
         self.picker_vao.transform(self.frag_pick_prog, self.picker_output, vertices=1)
-        x, y, z, obj_id, tri_id = struct.unpack('3f2i', self.picker_output.read())
+        x, y, z, obj_id, tri_id, instance_id = struct.unpack('3f3i', self.picker_output.read())
 
         if obj_id >= 0 and tri_id >= 0:
             node = self.scene.get_node_by_uid(obj_id)
@@ -991,9 +987,9 @@ class Viewer(moderngl_window.WindowConfig):
                 bc_coords = np.array([1, 0, 0])
             else:
                 vert_id = 0
-                bc_coords = np.array(0, 0, 0)
+                bc_coords = np.array([0, 0, 0])
 
-            return MeshMouseIntersection(node, tri_id, vert_id, point_world, point_local, bc_coords)
+            return MeshMouseIntersection(node, instance_id, tri_id, vert_id, point_world, point_local, bc_coords)
 
         return None
 
@@ -1008,7 +1004,7 @@ class Viewer(moderngl_window.WindowConfig):
                 if node.is_selectable:
                     # If the selection is locked only allow selecting the locked object
                     if not self.lock_selection or node == self.scene.selected_object:
-                        self.scene.select(node, mmi.node, mmi.tri_id)
+                        self.scene.select(node, mmi.node, mmi.instance_id, mmi.tri_id)
                         return True
                     else:
                         return False

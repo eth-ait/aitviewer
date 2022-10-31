@@ -123,10 +123,9 @@ class RigidBodies(Node):
 
         super().redraw(**kwargs)
 
-    def get_index_from_node_and_triangle(self, node, tri_id):
-        idx = self.spheres.get_index_from_node_and_triangle(node, tri_id)
-        if idx is not None:
-            return idx
+    def get_index_from_node_and_triangle(self, node, instance_id, tri_id):
+        if node == self.spheres:
+            return instance_id
 
         for a in self.coords:
             idx = a.get_index_from_node_and_triangle(node, tri_id)
@@ -134,15 +133,9 @@ class RigidBodies(Node):
                 return idx
 
     def color_one(self, index, color):
-        col = np.full((1, self.spheres.n_vertices * self.spheres.n_spheres, 4), self.color)
-        col[:, self.spheres.n_vertices * index: self.spheres.n_vertices * (index + 1)] = np.array(color)
-        self.spheres.vertex_colors = col
+        self.spheres.color_one(index, color)
 
     def gui(self, imgui):
-        super(RigidBodies, self).gui(imgui)
-        # Scale controls
-        u, scale = imgui.drag_float('Sphere Radius##radius{}'.format(self.unique_name), self.spheres.radius,
+        _, self.spheres.radius = imgui.drag_float('Sphere Radius'.format(self.unique_name), self.spheres.radius,
                                     0.01, min_value=0.001, max_value=10.0, format='%.3f')
-        if u:
-            self.spheres.radius = scale
-            self.redraw()
+        super(RigidBodies, self).gui(imgui)

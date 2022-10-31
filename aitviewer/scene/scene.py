@@ -213,11 +213,11 @@ class Scene(Node):
                 return n
         return None
 
-    def select(self, obj, selected_node=None, selected_tri_id=None):
+    def select(self, obj, selected_node=None, selected_instance=None, selected_tri_id=None):
         """Set 'obj' as the selected object"""
         self.selected_object = obj
         if isinstance(obj, Node):
-            self.selected_object.on_selection(selected_node, selected_tri_id)
+            self.selected_object.on_selection(selected_node, selected_instance, selected_tri_id)
         # Always keep the last selected object in the property panel
         if obj is not None:
             self.gui_selected_object = obj
@@ -406,6 +406,6 @@ class Scene(Node):
                 n_frames = max(n_frames, n._enabled_frames.shape[0])
         return n_frames
 
-    def render_outline(self, ctx, camera, prog):
+    def render_outline(self, *args, **kwargs):
         # No outline when the scene node is selected
         return

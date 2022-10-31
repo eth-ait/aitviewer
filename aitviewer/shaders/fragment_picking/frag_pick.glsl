@@ -15,6 +15,7 @@ uniform ivec2 texel_pos;
 out vec3 out_position;
 out int out_obj_id;
 out int out_tri_id;
+out int out_instance_id;
 
 void main() {
     vec3 viewpos = texelFetch(position_texture, texel_pos, 0).rgb;
@@ -27,7 +28,7 @@ void main() {
         out_position = viewpos;
         out_obj_id = int(texelFetch(obj_info_texture, texel_pos, 0).r);
         out_tri_id = int(texelFetch(obj_info_texture, texel_pos, 0).g);
-
+        out_instance_id = int(texelFetch(obj_info_texture, texel_pos, 0).b);
     }
 }
 #endif

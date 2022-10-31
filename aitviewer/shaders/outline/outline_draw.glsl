@@ -3,7 +3,7 @@
 #if defined VERTEX_SHADER
 
     in vec3 in_position;
-    
+
     void main() {
         gl_Position = vec4(in_position, 1.0);
     }
@@ -17,10 +17,10 @@
     void main() {
         // Transform pixel coordinates from float to int.
         ivec2 coords = ivec2(gl_FragCoord.xy);
-        
+
         // Load the value at the current pixel.
         float v = texelFetch(outline, coords, 0).r;
-        
+
         // If inside one of the objects to outline, discard.
         if(v > 0) {
             discard;

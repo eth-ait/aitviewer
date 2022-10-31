@@ -24,6 +24,32 @@ def _load(name, defines={}):
 
 
 @functools.lru_cache()
+def get_sphere_instanced_program():
+    return resources.programs.load(ProgramDescription(vertex_shader="sphere_instanced.glsl",
+                                                      geometry_shader="lit_with_edges.glsl",
+                                                      fragment_shader="lit_with_edges.glsl",
+                                                      defines={ 'SMOOTH_SHADING': 1, 'TEXTURE': 0, 'FACE_COLOR': 0}))
+
+
+@functools.lru_cache()
+def get_outline_program(vs_path):
+    return resources.programs.load(ProgramDescription(vertex_shader=vs_path,
+                                                      fragment_shader="outline/outline_prepare.fs.glsl"))
+
+
+@functools.lru_cache()
+def get_fragmap_program(vs_path):
+    return resources.programs.load(ProgramDescription(vertex_shader=vs_path,
+                                                      fragment_shader="fragment_picking/frag_map.fs.glsl"))
+
+
+@functools.lru_cache()
+def get_depth_only_program(vs_path):
+    return resources.programs.load(ProgramDescription(vertex_shader=vs_path,
+                                                      fragment_shader="shadow_mapping/depth_only.fs.glsl"))
+
+
+@functools.lru_cache()
 def get_smooth_lit_with_edges_program():
     return _load('lit_with_edges.glsl', defines={ 'SMOOTH_SHADING': 1, 'TEXTURE': 0 })
 
