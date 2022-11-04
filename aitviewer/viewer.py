@@ -227,6 +227,9 @@ class Viewer(moderngl_window.WindowConfig):
         # GUI
         self._render_gui = True
         self._exit_popup_open = False
+        self._screenshot_popup_open = False
+        self._screenshot_popup_just_opened = False
+        self._screenshot_focus_count = 0
         self._go_to_frame_popup_open = False
         self._go_to_frame_string = ""
         self._show_shortcuts_window = False
@@ -305,6 +308,10 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_fps = self.playback_fps
         self.export_scale_factor = 1.0
 
+        # Screenshot settings
+        self.screenshot_transparent = False
+        self.screenshot_name = None
+
         # Set the mode once the viewer has been completely initialized
         self.selected_mode = 'view'
 
@@ -345,7 +352,7 @@ class Viewer(moderngl_window.WindowConfig):
         if duration > 0 and log:
             print("Duration: {0:.2f}s @ {1:.2f} FPS".format(duration, self.window.frames / duration))
 
-    def render(self, time, frame_time, export=False):
+    def render(self, time, frame_time, export=False, transparent_background=False):
         """The main drawing function."""
         if self.run_animations:
             # Compute number of frames to advance by.
@@ -364,7 +371,7 @@ class Viewer(moderngl_window.WindowConfig):
 
         self.render_fragmap()
         self.render_shadowmap()
-        self.render_prepare()
+        self.render_prepare(transparent_background)
         self.render_scene()
         self.render_outline(self.scene.lights, self.light_outline_color)
         self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], self.outline_color)
@@ -443,14 +450,17 @@ class Viewer(moderngl_window.WindowConfig):
                           depth_prepass_prog=self.depth_only_prog,
                           ambient_strength = self.scene.ambient_strength)
 
-    def render_prepare(self):
+    def render_prepare(self, transparent_background=True):
         """Prepare the framebuffer."""
         self.wnd.use()
         # Clear background and make sure only the flags we want are enabled.
-        if self.dark_mode:
-            self.ctx.clear(0.1, 0.1, 0.1, 1.0)
+        if transparent_background:
+            self.ctx.clear(0, 0, 0, 0)
         else:
-            self.ctx.clear(*self.scene.background_color)
+            if self.dark_mode:
+                self.ctx.clear(0.1, 0.1, 0.1, 1.0)
+            else:
+                self.ctx.clear(*self.scene.background_color)
 
         self.ctx.enable_only(moderngl.DEPTH_TEST | moderngl.BLEND | moderngl.CULL_FACE)
         self.ctx.cull_face = 'back'
@@ -542,6 +552,7 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_menu(self):
         clicked_export = False
+        clicked_screenshot = False
 
         if imgui.begin_main_menu_bar():
             if imgui.begin_menu("File", True):
@@ -556,8 +567,6 @@ class Viewer(moderngl_window.WindowConfig):
 
                 clicked_screenshot, selected_screenshot = imgui.menu_item(
                     "Screenshot", self._shortcut_names[self._screenshot_key], False, True)
-                if clicked_screenshot:
-                    self.take_screenshot()
 
                 imgui.end_menu()
 
@@ -630,6 +639,13 @@ class Viewer(moderngl_window.WindowConfig):
             self.export_fps = self.playback_fps
             self.toggle_animation(False)
 
+        if clicked_screenshot:
+            self._screenshot_popup_just_opened = True
+
+        self.gui_export()
+        self.gui_screenshot()
+
+    def gui_export(self):
         imgui.set_next_window_size(570,0)
         if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
             if self.scene.n_frames == 1:
@@ -864,6 +880,55 @@ class Viewer(moderngl_window.WindowConfig):
                 imgui.close_current_popup()
             imgui.end_popup()
 
+    def gui_screenshot(self):
+        if self._screenshot_popup_just_opened:
+            self._screenshot_popup_just_opened = False
+            self._screenshot_popup_open = True
+            self.screenshot_name = None
+            self._screenshot_focus_count = 2
+            self.toggle_animation(False)
+            imgui.open_popup("Screenshot##screenshot-popup")
+
+        imgui.set_next_window_size(250,0)
+        if imgui.begin_popup_modal("Screenshot##screenshot-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
+            if self._screenshot_popup_open:
+                _, self.screenshot_transparent = imgui.checkbox("Transparent background", self.screenshot_transparent)
+                if self.screenshot_name is None:
+                    self.screenshot_name = 'frame_{:0>6}.png'.format(self.scene.current_frame_id)
+
+                # HACK: we need to set the focus twice when the modal is first opened for it to take effect
+                if self._screenshot_focus_count > 0:
+                    self._screenshot_focus_count -= 1
+                    imgui.set_keyboard_focus_here()
+                _, self.screenshot_name = imgui.input_text("File name", self.screenshot_name, 64, imgui.INPUT_TEXT_AUTO_SELECT_ALL)
+                imgui.spacing()
+
+                button_width = (imgui.get_content_region_available()[0] - imgui.get_style().item_spacing[0]) * 0.5
+
+                # Style the cancel with a grey color
+                imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
+
+                if imgui.button("cancel", width=button_width):
+                    imgui.close_current_popup()
+                    self._screenshot_popup_open = False
+
+                imgui.pop_style_color()
+                imgui.pop_style_color()
+                imgui.pop_style_color()
+
+                imgui.same_line()
+                if imgui.button("save", button_width):
+                    if self.screenshot_name:
+                        self.take_screenshot(self.screenshot_name, self.screenshot_transparent)
+                    imgui.close_current_popup()
+                    self._screenshot_popup_open = False
+
+            else:
+                imgui.close_current_popup()
+            imgui.end_popup()
+
     def gui_exit(self):
         if self._exit_popup_open:
             imgui.open_popup("Exit##exit-popup")
@@ -983,6 +1048,15 @@ class Viewer(moderngl_window.WindowConfig):
                 self._exit_popup_open = False
             return
 
+        if action == self.wnd.keys.ACTION_PRESS and self._screenshot_popup_open:
+            if key == self.wnd.keys.ENTER:
+                if self.screenshot_name:
+                    self.take_screenshot(self.screenshot_name, self.screenshot_transparent)
+                    self._screenshot_popup_open = False
+            elif key == self._exit_key:
+                self._screenshot_popup_open = False
+            return
+
         if action == self.wnd.keys.ACTION_PRESS and self._go_to_frame_popup_open:
             if key == self._exit_key:
                 self._go_to_frame_popup_open = False
@@ -1039,7 +1113,8 @@ class Viewer(moderngl_window.WindowConfig):
                 self.scene.set_lights(self.dark_mode)
 
             elif key == self._screenshot_key:
-                self.take_screenshot()
+                self._screenshot_popup_just_opened = True
+
             elif key == self._save_cam_key:
                 if self._using_temp_camera:
                     self.reset_camera()
@@ -1131,21 +1206,27 @@ class Viewer(moderngl_window.WindowConfig):
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
 
-    def save_current_frame_as_image(self, path, scale_factor=None):
+    def save_current_frame_as_image(self, path, scale_factor=None, alpha=False):
         """Saves the current frame as an image to disk."""
-        image = self.get_current_frame_as_image()
+        image = self.get_current_frame_as_image(alpha)
         if scale_factor is not None and scale_factor != 1.0:
             w = int(image.width * scale_factor)
             h = int(image.height * scale_factor)
             image = image.resize((w, h), Image.LANCZOS)
         image.save(path)
 
-    def get_current_frame_as_image(self):
+    def get_current_frame_as_image(self, alpha=False):
         """Return the FBO content as a PIL image."""
-        image = Image.frombytes('RGB',
+        if alpha:
+            fmt = 'RGBA'
+            components = 4
+        else:
+            fmt = 'RGB'
+            components = 3
+        image = Image.frombytes(fmt,
                                 (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
                                  self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
-                                self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1))
+                                self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components))
         return image.transpose(Image.FLIP_TOP_BOTTOM)
 
     def get_current_depth_image(self):
@@ -1219,13 +1300,17 @@ class Viewer(moderngl_window.WindowConfig):
         # See issue #12 https://github.com/eth-ait/aitviewer/issues/12
         clear_shader_cache()
 
-    def take_screenshot(self):
+    def take_screenshot(self, file_name=None, transparent_background=False):
         """Save the current frame to an image in the screenshots directory inside the export directory"""
-        file_path = os.path.join(C.export_dir, 'screenshots', 'frame_{:0>6}.png'.format(self.scene.current_frame_id))
-        self.export_frame(file_path)
+        if file_name is None:
+            file_name = 'frame_{:0>6}.png'.format(self.scene.current_frame_id)
+        if not file_name.endswith(".png"):
+            file_name += ".png"
+        file_path = os.path.join(C.export_dir, 'screenshots', file_name)
+        self.export_frame(file_path, transparent_background=transparent_background)
         print(f"Screenshot saved to {file_path}")
 
-    def export_frame(self, file_path, scale_factor:float=None):
+    def export_frame(self, file_path, scale_factor:float=None, transparent_background=False):
         """Save the current frame to an image.
         :param file_path: the path where the image is saved.
         :param scale_factor: a scale factor used to scale the image. If None no scale factor is used and
@@ -1238,8 +1323,8 @@ class Viewer(moderngl_window.WindowConfig):
         self.run_animations = False
 
         # Render and save frame.
-        self.render(0, 0, export=True)
-        self.save_current_frame_as_image(file_path, scale_factor)
+        self.render(0, 0, export=True, transparent_background=transparent_background)
+        self.save_current_frame_as_image(file_path, scale_factor, transparent_background)
 
         # Restore run animation and update last frame rendered time.
         self.run_animations = run_animations
