@@ -612,8 +612,8 @@ class SMPLSequence(Node):
 
     def on_selection(self, node, instance_id, tri_id):
         if self.edit_mode:
-            # Find the index of the joint that is currently being edited.
-            self._edit_joint = self.rbs.get_index_from_node_and_triangle(node, instance_id, tri_id)
+            # Index of the joint that is currently being edited.
+            self._edit_joint = instance_id
             if self._edit_joint is not None:
                 self.rbs.color_one(self._edit_joint, (0.3, 0.4, 1, 1))
             else:

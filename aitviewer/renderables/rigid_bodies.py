@@ -123,15 +123,6 @@ class RigidBodies(Node):
 
         super().redraw(**kwargs)
 
-    def get_index_from_node_and_triangle(self, node, instance_id, tri_id):
-        if node == self.spheres:
-            return instance_id
-
-        for a in self.coords:
-            idx = a.get_index_from_node_and_triangle(node, tri_id)
-            if idx is not None:
-                return idx
-
     def color_one(self, index, color):
         self.spheres.color_one(index, color)
 

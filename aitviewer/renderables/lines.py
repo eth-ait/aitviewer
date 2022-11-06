@@ -21,7 +21,7 @@ import trimesh
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
-from aitviewer.shaders import get_cylinder_program
+from aitviewer.shaders import get_cylinder_program, get_depth_only_program, get_fragmap_program, get_lines_instanced_program, get_outline_program
 from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
 from aitviewer.utils import compute_vertex_and_face_normals
@@ -222,7 +222,7 @@ class Lines(Node):
                  **kwargs):
         """
         Initializer.
-        :param lines: Set of 3D coordinates as a np array of shape (F, L, 3).
+        :param lines: Set of 3D coordinates as a np array of shape (F, L, 3) or (L, 3).
         :param r_base: Thickness of the line.
         :param r_tip: If set, the thickness of the line will taper from r_base to r_tip. If set to 0.0 it will create
           a proper cone.
@@ -230,29 +230,48 @@ class Lines(Node):
         :param mode: 'lines' or 'line_strip' -> ModernGL drawing mode - LINE_STRIP oder LINES
         """
         assert len(color) == 4
-        assert len(lines.shape) >= 2
+        if len(lines.shape) == 2:
+            lines = lines[np.newaxis]
+        assert len(lines.shape) == 3
         assert mode == "lines" or mode == "line_strip"
-        self.mode = mode
-        self._lines = None
-        self.lines = lines
+        if mode == "lines":
+            assert lines.shape[1] % 2 == 0
 
+        self._lines = lines
+        self.mode = mode
+        self.r_base = r_base
+        self.r_tip = r_tip if r_tip is not None else r_base
+
+        self.vertices, self.faces = self.get_mesh()
+        self.n_lines = self.lines.shape[1] // 2 if mode == "lines" else self.lines.shape[1] - 1
+
+        kwargs['material'] = kwargs.get('material', Material(color=color, ambient=0.2))
         super(Lines, self).__init__(n_frames=self.lines.shape[0], **kwargs)
 
-        self.r_base = r_base
-        self.r_tip = r_tip
+        self._need_upload = True
+        self.draw_edges = False
 
-        vs, fs, ns = self.get_mesh()
-        material = kwargs.get('material', Material(color=color, ambient=0.2))
-        self.mesh = Meshes(vs, fs, ns, color=color, material=material, cast_shadow=cast_shadow, is_selectable=False)
-        self.add(self.mesh, show_in_hierarchy=False)
+        # Render passes.
+        self.outline = True
+        self.fragmap = True
+        self.depth_prepass = True
+        self.cast_shadow = cast_shadow
 
     @property
     def bounds(self):
-        return self.mesh.bounds
+        bounds = self.get_bounds(self.lines)
+        r = max(self.r_base, self.r_tip)
+        bounds[:, 0] -= r
+        bounds[:, 1] += r
+        return bounds
 
     @property
     def current_bounds(self):
-        return self.mesh.current_bounds
+        bounds = self.get_bounds(self.current_lines)
+        r = max(self.r_base, self.r_tip)
+        bounds[:, 0] -= r
+        bounds[:, 1] += r
+        return bounds
 
     @property
     def lines(self):
@@ -261,6 +280,7 @@ class Lines(Node):
     @lines.setter
     def lines(self, value):
         self._lines = value if len(value.shape) == 3 else value[np.newaxis]
+        self.redraw()
 
     @property
     def current_lines(self):
@@ -272,86 +292,85 @@ class Lines(Node):
         assert len(lines.shape) == 2
         idx = self.current_frame_id if self._lines.shape[0] > 1 else 0
         self._lines[idx] = lines
+        self.redraw()
 
-    def gui(self, imgui):
-        self.mesh.gui(imgui)
+    def on_frame_update(self):
+        self.redraw()
 
     def redraw(self, **kwargs):
-        if kwargs.get('current_frame_only', False):
-            vs, fs, ns = self.get_mesh(current_frame_only=True)
-            self.mesh.current_vertices = vs
-            self.mesh.faces = fs
-        else:
-            vs, fs, ns = self.get_mesh()
-            self.mesh.vertices = vs
-            self.mesh.faces = fs
+        self._need_upload = True
 
-        super().redraw(**kwargs)
+    @Node.once
+    def make_renderable(self, ctx: moderngl.Context):
+        self.prog = get_lines_instanced_program()
 
-    @property
-    def color(self):
-        return self.mesh.color
+        vs_path = "lines_instanced_positions.vs.glsl"
+        self.outline_program = get_outline_program(vs_path)
+        self.depth_only_program = get_depth_only_program(vs_path)
+        self.fragmap_program = get_fragmap_program(vs_path)
 
-    @color.setter
-    def color(self, color):
-        self.mesh.color = color
+        self.vbo_vertices = ctx.buffer(self.vertices.astype('f4').tobytes())
+        self.vbo_indices = ctx.buffer(self.faces.astype('i4').tobytes())
+        self.vbo_instance_base = ctx.buffer(reserve=self.n_lines * 12)
+        self.vbo_instance_tip = ctx.buffer(reserve=self.n_lines * 12)
 
-    def get_mesh(self, current_frame_only=False):
-        # Extract pairs of lines such that line i goes from v0s[i] to v1s[i].
-        if current_frame_only:
-            index = self.current_frame_id
-        else:
-            index = slice(None)
+        self.vao = VAO()
+        self.vao.buffer(self.vbo_vertices, "3f4", "in_position")
+        self.vao.buffer(self.vbo_instance_base, "3f4/i", "instance_base")
+        self.vao.buffer(self.vbo_instance_tip, "3f4/i", "instance_tip")
+        self.vao.index_buffer(self.vbo_indices)
 
+    def _upload_buffers(self):
+        if not self.is_renderable or not self._need_upload:
+            return
+        self._need_upload = False
+
+        lines = self.current_lines
         if self.mode == 'lines':
-            assert self.lines.shape[1] % 2 == 0
-            v0s = self.lines[index, ::2]
-            v1s = self.lines[index, 1::2]
+            v0s = lines[::2]
+            v1s = lines[1::2]
         else:
-            v0s = self.lines[index, :-1]
-            v1s = self.lines[index, 1:]
+            v0s = lines[:-1]
+            v1s = lines[1:]
 
-        if current_frame_only:
-            v0s = v0s[np.newaxis]
-            v1s = v1s[np.newaxis]
+        self.vbo_instance_base.write(v0s.astype("f4").tobytes())
+        self.vbo_instance_tip.write(v1s.astype("f4").tobytes())
 
-        # Data is in the form of (F, N_LINES, V, 3), convert it to (F*N_LINES, 3)
-        n_lines = v0s.shape[1]
-        v0s = np.reshape(v0s, (-1, 3))
-        v1s = np.reshape(v1s, (-1, 3))
-        self.r_tip = self.r_base if self.r_tip is None else self.r_tip
+    def render(self, camera, **kwargs):
+        self._upload_buffers()
+
+        prog = self.prog
+        prog["r_base"] = self.r_base
+        prog["r_tip"] = self.r_tip
+        prog['use_uniform_color'] = True
+        prog['uniform_color'] = tuple(self.color)
+        prog['draw_edges'].value = 1.0 if self.draw_edges else 0.0
+        prog['win_size'].value = kwargs['window_size']
+
+        self.set_camera_matrices(prog, camera, **kwargs)
+        set_lights_in_program(prog, kwargs['lights'], kwargs['shadows_enabled'], kwargs['ambient_strength'])
+        set_material_properties(prog, self.material)
+        self.receive_shadow(prog, **kwargs)
+        self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_lines)
+
+    def render_positions(self, prog):
+        if self.is_renderable:
+            self._upload_buffers()
+            prog["r_base"] = self.r_base
+            prog["r_tip"] = self.r_tip
+            self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_lines)
+
+    def get_mesh(self):
+        v0s = np.array([[0, 0, 0]], np.float32)
+        v1s = np.array([[0, 0, 1]], np.float32)
+
         # If r_tip is below a certain threshold, we create a proper cone, i.e. with just a single vertex at the top.
-        if self.r_tip < 10e-6:
-            data = _create_cone_from_to(v0s, v1s, radius=self.r_base)
+        if self.r_tip < 1e-5:
+            data = _create_cone_from_to(v0s, v1s, radius=1.0)
         else:
-            data = _create_cylinder_from_to(v0s, v1s, radius1=self.r_base, radius2=self.r_tip)
+            data = _create_cylinder_from_to(v0s, v1s, radius1=1.0, radius2=1.0)
 
-        # Convert to (F, N_LINES*V, 3)
-        n_vertices = data['vertices'].shape[1]
-
-        if current_frame_only:
-            vs = np.reshape(data['vertices'], [-1, 3])
-            ns = np.reshape(data['normals'], [-1, 3])
-        else:
-            vs = np.reshape(data['vertices'], [self.n_frames, -1, 3])
-            ns = np.reshape(data['normals'], [self.n_frames, -1, 3])
-
-        fs = []
-        for i in range(n_lines):
-            fs.append(data['faces'] + i * n_vertices)
-        fs = np.concatenate(fs)
-
-        return vs, fs, ns
-
-    def get_index_from_node_and_triangle(self, node, tri_id):
-        if node == self.mesh:
-            if self.mode == 'lines':
-                n_lines = self.lines.shape[1] // 2
-            else:
-                n_lines = self.lines.shape[1] - 1
-            return tri_id // (self.mesh.faces.shape[0] // n_lines)
-        return None
-
+        return data['vertices'][0], data['faces']
 
 class LinesWithGeometryShader(Node):
     """

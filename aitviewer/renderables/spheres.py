@@ -16,21 +16,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
 
-from aitviewer.renderables.meshes import Meshes
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_depth_only_program, get_fragmap_program, get_outline_program, get_sphere_instanced_program
+from aitviewer.utils.utils import set_lights_in_program, set_material_properties
 
 from moderngl_window.opengl.vao import VAO
 import moderngl
-from aitviewer.utils.decorators import hooked
 
-from aitviewer.utils.utils import set_lights_in_program, set_material_properties
-
-def _create_spheres(radius=1.0, rings=16, sectors=32):
+def _create_sphere(radius=1.0, rings=16, sectors=32):
     """
     Create a sphere centered at the origin. This is a port of moderngl-window's geometry.sphere() function, but it
-    returns the vertices, normals, and faces explicitly instead of directly storing them in a VAO.
+    returns the vertices and faces explicitly instead of directly storing them in a VAO.
     :param radius: Radius of the sphere.
     :param rings: Longitudinal resolution.
     :param sectors: Latitudinal resolution.
@@ -92,24 +89,25 @@ class Spheres(Node):
         assert len(positions.shape) == 3
 
         # Define a default material in case there is None.
-        if isinstance(color, tuple) or len(self.color.shape) == 1:
+        if isinstance(color, tuple) or len(color.shape) == 1:
             kwargs['material'] = kwargs.get('material', Material(color=color, ambient=0.2))
             self.sphere_colors = kwargs['material'].color
         else:
+            assert color.shape[1] == 4 and positions.shape[1] == color.shape[0]
             self.sphere_colors = color
         super().__init__(n_frames=positions.shape[0], icon=icon, **kwargs)
 
-        self.sphere_positions = positions
+        self._sphere_positions = positions
         self.radius = radius
 
-        self.vertices, self.faces = _create_spheres(radius=1.0, rings=rings, sectors=sectors)
+        self.vertices, self.faces = _create_sphere(radius=1.0, rings=rings, sectors=sectors)
         self.n_vertices = self.vertices.shape[0]
         self.n_spheres = self.sphere_positions.shape[1]
 
         self.draw_edges = False
         self._need_upload = True
 
-        # Render passes
+        # Render passes.
         self.outline = True
         self.fragmap = True
         self.depth_prepass = True
@@ -128,6 +126,13 @@ class Spheres(Node):
         bounds[:, 1] += self.radius
         return bounds
 
+    @property
+    def vertex_colors(self):
+        if len(self._sphere_colors.shape) == 1:
+            return np.full((self.n_spheres * self.n_vertices, 4), self._sphere_colors)
+        else:
+            return np.tile(self._sphere_colors, (self.n_vertices,1))
+
     def color_one(self, index, color):
         new_colors = np.tile(np.array(self.material.color), (self.n_spheres, 1))
         new_colors[index] = color
@@ -145,7 +150,7 @@ class Spheres(Node):
             t = np.tile(np.array(self._sphere_colors), (self.n_spheres, 1))
             return t
         else:
-            return self._sphere_colors.copy()
+            return self._sphere_colors
 
     @sphere_colors.setter
     def sphere_colors(self, color):
@@ -164,6 +169,18 @@ class Spheres(Node):
         assert len(positions.shape) == 2
         idx = self.current_frame_id if self.sphere_positions.shape[0] > 1 else 0
         self.sphere_positions[idx] = positions
+        self.redraw()
+
+    @property
+    def sphere_positions(self):
+        return self._sphere_positions
+
+    @sphere_positions.setter
+    def sphere_positions(self, pos):
+        if len(pos.shape) == 2:
+            pos = pos[np.newaxis]
+        self._sphere_positions = pos
+        self.redraw()
 
     def on_frame_update(self):
         self.redraw()
@@ -197,7 +214,7 @@ class Spheres(Node):
             return
         self._need_upload = False
         self.vbo_instance_position.write(self.current_sphere_positions.astype("f4").tobytes())
-        if len(self._sphere_colors.shape) != 1:
+        if len(self._sphere_colors.shape) > 1:
             self.vbo_instance_color.write(self._sphere_colors.astype("f4").tobytes())
 
     def render(self, camera, **kwargs):

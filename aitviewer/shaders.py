@@ -25,7 +25,15 @@ def _load(name, defines={}):
 
 @functools.lru_cache()
 def get_sphere_instanced_program():
-    return resources.programs.load(ProgramDescription(vertex_shader="sphere_instanced.glsl",
+    return resources.programs.load(ProgramDescription(vertex_shader="sphere_instanced.vs.glsl",
+                                                      geometry_shader="lit_with_edges.glsl",
+                                                      fragment_shader="lit_with_edges.glsl",
+                                                      defines={ 'SMOOTH_SHADING': 1, 'TEXTURE': 0, 'FACE_COLOR': 0}))
+
+
+@functools.lru_cache()
+def get_lines_instanced_program():
+    return resources.programs.load(ProgramDescription(vertex_shader="lines_instanced.vs.glsl",
                                                       geometry_shader="lit_with_edges.glsl",
                                                       fragment_shader="lit_with_edges.glsl",
                                                       defines={ 'SMOOTH_SHADING': 1, 'TEXTURE': 0, 'FACE_COLOR': 0}))
