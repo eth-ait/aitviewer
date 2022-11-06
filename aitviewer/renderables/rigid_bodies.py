@@ -19,6 +19,7 @@ import numpy as np
 from aitviewer.scene.node import Node
 from aitviewer.renderables.spheres import Spheres
 from aitviewer.renderables.arrows import Arrows
+from aitviewer.utils.utils import compute_union_of_bounds, compute_union_of_current_bounds
 
 
 class RigidBodies(Node):
@@ -94,11 +95,11 @@ class RigidBodies(Node):
 
     @property
     def bounds(self):
-        return self.get_bounds(self.rb_pos)
+        return compute_union_of_bounds(self.coords)
 
     @property
     def current_bounds(self):
-        return self.get_bounds(self.current_rb_pos)
+        return compute_union_of_current_bounds(self.coords)
 
     def redraw(self, **kwargs):
         if kwargs.get('current_frame_only', False):

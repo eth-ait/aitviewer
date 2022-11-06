@@ -24,6 +24,7 @@ from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
 from aitviewer.renderables.lines import Lines
 from aitviewer.configuration import CONFIG as C
+from aitviewer.utils.utils import compute_union_of_bounds, compute_union_of_current_bounds
 
 
 class Scene(Node):
@@ -153,21 +154,11 @@ class Scene(Node):
 
     @property
     def bounds(self):
-        bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
-        for n in self.nodes:
-            child = n.bounds
-            bounds[:, 0] = np.minimum(bounds[:, 0], child[:, 0])
-            bounds[:, 1] = np.maximum(bounds[:, 1], child[:, 1])
-        return bounds
+        return compute_union_of_bounds([n for n in self.nodes if n not in self.lights])
 
     @property
     def current_bounds(self):
-        bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
-        for n in self.nodes:
-            child = n.current_bounds
-            bounds[:, 0] = np.minimum(bounds[:, 0], child[:, 0])
-            bounds[:, 1] = np.maximum(bounds[:, 1], child[:, 1])
-        return bounds
+        return compute_union_of_current_bounds([n for n in self.nodes if n not in self.lights])
 
     def auto_set_floor(self):
         """Finds the minimum lower bound in the y coordinate from all the children bounds and uses that as the floor"""
@@ -179,7 +170,8 @@ class Scene(Node):
         """Sets the camera target to the average of the center of all objects in the scene"""
         centers = []
         for n in self.nodes:
-            centers.append(n.current_bounds.mean(-1))
+            if n not in self.lights:
+                centers.append(n.current_center)
 
         if isinstance(self.camera, ViewerCamera) and len(centers) > 0:
             self.camera.target = np.array(centers).mean(0)

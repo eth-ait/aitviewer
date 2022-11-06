@@ -280,6 +280,30 @@ def set_material_properties(prog, material):
     prog['ambient_coeff'].value = material.ambient
 
 
+def compute_union_of_bounds(nodes):
+    if len(nodes) == 0:
+        return np.zeros((3, 2))
+
+    bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
+    for n in nodes:
+        child = n.bounds
+        bounds[:, 0] = np.minimum(bounds[:, 0], child[:, 0])
+        bounds[:, 1] = np.maximum(bounds[:, 1], child[:, 1])
+    return bounds
+
+
+def compute_union_of_current_bounds(nodes):
+    if len(nodes) == 0:
+        return np.zeros((3, 2))
+
+    bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
+    for n in nodes:
+        child = n.current_bounds
+        bounds[:, 0] = np.minimum(bounds[:, 0], child[:, 0])
+        bounds[:, 1] = np.maximum(bounds[:, 1], child[:, 1])
+    return bounds
+
+
 def local_to_global(poses, parents, output_format='aa', input_format='aa'):
     """
     Convert relative joint angles to global ones by unrolling the kinematic chain.

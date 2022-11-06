@@ -162,6 +162,14 @@ class Light(Node):
         self._update_debug_lines()
 
     @property
+    def bounds(self):
+        return self.sphere.bounds
+
+    @property
+    def current_bounds(self):
+        return self.sphere.current_bounds
+
+    @property
     def direction(self):
         return direction_from_spherical_coordinates(self.elevation, self.azimuth, degrees=True)
 
