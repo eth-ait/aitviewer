@@ -24,6 +24,20 @@ ref_funcs = {}
 headless = HeadlessRenderer(size=SIZE)
 
 
+def initialize_viewer(viewer):
+    """Resets the viewer to the state expected when running a test."""
+    # Reset scene and settings.
+    viewer.reset()
+
+    # Remove the floor and the origin objects.
+    viewer.scene.remove(headless.scene.floor)
+    viewer.scene.remove(headless.scene.origin)
+
+    # Disable automatic setting of the camera target and floor.
+    viewer.auto_set_camera_target = False
+    viewer.auto_set_floor = False
+
+
 def generate_images(viewer, count):
     """Generator that yields 'count' sequential rendered images from the viewer."""
     viewer._init_scene()
@@ -38,15 +52,17 @@ def generate_images(viewer, count):
 @pytest.fixture
 def viewer(refs):
     """Fixture that resets the viewer, yields it and then compares generated images with a set of reference images."""
-    headless.reset()
+    initialize_viewer(headless)
+
     yield headless
+
     for ref, img in zip(refs, generate_images(headless, len(refs))):
         # Load and check the refernce image.
         ref_img = Image.open(ref)
 
         diff = ImageChops.difference(img, ref_img)
         relative_error = np.asarray(diff).sum() / np.full(np.asarray(img).shape, 255).sum()
-        
+
         # If the relative error is higher than this threshold report a failure.
         if relative_error > 1e-5:
             os.makedirs(FAILURE_DIR, exist_ok=True)

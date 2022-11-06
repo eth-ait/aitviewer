@@ -42,6 +42,7 @@ def test_renderables(viewer: Viewer):
 
     viewer.scene.add(line_renderable, spheres, rbs)
     viewer.scene.camera.position = np.array([2.0, 2.0, 2.0])
+    viewer.scene.camera.target = np.array([0.0, 0.5, 0.0])
 
 
 @reference()
@@ -74,6 +75,7 @@ def test_smplh(viewer: Viewer):
                                                position=np.array((-1, 0.0, 0.0)))
     smplh_female = SMPLSequence.t_pose(SMPLLayer(model_type='smplh', gender='female', device=C.device), name='SMPL',
                                                  position=np.array((1, 0.0, 0.0)))
+    viewer.scene.camera.position = np.array([0.0, 0.5, 3.5])
     viewer.scene.add(smplh_male, smplh_female)
 
 
@@ -113,7 +115,6 @@ def test_amass(viewer: Viewer):
     viewer.scene.camera.position = np.array([-3.3, 1.4, 0.2])
     viewer.scene.camera.target = np.array([-2.8, 1.0, -1.6])
     viewer.scene.add(seq_amass)
-    viewer.auto_set_camera_target = False
 
 
 @reference(count=3)
@@ -125,4 +126,3 @@ def test_3dpw(viewer: Viewer):
     viewer.scene.camera.position = np.array([-1.0, 1.5, -1.5])
     viewer.scene.camera.target = np.array([-2.2, 1.0, -4.0])
     viewer.scene.add(*seqs_3dpw)
-    viewer.auto_set_camera_target = False

@@ -63,6 +63,16 @@ def test_normals(viewer: Viewer):
     smpl_opaque.mesh_seq.norm_coloring = True
     viewer.scene.add(smpl_transparent, smpl_opaque)
 
+    viewer.scene.camera.position = np.array([0.0, 0.5, 3.5])
+
+
+@reference()
+def test_empty(viewer: Viewer):
+    viewer.scene.add(viewer.scene.floor)
+    viewer.scene.add(viewer.scene.origin)
+    viewer.scene.camera.position = np.array([0.2, 0.2, 0.2])
+    viewer.scene.camera.target = np.array([0.0, 0.0, 0.0])
+
 
 def add_cube(viewer: Viewer, pos):
     cube = trimesh.load(os.path.join(RESOURCE_DIR, 'cube.obj'), process=False)

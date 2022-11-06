@@ -29,7 +29,7 @@ if __name__ == "__main__":
         print(f'{func.__name__}')
 
         # Reset the viewer.
-        viewer.reset()
+        utils.initialize_viewer(viewer)
 
         # Call the test function to initialize the scene.
         func(viewer)
