@@ -464,7 +464,10 @@ class Viewer(moderngl_window.WindowConfig):
 
         self.ctx.enable_only(moderngl.DEPTH_TEST | moderngl.BLEND | moderngl.CULL_FACE)
         self.ctx.cull_face = 'back'
-        self.ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
+        self.ctx.blend_func = (
+            moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA,
+            moderngl.ONE, moderngl.ONE
+        )
 
     def prevent_background_interactions(self):
         """Prevent background interactions when hovering over any imgui window."""

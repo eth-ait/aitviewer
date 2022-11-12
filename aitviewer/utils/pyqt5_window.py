@@ -34,6 +34,7 @@ class PyQt5Window(Window):
         gl.setDepthBufferSize(24)
         gl.setDoubleBuffer(True)
         gl.setSwapInterval(1 if self._vsync else 0)
+        gl.setAlphaBufferSize(8)
 
         # Configure multisampling if needed
         if self.samples > 1:
