@@ -495,6 +495,8 @@ class SMPLSequence(Node):
 
     @selected_mode.setter
     def selected_mode(self, selected_mode):
+        if self._selected_mode == selected_mode:
+            return
         self._selected_mode = selected_mode
 
         if self.selected_mode == 'edit':
@@ -613,10 +615,11 @@ class SMPLSequence(Node):
     def on_selection(self, node, instance_id, tri_id):
         if self.edit_mode:
             # Index of the joint that is currently being edited.
-            self._edit_joint = instance_id
-            if self._edit_joint is not None:
+            if node != self.mesh_seq:
+                self._edit_joint = instance_id
                 self.rbs.color_one(self._edit_joint, (0.3, 0.4, 1, 1))
             else:
+                self._edit_joint = None
                 # Reset color of all spheres to the default color
                 self.rbs.color = self.rbs.color
 
