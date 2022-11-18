@@ -57,6 +57,7 @@ class Meshes(Node):
                  flat_shading=False,
                  draw_edges=False,
                  draw_outline=False,
+                 instance_transforms=None,
                  icon="\u008d",
                  **kwargs):
         """
@@ -76,7 +77,24 @@ class Meshes(Node):
             vertices = vertices[np.newaxis]
         assert len(vertices.shape) == 3
         assert len(faces.shape) == 2
-        super(Meshes, self).__init__(n_frames=vertices.shape[0], icon=icon, **kwargs)
+        n_frames = vertices.shape[0]
+
+        # Instancing.
+        if instance_transforms is not None:
+            # Check shape of transforms.
+            if len(instance_transforms.shape) == 3:
+                instance_transforms = instance_transforms[np.newaxis]
+            assert len(instance_transforms.shape) == 4
+
+            # Number of instance frames must match number of frames or be 1.
+            assert n_frames == 1 or instance_transforms.shape[0] == 1 or n_frames == instance_transforms.shape[0]
+            n_frames = max(n_frames, instance_transforms.shape[0])
+
+            self._instance_transforms = instance_transforms
+        else:
+            self._instance_transforms = None
+
+        super(Meshes, self).__init__(n_frames=n_frames, icon=icon, **kwargs)
 
         self._vertices = vertices
         self._faces = faces.astype(np.int32)
@@ -118,6 +136,48 @@ class Meshes(Node):
         self.need_upload = True
         self._use_uniform_color = self._vertex_colors is None and self._face_colors is None
         self._vertex_faces_sparse = trimesh.geometry.index_sparse(self._vertices.shape[1], self._faces)
+
+    @classmethod
+    def instanced(cls, *args, positions=None, rotations=None, scales=None, **kwargs):
+        """
+        Creates and returns an instanced sequence of N frames and I instances.
+        Each instance will have its own position, rotation and scale.
+        :param positions: np array of size (N, I, 3) or (I, 3) or None.
+        :param rotations: np array of size (N, I, 3, 3) or (I, 3, 3) or None.
+        :param scales: np array of size (N, I) or (I) or None.
+
+        *args, and **kwargs are forwarded to the Meshes constructor.
+        """
+        assert positions is not None or rotations is not None or scales is not None
+
+        n_instances = 0
+        n_frames = 0
+        def check_array(a, dim):
+            nonlocal n_instances, n_frames
+            if a is not None:
+                if len(a.shape) == dim + 1:
+                    a = a[np.newaxis]
+                n_frames = max(n_frames, a.shape[0])
+                n_instances = max(n_instances, a.shape[1])
+            return a
+
+        positions = check_array(positions, 1)
+        rotations = check_array(rotations, 2)
+        scales = check_array(scales, 0)
+
+        if positions is None:
+            positions = np.zeros((n_frames, n_instances, 3))
+        if rotations is None:
+            rotations = np.zeros((n_frames, n_instances, 3, 3))
+            rotations[:, :] = np.eye(3)
+        if scales is None:
+            scales = np.ones((n_frames, n_instances))
+
+        transforms = np.zeros((n_frames, n_instances, 4, 4))
+        transforms[:, :, :3, :3] = (rotations.reshape((-1, 9)) * scales.reshape((-1, 1))).reshape((n_frames, n_instances, 3, 3))
+        transforms[:, :, :3, 3] = positions
+        transforms[:, :, 3, 3] = 1.0
+        return cls(*args, **kwargs, instance_transforms=transforms)
 
     @property
     def vertices(self):
@@ -311,11 +371,39 @@ class Meshes(Node):
 
     @property
     def bounds(self):
-        return self.get_bounds(self.vertices)
+        if self.instance_transforms is None:
+            return self.get_bounds(self.vertices)
+        else:
+            # Get bounds in local coordinates
+            bounds = self.get_local_bounds(self.vertices)
+
+            # Transform bounds with instance transforms
+            min = np.append(bounds[:, 0], 1.0)
+            max = np.append(bounds[:, 1], 1.0)
+            transforms = self.instance_transforms.reshape((-1, 4, 4))
+            mins = transforms @ min
+            maxs = transforms @ max
+
+            # Return bounds in world coordinates
+            return self.get_bounds(np.vstack((mins, maxs)))
 
     @property
     def current_bounds(self):
-        return self.get_bounds(self.current_vertices)
+        if self.instance_transforms is None:
+            return self.get_bounds(self.current_vertices)
+        else:
+            # Get bounds in local coordinates
+            bounds = self.get_local_bounds(self.current_vertices)
+
+            # Transform bounds with instance transforms
+            min = np.append(bounds[:, 0], 1.0)
+            max = np.append(bounds[:, 1], 1.0)
+            transforms = self.current_instance_transforms.reshape((-1, 4, 4))
+            mins = transforms @ min
+            maxs = transforms @ max
+
+            # Return bounds in world coordinates
+            return self.get_bounds(np.vstack((mins[:, :3], maxs[:, :3])))
 
     def is_transparent(self):
         return self.color[3] < 1.0
@@ -324,6 +412,29 @@ class Meshes(Node):
         """Called whenever a new frame must be displayed."""
         super().on_frame_update()
         self.redraw()
+
+    @property
+    def current_instance_transforms(self):
+        if self._instance_transforms is None:
+            return None
+        idx = self.current_frame_id if self._instance_transforms.shape[0] > 1 else 0
+        return self._instance_transforms[idx]
+
+    @property
+    def instance_transforms(self):
+        return self._instance_transforms
+
+    @instance_transforms.setter
+    def instance_transforms(self, instance_transforms):
+        assert self._instance_transforms.shape == instance_transforms
+        self._instance_transforms = instance_transforms
+
+    @property
+    def n_instances(self):
+        if self._instance_transforms is None:
+            return 1
+        else:
+            return self._instance_transforms.shape[1]
 
     def _upload_buffers(self):
         """Upload the current frame data to the GPU for rendering."""
@@ -344,12 +455,16 @@ class Meshes(Node):
             # Write vertex colors.
             self.vbo_colors.write(self.current_vertex_colors.astype('f4').tobytes())
         else:
-            # Write face colors
+            # Write face colors.
             self.ssbo_face_colors.write(self.current_face_colors.astype('f4').tobytes())
 
         # Write uvs.
         if self.has_texture:
             self.vbo_uvs.write(self.uv_coords.astype('f4').tobytes())
+
+        # Write instance transforms.
+        if self.instance_transforms is not None:
+            self.ssbo_instance_transforms.write(np.transpose(self.current_instance_transforms.astype('f4'), (0, 2, 1)).tobytes())
 
     def redraw(self, **kwargs):
         self._need_upload = True
@@ -358,15 +473,18 @@ class Meshes(Node):
     @Node.once
     def make_renderable(self, ctx: moderngl.Context):
         """Prepares this object for rendering. This function must be called before `render` is used."""
-        self.smooth_prog = get_smooth_lit_with_edges_program()
-        self.flat_prog = get_flat_lit_with_edges_program()
-        self.smooth_face_prog = get_smooth_lit_with_edges_face_color_program()
-        self.flat_face_prog = get_flat_lit_with_edges_face_color_program()
 
-        vs_path = "mesh_positions.vs.glsl"
-        self.depth_only_program = get_depth_only_program(vs_path)
-        self.outline_program = get_outline_program(vs_path)
-        self.fragmap_program = get_fragmap_program(vs_path)
+        vs = "lit_with_edges.glsl"
+        positions_vs = "mesh_positions.vs.glsl"
+        instanced = 1 if self.instance_transforms is not None else 0
+        self.smooth_prog = get_smooth_lit_with_edges_program(vs, instanced)
+        self.flat_prog = get_flat_lit_with_edges_program(vs, instanced)
+        self.smooth_face_prog = get_smooth_lit_with_edges_face_color_program(vs, instanced)
+        self.flat_face_prog = get_flat_lit_with_edges_face_color_program(vs, instanced)
+
+        self.depth_only_program = get_depth_only_program(positions_vs, instanced)
+        self.outline_program = get_outline_program(positions_vs, instanced)
+        self.fragmap_program = get_fragmap_program(positions_vs, instanced)
 
         vertices = self.current_vertices
         vertex_normals = self.vertex_normals_at(self.current_frame_id)
@@ -383,6 +501,9 @@ class Meshes(Node):
         self.vao.buffer(self.vbo_colors, '4f4', 'in_color')
         self.vao.index_buffer(self.vbo_indices)
 
+        if self.instance_transforms is not None:
+            self.ssbo_instance_transforms = ctx.buffer(np.transpose(self.current_instance_transforms.astype('f4'), (0, 2, 1)).tobytes())
+
         self.ssbo_face_colors = ctx.buffer(reserve=self.faces.shape[0] * 16)
         if self.face_colors is not None:
             self.ssbo_face_colors.write(self.current_face_colors.astype('f4').tobytes())
@@ -393,7 +514,7 @@ class Meshes(Node):
                 self.texture = ctx.texture(img.shape[:2], img.shape[2], img.tobytes())
             else:
                 self.texture = ctx.texture(img.size, 3, img.tobytes())
-            self.texture_prog = get_smooth_lit_texturized_program()
+            self.texture_prog = get_smooth_lit_texturized_program(vs)
             self.vbo_uvs = ctx.buffer(self.uv_coords.astype('f4').tobytes())
             self.vao.buffer(self.vbo_uvs, '2f4', 'in_uv')
 
@@ -425,6 +546,9 @@ class Meshes(Node):
                 self.ssbo_face_colors.bind_to_storage_buffer(0)
             prog['norm_coloring'].value = self.norm_coloring
 
+        if self.instance_transforms is not None:
+            self.ssbo_instance_transforms.bind_to_storage_buffer(1)
+
         prog['use_uniform_color'] = self._use_uniform_color
         prog['uniform_color'] = self.material.color
         prog['draw_edges'].value = 1.0 if self.draw_edges else 0.0
@@ -434,12 +558,16 @@ class Meshes(Node):
         set_lights_in_program(prog, kwargs['lights'], kwargs['shadows_enabled'], kwargs['ambient_strength'])
         set_material_properties(prog, self.material)
         self.receive_shadow(prog, **kwargs)
-        self.vao.render(prog, moderngl.TRIANGLES)
+        self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_instances)
 
     def render_positions(self, prog):
         if self.is_renderable:
             self._upload_buffers()
-            self.vao.render(prog, moderngl.TRIANGLES)
+
+            if self.instance_transforms is not None:
+                self.ssbo_instance_transforms.bind_to_storage_buffer(1)
+
+            self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_instances)
 
     def _show_normals(self):
         """Create and add normals at runtime"""

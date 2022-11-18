@@ -265,7 +265,7 @@ class Node(object):
     def center(self):
         return self.bounds.mean(-1)
 
-    def get_bounds(self, points):
+    def get_local_bounds(self, points):
         if len(points.shape) == 2 and points.shape[-1] == 3:
             points = points[np.newaxis]
         assert len(points.shape) == 3
@@ -275,6 +275,15 @@ class Node(object):
             [np.nanmin(points[:, :, 0]), np.nanmax(points[:, :, 0])],
             [np.nanmin(points[:, :, 1]), np.nanmax(points[:, :, 1])],
             [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]])
+
+        # If any of the elements is NaN return an empty bounding box.
+        if np.isnan(val).any():
+            return np.array([[0, 0], [0, 0], [0, 0]])
+        else:
+            return val
+
+    def get_bounds(self, points):
+        val = self.get_local_bounds(points)
 
         # Transform bounding box with the model matrix.
         val = (self.model_matrix @ np.vstack((val, np.array([1.0, 1.0]))))[:3]
