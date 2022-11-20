@@ -43,6 +43,7 @@ class PointClouds(Node):
         :param colors: Sequence of Colors (F, C, 4) or None. If None, all points are colored according to `color`.
         :param point_size: Initial point size.
         :param color: Default color applied to all points of all frames if `colors` is not provided.
+        :param z_up: If true the point cloud rotation matrix is initialized to convert from z-up to y-up data.
         """
         assert isinstance(points, list) or isinstance(points, np.ndarray)
         if colors is not None:

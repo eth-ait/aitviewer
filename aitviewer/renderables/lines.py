@@ -228,6 +228,7 @@ class Lines(Node):
           a proper cone.
         :param color: Color of the line (4-tuple).
         :param mode: 'lines' or 'line_strip' -> ModernGL drawing mode - LINE_STRIP oder LINES
+        :param cast_shadow: If True the mesh casts a shadow on other objects.
         """
         assert len(color) == 4
         if len(lines.shape) == 2:

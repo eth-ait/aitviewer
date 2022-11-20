@@ -41,7 +41,6 @@ class Arrows(Node):
         :param r_head: Radius of the tip cylinder.
         :param p: Percentage of arrow head on the entire length.
         :param color: Color of the line (4-tuple).
-        :param mode: 'lines' or 'line_strip' -> ModernGL drawing mode - LINE_STRIP oder LINES
         """
         assert (origins.shape == tips.shape)
         if len(origins.shape) == 2:

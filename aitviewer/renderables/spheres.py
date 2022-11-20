@@ -82,7 +82,6 @@ class Spheres(Node):
         :param color: Color of the spheres.
         :param rings: Longitudinal resolution.
         :param sectors: Latitudinal resolution.
-        :param kwargs: Remaining parameters.
         """
         if len(positions.shape) == 2:
             positions = positions[np.newaxis]

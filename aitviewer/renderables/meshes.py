@@ -72,6 +72,13 @@ class Meshes(Node):
         :param face_colors: A np array of shape (N, F, 4) overriding the uniform or vertex colors.
         :param uv_coords: A np array of shape (V, 2) if the mesh is to be textured.
         :param path_to_texture: Path to an image file that serves as the texture.
+        :param cast_shadow: If True the mesh casts a shadow on other objects.
+        :param pickable: If True the mesh can be selected with a mouse click.
+        :param flat_shading: If True the each face of the mesh is shaded with a constant normal.
+        :param draw_edges: If True the normals the edges of the mesh is drawn on top of the mesh.
+        :param draw_outline: If true an outline is drawn around the mesh.
+        :instance_transforms: np array of size (N, I, 4, 4) or (I, 4, 4) or None. If not None, 'I' instances of
+            the same mesh will be rendered, each with its own transformation matrix.
         """
         if len(vertices.shape) == 2 and vertices.shape[-1] == 3:
             vertices = vertices[np.newaxis]
