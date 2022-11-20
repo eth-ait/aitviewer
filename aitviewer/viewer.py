@@ -373,10 +373,11 @@ class Viewer(moderngl_window.WindowConfig):
         self.render_shadowmap()
         self.render_prepare(transparent_background)
         self.render_scene()
-        self.render_outline(self.scene.lights, self.light_outline_color)
         self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], self.outline_color)
 
         if not export:
+            self.render_outline([l for l in self.scene.lights if l.enabled], self.light_outline_color)
+
             # If the selected object is a Node render its outline.
             if isinstance(self.scene.selected_object, Node):
                 self.render_outline([self.scene.selected_object], self.selected_outline_color)

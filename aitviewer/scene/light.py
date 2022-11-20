@@ -52,9 +52,8 @@ class Light(Node):
         self._debug_lines = None
         self._show_debug_lines = False
 
-        self.sphere = Spheres(np.array([[0.0, 0.0, 0.0]]), 0.2, material=Material(diffuse=0.0, ambient=1.0, color=(*tuple(light_color), 1.0)), is_selectable=False)
-        self.arrow = Arrows(np.array([[[0.0, 0.0, 0.0]]]), np.array([[[0, 0, -1]]]) * 0.4, is_selectable=False)
-        self.add(self.sphere, self.arrow, show_in_hierarchy=False)
+        self.arrow = Lines(np.array([[[0.0, 0.0, 0.0], [ 0, 0, -0.6]]]), 0.15, 0, is_selectable=False, material=Material(diffuse=0.0, ambient=1.0, color=(*tuple(light_color), 1.0)))
+        self.add(self.arrow, show_in_hierarchy=False)
 
     @classmethod
     def facing_origin(cls, **kwargs):
@@ -88,7 +87,7 @@ class Light(Node):
     @light_color.setter
     def light_color(self, light_color):
         self._light_color = light_color
-        self.sphere.color = (*tuple(light_color), 1.0)
+        self.arrow.color = (*tuple(light_color), 1.0)
 
     def update_rotation(self):
         self.rotation = look_at(np.array([0, 0, 0]), self.direction, np.array([0.0, 1.0, 0.0]))[:3, :3].T
@@ -154,7 +153,7 @@ class Light(Node):
             self._debug_lines.redraw()
 
     def render_outline(self, ctx, camera, prog):
-        self.sphere.render_outline(ctx, camera, prog)
+        self.arrow.render_outline(ctx, camera, prog)
 
     @Node.position.setter
     def position(self, position):
@@ -163,11 +162,11 @@ class Light(Node):
 
     @property
     def bounds(self):
-        return self.sphere.bounds
+        return self.arrow.bounds
 
     @property
     def current_bounds(self):
-        return self.sphere.current_bounds
+        return self.arrow.current_bounds
 
     @property
     def direction(self):
