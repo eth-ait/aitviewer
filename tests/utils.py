@@ -30,8 +30,8 @@ def initialize_viewer(viewer):
     viewer.reset()
 
     # Remove the floor and the origin objects.
-    viewer.scene.remove(headless.scene.floor)
-    viewer.scene.remove(headless.scene.origin)
+    viewer.scene.remove(viewer.scene.floor)
+    viewer.scene.remove(viewer.scene.origin)
 
     # Disable automatic setting of the camera target and floor.
     viewer.auto_set_camera_target = False
