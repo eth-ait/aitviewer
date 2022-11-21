@@ -81,7 +81,7 @@ class Viewer(moderngl_window.WindowConfig):
     gl_version = (4, 3)
     window_type = C.window_type
 
-    def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, **kwargs):
+    def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, samples: int=None, **kwargs):
         """
         Initializer.
         :param title: Window title
@@ -98,16 +98,20 @@ class Viewer(moderngl_window.WindowConfig):
             self.window_type = C.window_type
 
         # HACK: We use our own version of the PyQt5 windows to override
-        # part of the initialization that crashes on Python >= 3.10
+        # part of the initialization that crashes on Python >= 3.10.
         if self.window_type == 'pyqt5':
             from aitviewer.utils.pyqt5_window import PyQt5Window
             base_window_cls = PyQt5Window
         else:
             base_window_cls = get_local_window_cls(self.window_type)
 
-        # If no size is provided use the size from the configuration file
+        # If no size is provided use the size from the configuration file.
         if size is None:
             size = C.window_width, C.window_height
+
+        # Update nubmer of samples to use if specified as a parameter.
+        if samples is not None:
+            self.samples = samples
 
         # Calculate window size
         size = int(size[0] * self.size_mult), int(size[1] * self.size_mult)
@@ -253,6 +257,13 @@ class Viewer(moderngl_window.WindowConfig):
         # Outline rendering
         self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
         self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
+
+        # If in headlesss mode we create a framebuffer without multisampling that we can use
+        # to resolve the default framebuffer before reading.
+        if self.window_type == 'headless':
+            self.headless_fbo_color = self.ctx.texture(self.wnd.buffer_size, 4)
+            self.headless_fbo_depth = self.ctx.depth_texture(self.wnd.buffer_size)
+            self.headless_fbo = self.ctx.framebuffer(self.headless_fbo_color, self.headless_fbo_depth)
 
     # noinspection PyAttributeOutsideInit
     def reset(self):
@@ -1223,10 +1234,19 @@ class Viewer(moderngl_window.WindowConfig):
         else:
             fmt = 'RGB'
             components = 3
+
+        # If in headless mode we first resolve the multisampled framebuffer into
+        # a non multisampled one and read from that instead.
+        if self.window_type == 'headless':
+            self.ctx.copy_framebuffer(self.headless_fbo, self.wnd.fbo)
+            fbo = self.headless_fbo
+        else:
+            fbo = self.wnd.fbo
+
         image = Image.frombytes(fmt,
                                 (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
                                  self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
-                                self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components))
+                                fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components))
         return image.transpose(Image.FLIP_TOP_BOTTOM)
 
     def get_current_depth_image(self):
@@ -1238,11 +1258,20 @@ class Viewer(moderngl_window.WindowConfig):
         Values are between the near and far plane distances of the camera used for rendering,
         everything outside this range is clipped by OpenGL.
         """
+
+        # If in headless mode we first resolve the multisampled framebuffer into
+        # a non multisampled one and read from that instead.
+        if self.window_type == 'headless':
+            self.ctx.copy_framebuffer(self.headless_fbo, self.wnd.fbo)
+            fbo = self.headless_fbo
+        else:
+            fbo = self.wnd.fbo
+
         # Get depth image from depth buffer.
         depth = Image.frombytes('F',
                                 (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
                                  self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
-                                self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype='f4'))
+                                fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype='f4'))
 
         # Convert from [0, 1] range to [-1, 1] range.
         # This is necessary because our projection matrix computes NDC
@@ -1316,7 +1345,9 @@ class Viewer(moderngl_window.WindowConfig):
         :param scale_factor: a scale factor used to scale the image. If None no scale factor is used and
           the image will have the same size as the viewer.
         """
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        dir = os.path.dirname(file_path)
+        if dir:
+            os.makedirs(dir, exist_ok=True)
 
         # Store run_animation old value and set it to false.
         run_animations = self.run_animations

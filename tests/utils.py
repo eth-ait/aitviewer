@@ -21,7 +21,7 @@ SMPL_PRESENT = os.path.exists(C.smplx_models)
 ref_funcs = {}
 
 # Headless viewer used for tests.
-headless = HeadlessRenderer(size=SIZE)
+headless = HeadlessRenderer(size=SIZE, samples=0)
 
 
 def initialize_viewer(viewer):
