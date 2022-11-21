@@ -270,7 +270,7 @@ def set_lights_in_program(prog, lights, shadows_enabled, ambient_strength):
     for i, light in enumerate(lights):
         prog[f'dirLights[{i}].direction'].value = tuple(light.direction)
         prog[f'dirLights[{i}].color'].value = light.light_color
-        prog[f'dirLights[{i}].strength'].value = light.strength
+        prog[f'dirLights[{i}].strength'].value = light.strength if light.enabled else 0.0
         prog[f'dirLights[{i}].shadow_enabled'].value = shadows_enabled and light.shadow_enabled
     prog['ambient_strength'] = ambient_strength
 
