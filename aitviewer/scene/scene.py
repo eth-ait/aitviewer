@@ -176,11 +176,29 @@ class Scene(Node):
         if isinstance(self.camera, ViewerCamera) and len(centers) > 0:
             self.camera.target = np.array(centers).mean(0)
 
-    def set_lights(self, is_dark_mode=False):
-        if is_dark_mode:
-            self.ambient_strength = 0.4
-        else:
+    @property
+    def light_mode(self):
+        return self._light_mode
+
+    @light_mode.setter
+    def light_mode(self, mode):
+        if mode == "default":
+            self._light_mode = mode
             self.ambient_strength = 2.0
+            for l in self.lights:
+                l.strength = 1.0
+        elif mode == "dark":
+            self._light_mode = mode
+            self.ambient_strength = 0.4
+            for l in self.lights:
+                l.strength = 1.0
+        elif mode == "diffuse":
+            self._light_mode = mode
+            self.ambient_strength = 1.0
+            for l in self.lights:
+                l.strength = 2.0
+        else:
+            raise ValueError(f"Invalid light mode: {mode}")
 
     def collect_nodes(self, req_enabled=True, obj_type=Node):
         nodes = []

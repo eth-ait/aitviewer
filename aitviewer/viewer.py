@@ -277,12 +277,12 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Settings
         self.run_animations = C.run_animations
-        self.dark_mode = C.dark_mode
         self.playback_fps = C.playback_fps
         self.shadows_enabled = C.shadows_enabled
         self.auto_set_floor = C.auto_set_floor
         self.auto_set_camera_target = C.auto_set_camera_target
         self.backface_culling = C.backface_culling
+        self.scene.light_mode = "dark" if C.dark_mode else "default"
         self.lock_selection = False
         self.show_camera_target = False
         self.visualize = False
@@ -465,7 +465,7 @@ class Viewer(moderngl_window.WindowConfig):
         if transparent_background:
             self.ctx.clear(0, 0, 0, 0)
         else:
-            if self.dark_mode:
+            if self.scene.light_mode == 'dark':
                 self.ctx.clear(0.1, 0.1, 0.1, 1.0)
             else:
                 self.ctx.clear(*self.scene.background_color)
@@ -582,10 +582,23 @@ class Viewer(moderngl_window.WindowConfig):
                 imgui.end_menu()
 
             if imgui.begin_menu("View", True):
+                if imgui.begin_menu("Light modes"):
+                    _, default = imgui.menu_item("Default", None, self.scene.light_mode == "default")
+                    if default:
+                        self.scene.light_mode = "default"
+
+                    _, dark = imgui.menu_item("Dark", self._shortcut_names[self._dark_mode_key],
+                                              self.scene.light_mode == "dark")
+                    if dark:
+                        self.scene.light_mode = "dark"
+
+                    _, diffuse = imgui.menu_item("Diffuse", None, self.scene.light_mode == "diffuse")
+                    if diffuse:
+                        self.scene.light_mode = "diffuse"
+                    imgui.end_menu()
+
                 _, self.shadows_enabled = imgui.menu_item("Render Shadows", self._shortcut_names[self._shadow_key],
                                                           self.shadows_enabled, True)
-                _, self.dark_mode = imgui.menu_item("Dark Mode", self._shortcut_names[self._dark_mode_key],
-                                                    self.dark_mode, True)
 
                 _, self.lock_selection = imgui.menu_item("Lock selection", self._shortcut_names[self._lock_selection_key],
                                                          self.lock_selection, True)
@@ -1120,8 +1133,7 @@ class Viewer(moderngl_window.WindowConfig):
                 self.selected_mode = 'inspect'
 
             elif key == self._dark_mode_key:
-                self.dark_mode = not self.dark_mode
-                self.scene.set_lights(self.dark_mode)
+                self.scene.light_mode = "dark" if self.scene.light_mode != "dark" else "default"
 
             elif key == self._screenshot_key:
                 self._screenshot_popup_just_opened = True
