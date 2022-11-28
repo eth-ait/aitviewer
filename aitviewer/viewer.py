@@ -330,7 +330,6 @@ class Viewer(moderngl_window.WindowConfig):
             self.scene.backface_culling = self.backface_culling
         if self.auto_set_camera_target:
             self.scene.auto_set_camera_target()
-        self.scene.set_lights(self.dark_mode)
 
     def run(self, *args, log=True):
         """
@@ -377,11 +376,21 @@ class Viewer(moderngl_window.WindowConfig):
         if not export:
             self.streamable_capture()
 
+        # Disable light renderables if exporting
+        if export:
+            for l in self.scene.lights:
+                l.arrow.enabled = False
+
         self.render_fragmap()
         self.render_shadowmap()
         self.render_prepare(transparent_background)
         self.render_scene()
         self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], self.outline_color)
+
+        # Re-enable light renderables
+        if export:
+            for l in self.scene.lights:
+                l.arrow.enabled = True
 
         if not export:
             self.render_outline([l for l in self.scene.lights if l.enabled], self.light_outline_color)
