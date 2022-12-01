@@ -21,7 +21,7 @@ import pickle
 
 from aitviewer.scene.camera import Camera, OpenCVCamera
 from aitviewer.scene.node import Node
-from aitviewer.shaders import get_screen_texture_program
+from aitviewer.shaders import get_fragmap_program, get_outline_program, get_screen_texture_program
 from aitviewer.utils.decorators import hooked
 from moderngl_window.opengl.vao import VAO
 from trimesh.triangles import points_to_barycentric
@@ -56,6 +56,7 @@ class Billboard(Node):
         self.vertices = vertices - center
         self.position = center
         self.img_process_fn = (lambda img, _: img) if img_process_fn is None else img_process_fn
+        self._need_redraw = False
 
         # Tile the uv buffer to match the size of the vertices buffer,
         # we do this so that we can use the same vertex array for all draws
@@ -99,7 +100,7 @@ class Billboard(Node):
 
     @classmethod
     def from_camera_and_distance(cls, camera: Camera, distance: float, cols: int, rows: int,
-                                 texture_paths: List[str], image_process_fn=None):
+                                 texture_paths: List[str], image_process_fn=None, **kwargs):
         """
         Initialize a Billboard from a camera object, a distance from the camera, the size of the image in
         pixels and the set of images. `image_process_fn` can be used to apply a function to each image.
@@ -148,12 +149,17 @@ class Billboard(Node):
                     return cv2.undistort(img, camera.current_K, camera.dist_coeffs)
                 image_process_fn = undistort
 
-        return cls(all_corners, texture_paths, image_process_fn)
+        return cls(all_corners, texture_paths, image_process_fn, **kwargs)
 
     # noinspection PyAttributeOutsideInit
     @Node.once
     def make_renderable(self, ctx):
         self.prog = get_screen_texture_program()
+
+        vs_path = "mesh_positions.vs.glsl"
+        self.outline_program = get_outline_program(vs_path)
+        self.fragmap_program = get_fragmap_program(vs_path)
+
         self.vbo_vertices = ctx.buffer(self.vertices.astype('f4').tobytes())
         self.vbo_uvs = ctx.buffer(self.uvs.astype('f4').tobytes())
         self.vao = ctx.vertex_array(self.prog,
@@ -165,8 +171,13 @@ class Billboard(Node):
 
         self.ctx = ctx
 
+    def redraw(self, **kwargs):
+        self._need_redraw = True
+
     def render(self, camera, **kwargs):
-        if self.current_frame_id != self._current_texture_id:
+        if self.current_frame_id != self._current_texture_id or self._need_redraw:
+            self._need_redraw = False
+
             if self.texture:
                 self.texture.release()
 

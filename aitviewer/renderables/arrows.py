@@ -41,7 +41,6 @@ class Arrows(Node):
         :param r_head: Radius of the tip cylinder.
         :param p: Percentage of arrow head on the entire length.
         :param color: Color of the line (4-tuple).
-        :param mode: 'lines' or 'line_strip' -> ModernGL drawing mode - LINE_STRIP oder LINES
         """
         assert (origins.shape == tips.shape)
         if len(origins.shape) == 2:
@@ -103,13 +102,6 @@ class Arrows(Node):
         c[:, 0::2] = starts
         c[:, 1::2] = ends
         return c
-
-    def get_index_from_node_and_triangle(self, node, tri_id):
-        idx = self.bases_r.get_index_from_node_and_triangle(node, tri_id)
-        if idx is not None:
-            return idx
-
-        return self.arrows_r.get_index_from_node_and_triangle(node, tri_id)
 
     def redraw(self, **kwargs):
         self.bases_r.lines = self.get_line_coords(self.origins, self.mid_points)

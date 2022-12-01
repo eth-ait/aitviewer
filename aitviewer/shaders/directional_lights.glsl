@@ -1,8 +1,7 @@
 struct DirLight {
-    vec3 pos;
+    vec3 direction;
     vec3 color;
-    float intensity_ambient;
-    float intensity_diffuse;
+    float strength;
     bool shadow_enabled;
     mat4 matrix;
 };
@@ -12,25 +11,18 @@ struct DirLight {
 uniform DirLight dirLights[NR_DIR_LIGHTS];
 uniform sampler2DShadow shadow_maps[NR_DIR_LIGHTS];
 
+// Material coefficients
 uniform float diffuse_coeff;
 uniform float ambient_coeff;
 
+// Scene ambient strength
+uniform float ambient_strength;
+
 vec3 directionalLight(DirLight dirLight, vec3 color, vec3 fragPos, vec3 normal, float shadow) {
-    // Ambient
-    vec3 ambient = dirLight.intensity_ambient * dirLight.color * ambient_coeff;
-
-    // Diffuse
-    vec3 lightDir = normalize(dirLight.pos); // Here we assume that lights are always directed at the origin
+    vec3 lightDir = -dirLight.direction;
     float diff = max(dot(normal, lightDir), 0.0);
-    vec3 diffuse = diffuse_coeff * diff * dirLight.intensity_diffuse * dirLight.color;
-
-    // Specular
-//    vec3 viewDir = normalize(viewPos - fragPos);
-//    vec3 reflectDir = reflect(-lightDir, normal);
-//    float spec = pow(max(dot(viewDir, reflectDir), 0.0), dirLight.shininess);
-//    vec3 specular = dirLight.specular * spec * dirLight.color;
-
-    return (ambient + (1.0 - shadow)*diffuse) * color;
+    vec3 diffuse = diffuse_coeff * diff * dirLight.color * dirLight.strength;
+    return (1.0 - shadow) * diffuse * color;
 }
 
 // Gratefully adopted from https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping
@@ -48,7 +40,7 @@ float shadow_calculation(sampler2DShadow shadow_map, vec4 frag_pos_light_space, 
     float currentDepth = projCoords.z;
 
     // calculate bias to remove shadow acne
-    float bias = max(0.005 * (1.0 - dot(normal, light_dir)), 0.001);
+    float bias = max(0.0005 * (1.0 - dot(normal, light_dir)), 0.001);
 
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadow_map, 0);
@@ -68,8 +60,9 @@ float shadow_calculation(sampler2DShadow shadow_map, vec4 frag_pos_light_space, 
 vec3 compute_lighting(vec3 base_color, vec3 vert, vec3 normal, vec4 vert_light[NR_DIR_LIGHTS]) {
     vec3 color = vec3(0.0, 0.0, 0.0);
     for(int i = 0; i < NR_DIR_LIGHTS; i++){
-        float shadow = dirLights[i].shadow_enabled ? shadow_calculation(shadow_maps[i], vert_light[i], dirLights[i].pos, normal) : 0.0;
+        float shadow = dirLights[i].shadow_enabled ? shadow_calculation(shadow_maps[i], vert_light[i], -dirLights[i].direction, normal) : 0.0;
         color += directionalLight(dirLights[i], base_color.rgb, vert, normal, shadow);
     }
+    color += ambient_strength * ambient_coeff * base_color;
     return color;
 }

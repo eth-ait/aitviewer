@@ -295,7 +295,7 @@ class MultiViewSystem(Node):
 
         self._gui_checkboxes(imgui)
 
-    def on_selection(self, node, tri_id):
+    def on_selection(self, node, instance_id, tri_id):
         # Find which camera is selected.
         for idx, c in enumerate(self.cameras):
             # A camera is selected if the selected node is one of its children.
@@ -303,7 +303,7 @@ class MultiViewSystem(Node):
                 self.selected_camera_index = idx
                 break
 
-    def render_outline(self, ctx, camera, prog):
+    def render_outline(self, *args, **kwargs):
         # Render outline of the currently selected camera.
         if self.selected_camera_index is not None:
-            self.cameras[self.selected_camera_index].render_outline(ctx, camera, prog)
+            self.cameras[self.selected_camera_index].render_outline(*args, **kwargs)

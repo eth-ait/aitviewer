@@ -1,7 +1,9 @@
-#version 400
+#version 430
 
 #define SMOOTH_SHADING 0
 #define TEXTURE 0
+#define FACE_COLOR 0
+#define INSTANCED 0
 
 #include directional_lights.glsl
 
@@ -32,27 +34,48 @@
 #if TEXTURE
         vec2 uv;
 #endif
+#if !FACE_COLOR
         vec4 color;
+#endif
         vec4 vert_light[NR_DIR_LIGHTS];
     } vs_out;
 
 
+#if INSTANCED
+    layout(std430, binding=1) buffer instance_data_buf
+    {
+        mat4 transforms[];
+    } instance_data;
+#endif
+
     void main() {
+
+#if INSTANCED
+        mat4 transform = model_matrix * instance_data.transforms[gl_InstanceID];
+#else
+        mat4 transform = model_matrix;
+#endif
+
 #if SMOOTH_SHADING
-        vs_out.norm = (model_matrix * vec4(in_normal, 0.0)).xyz;
+        vs_out.norm = (transform * vec4(in_normal, 0.0)).xyz;
 #endif
 
 #if TEXTURE
         vs_out.uv = in_uv;
 #endif
+#if !FACE_COLOR
         vs_out.color = in_color;
-
-        vec3 world_position = (model_matrix * vec4(in_position, 1.0)).xyz;
+#endif
+        vec3 world_position = (transform * vec4(in_position, 1.0)).xyz;
         vs_out.vert = world_position;
         gl_Position = view_projection_matrix * vec4(world_position, 1.0);
 
         for(int i = 0; i < NR_DIR_LIGHTS; i++) {
+#if INSTANCED
+            vs_out.vert_light[i] = dirLights[i].matrix * (instance_data.transforms[gl_InstanceID] * vec4(in_position, 1.0));
+#else
             vs_out.vert_light[i] = dirLights[i].matrix * vec4(in_position, 1.0);
+#endif
         }
     }
 
@@ -77,11 +100,20 @@
 #if TEXTURE
         vec2 uv;
 #endif
+#if !FACE_COLOR
         vec4 color;
+#endif
         vec4 vert_light[NR_DIR_LIGHTS];
     } gs_in[];
 
     out vec3 g_norm;
+
+#if FACE_COLOR
+layout(std430, binding=0) buffer face_data_buf
+{
+    vec4 colors[];
+} face_data;
+#endif
 
 #if TEXTURE
     out vec2 g_uv;
@@ -133,7 +165,11 @@
 #if TEXTURE
             g_uv = gs_in[i].uv;
 #endif
+#if !FACE_COLOR
             g_color = gs_in[i].color;
+#else
+            g_color = face_data.colors[gl_PrimitiveIDIn];
+#endif
 
             for(int j = 0; j < NR_DIR_LIGHTS; j++) {
                 g_vert_light[j] = gs_in[i].vert_light[j];
@@ -183,7 +219,7 @@
         if(use_uniform_color) {
             base_color = uniform_color;
         }
-        
+
 #if TEXTURE
         // Texture lookup.
         base_color.xyz = texture(diffuse_texture, g_uv).rgb;

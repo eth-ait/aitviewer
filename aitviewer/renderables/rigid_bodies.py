@@ -19,6 +19,7 @@ import numpy as np
 from aitviewer.scene.node import Node
 from aitviewer.renderables.spheres import Spheres
 from aitviewer.renderables.arrows import Arrows
+from aitviewer.utils.utils import compute_union_of_bounds, compute_union_of_current_bounds
 
 
 class RigidBodies(Node):
@@ -94,11 +95,11 @@ class RigidBodies(Node):
 
     @property
     def bounds(self):
-        return self.get_bounds(self.rb_pos)
+        return compute_union_of_bounds(self.coords)
 
     @property
     def current_bounds(self):
-        return self.get_bounds(self.current_rb_pos)
+        return compute_union_of_current_bounds(self.coords)
 
     def redraw(self, **kwargs):
         if kwargs.get('current_frame_only', False):
@@ -122,26 +123,10 @@ class RigidBodies(Node):
 
         super().redraw(**kwargs)
 
-    def get_index_from_node_and_triangle(self, node, tri_id):
-        idx = self.spheres.get_index_from_node_and_triangle(node, tri_id)
-        if idx is not None:
-            return idx
-
-        for a in self.coords:
-            idx = a.get_index_from_node_and_triangle(node, tri_id)
-            if idx is not None:
-                return idx
-
     def color_one(self, index, color):
-        col = np.full((1, self.spheres.n_vertices * self.spheres.n_spheres, 4), self.color)
-        col[:, self.spheres.n_vertices * index: self.spheres.n_vertices * (index + 1)] = np.array(color)
-        self.spheres.vertex_colors = col
+        self.spheres.color_one(index, color)
 
     def gui(self, imgui):
-        super(RigidBodies, self).gui(imgui)
-        # Scale controls
-        u, scale = imgui.drag_float('Sphere Radius##radius{}'.format(self.unique_name), self.spheres.radius,
+        _, self.spheres.radius = imgui.drag_float('Sphere Radius'.format(self.unique_name), self.spheres.radius,
                                     0.01, min_value=0.001, max_value=10.0, format='%.3f')
-        if u:
-            self.spheres.radius = scale
-            self.redraw()
+        super(RigidBodies, self).gui(imgui)

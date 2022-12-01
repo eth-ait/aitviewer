@@ -24,6 +24,7 @@ from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
 from aitviewer.renderables.lines import Lines
 from aitviewer.configuration import CONFIG as C
+from aitviewer.utils.utils import compute_union_of_bounds, compute_union_of_current_bounds
 
 
 class Scene(Node):
@@ -31,6 +32,7 @@ class Scene(Node):
 
     def __init__(self, **kwargs):
         """Create a scene with a name."""
+        kwargs["gui_material"] = False
         super(Scene, self).__init__(**kwargs)
 
         # References resources in the scene
@@ -48,11 +50,11 @@ class Scene(Node):
         # If you update the number of lights, make sure to change the respective `define` statement in
         # directional_lights.glsl as well!
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
-        self.lights.append(Light(name='Back Light',  position=(0.0, 10.0, 15.0),  color=(1.0, 1.0, 1.0, 1.0)))
-        self.lights.append(Light(name='Front Light', position=(0.0, 10.0, -15.0), color=(1.0, 1.0, 1.0, 1.0),
-                                 shadow_enabled=False))
-
+        self.lights.append(Light.facing_origin(light_color=(1.0, 1.0, 1.0), name='Back Light', position=(0.0, 10.0, -15.0), shadow_enabled=False))
+        self.lights.append(Light.facing_origin(light_color=(1.0, 1.0, 1.0), name='Front Light', position=(0.0, 10.0, 15.0)))
         self.add(*self.lights)
+
+        self.ambient_strength = 2.0
 
         # Scene items
         self.origin = CoordinateSystem(name="Origin", length=0.1, gui_affine=False, gui_material=False)
@@ -152,44 +154,51 @@ class Scene(Node):
 
     @property
     def bounds(self):
-        bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
-        for n in self.nodes:
-            child = n.bounds
-            bounds[:, 0] = np.minimum(bounds[:, 0], child[:, 0])
-            bounds[:, 1] = np.maximum(bounds[:, 1], child[:, 1])
-        return bounds
+        return compute_union_of_bounds([n for n in self.nodes if n not in self.lights])
 
     @property
     def current_bounds(self):
-        bounds = np.array([[np.inf, np.NINF], [np.inf, np.NINF], [np.inf, np.NINF]])
-        for n in self.nodes:
-            child = n.current_bounds
-            bounds[:, 0] = np.minimum(bounds[:, 0], child[:, 0])
-            bounds[:, 1] = np.maximum(bounds[:, 1], child[:, 1])
-        return bounds
+        return compute_union_of_current_bounds([n for n in self.nodes if n not in self.lights])
 
     def auto_set_floor(self):
         """Finds the minimum lower bound in the y coordinate from all the children bounds and uses that as the floor"""
         if self.floor is not None and len(self.nodes) > 0:
-            self.floor.position[1] = self.bounds[1, 0]
+            self.floor.position[1] = self.current_bounds[1, 0]
             self.floor.update_transform()
 
     def auto_set_camera_target(self):
         """Sets the camera target to the average of the center of all objects in the scene"""
         centers = []
         for n in self.nodes:
-            centers.append(n.center)
+            if n not in self.lights:
+                centers.append(n.current_center)
 
         if isinstance(self.camera, ViewerCamera) and len(centers) > 0:
             self.camera.target = np.array(centers).mean(0)
 
-    def set_lights(self, is_dark_mode=False):
-        if is_dark_mode:
+    @property
+    def light_mode(self):
+        return self._light_mode
+
+    @light_mode.setter
+    def light_mode(self, mode):
+        if mode == "default":
+            self._light_mode = mode
+            self.ambient_strength = 2.0
             for l in self.lights:
-                l.intensity_ambient = 0.2
+                l.strength = 1.0
+        elif mode == "dark":
+            self._light_mode = mode
+            self.ambient_strength = 0.4
+            for l in self.lights:
+                l.strength = 1.0
+        elif mode == "diffuse":
+            self._light_mode = mode
+            self.ambient_strength = 1.0
+            for l in self.lights:
+                l.strength = 2.0
         else:
-            for l in self.lights:
-                l.intensity_ambient = 1.0
+            raise ValueError(f"Invalid light mode: {mode}")
 
     def collect_nodes(self, req_enabled=True, obj_type=Node):
         nodes = []
@@ -222,11 +231,11 @@ class Scene(Node):
                 return n
         return None
 
-    def select(self, obj, selected_node=None, selected_tri_id=None):
+    def select(self, obj, selected_node=None, selected_instance=None, selected_tri_id=None):
         """Set 'obj' as the selected object"""
         self.selected_object = obj
         if isinstance(obj, Node):
-            self.selected_object.on_selection(selected_node, selected_tri_id)
+            self.selected_object.on_selection(selected_node, selected_instance, selected_tri_id)
         # Always keep the last selected object in the property panel
         if obj is not None:
             self.gui_selected_object = obj
@@ -294,6 +303,8 @@ class Scene(Node):
         uc, color = imgui.color_edit4("Background", *self.background_color, show_alpha=True)
         if uc:
             self.background_color = color
+
+        _, self.ambient_strength = imgui.drag_float('Ambient strength', self.ambient_strength, 0.01, min_value=0.0, max_value=10.0, format='%.2f')
 
     def gui_editor(self, imgui):
         """GUI to control scene settings."""
@@ -413,6 +424,6 @@ class Scene(Node):
                 n_frames = max(n_frames, n._enabled_frames.shape[0])
         return n_frames
 
-    def render_outline(self, ctx, camera, prog):
+    def render_outline(self, *args, **kwargs):
         # No outline when the scene node is selected
         return

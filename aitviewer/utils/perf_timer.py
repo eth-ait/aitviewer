@@ -84,7 +84,7 @@ class PerfTimer(BaseTimer):
         """Start the timer by recoding the current ``time.perf_counter()``
         preparing to report the number of seconds since this timestamp.
         """
-        if self._start_time is None:
+        if self._start_time is None or self._pause_time is None:
             self._start_time = time.perf_counter()
             self._last_frame = 0.0
         else:

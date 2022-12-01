@@ -1,3 +1,4 @@
+from aitviewer.utils.so3 import aa2rot_numpy
 from utils import reference, viewer, noreference, requires_smpl, RESOURCE_DIR
 
 from aitviewer.renderables.meshes import Meshes
@@ -62,6 +63,16 @@ def test_normals(viewer: Viewer):
 
     smpl_opaque.mesh_seq.norm_coloring = True
     viewer.scene.add(smpl_transparent, smpl_opaque)
+
+    viewer.scene.camera.position = np.array([0.0, 0.5, 3.5])
+
+
+@reference()
+def test_empty(viewer: Viewer):
+    viewer.scene.add(viewer.scene.floor)
+    viewer.scene.add(viewer.scene.origin)
+    viewer.scene.camera.position = np.array([0.2, 0.2, 0.2])
+    viewer.scene.camera.target = np.array([0.0, 0.0, 0.0])
 
 
 def add_cube(viewer: Viewer, pos):
@@ -140,3 +151,17 @@ def test_vertex_face_colors(viewer: Viewer):
     viewer.scene.floor.enabled = False
     viewer.shadows_enabled = False
     viewer.scene.add(per_vertex0, per_vertex1, per_vertex2, per_face0, per_face1, per_face2, uniform1, uniform2, uniform3)
+
+
+@reference()
+def test_instancing(viewer: Viewer):
+    cube = trimesh.load(os.path.join(RESOURCE_DIR, "cube.obj"), process=False)
+    p = np.linspace(np.array([-8, 0, 0]), np.array([8, 0, 0]), num=10)
+    r = aa2rot_numpy(np.linspace([0, 0, 0], np.array([0, 2 * np.pi, 0]), num=10))
+    s = np.linspace(0.4, 0.8, num=10)
+
+    viewer.scene.camera.position = (10, 5, 7)
+    viewer.scene.camera.target = (1.5, -1, -2)
+
+    cube_mesh = Meshes.instanced(cube.vertices, cube.faces, positions=p, rotations=r, scales=s, flat_shading=True)
+    viewer.scene.add(cube_mesh)

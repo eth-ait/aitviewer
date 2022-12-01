@@ -22,7 +22,7 @@ from PIL.Image import Image
 
 class HeadlessRenderer(Viewer):
     gl_version = (4, 0)
-    samples = 0  # Headless rendering does not like super sampling.
+    samples = 4
     window_type = 'headless'
 
     def __init__(self, **kwargs):
@@ -70,7 +70,9 @@ class HeadlessRenderer(Viewer):
         :param file_path: the path where the image is saved. The file is used by PIL to choose
         the file format, make sure that you use a format that supports 'F' mode PIL Images (e.g. tiff).
         """
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        dir = os.path.dirname(file_path)
+        if dir:
+            os.makedirs(dir, exist_ok=True)
         self.get_depth().save(file_path)
 
     def save_mask(self, file_path):
@@ -78,7 +80,9 @@ class HeadlessRenderer(Viewer):
         Render and save a color mask as a 'RGB' PIL image.
         :param file_path: the path where the image is saved.
         """
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        dir = os.path.dirname(file_path)
+        if dir:
+            os.makedirs(dir, exist_ok=True)
         self.get_mask().save(file_path)
 
     def _render_frame(self):

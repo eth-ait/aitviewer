@@ -35,12 +35,12 @@ from aitviewer.scene.node import Node
 from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
 from aitviewer.utils import PerfTimer, path
+from aitviewer.utils.imgui_integration import ImGuiRenderer
 from aitviewer.utils.utils import get_video_paths, video_to_gif
 from collections import namedtuple
 from moderngl_window import activate_context
 from moderngl_window import geometry
 from moderngl_window import get_local_window_cls
-from moderngl_window.integrations.imgui import ModernglWindowRenderer
 from moderngl_window.opengl.vao import VAO
 from omegaconf.dictconfig import DictConfig
 from pathlib import Path
@@ -49,12 +49,13 @@ from tqdm import tqdm
 from typing import Tuple, Union
 
 
-MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node tri_id vert_id point_world point_local bc_coords')
+MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node instance_id tri_id vert_id point_world point_local bc_coords')
 
 SHORTCUTS = {
     "SPACE": "Start/stop playing animation.",
     ".": "Go to next frame.",
     ",": "Go to previous frame.",
+    "G": "Open a window to change frame by typing the frame number.",
     "X": "Center view on the selected object.",
     "O": "Enable/disable orthographic camera.",
     "T": "Show the camera target in the scene.",
@@ -77,10 +78,10 @@ class Viewer(moderngl_window.WindowConfig):
     resource_dir = Path(__file__).parent / 'shaders'
     size_mult = 1.0
     samples = 4
-    gl_version = (4, 0)
+    gl_version = (4, 3)
     window_type = C.window_type
 
-    def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, **kwargs):
+    def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, samples: int=None, **kwargs):
         """
         Initializer.
         :param title: Window title
@@ -95,11 +96,22 @@ class Viewer(moderngl_window.WindowConfig):
         # Window Setup (Following `moderngl_window.run_window_config`).
         if self.window_type != 'headless':
             self.window_type = C.window_type
-        base_window_cls = get_local_window_cls(self.window_type)
 
-        # If no size is provided use the size from the configuration file
+        # HACK: We use our own version of the PyQt5 windows to override
+        # part of the initialization that crashes on Python >= 3.10.
+        if self.window_type == 'pyqt5':
+            from aitviewer.utils.pyqt5_window import PyQt5Window
+            base_window_cls = PyQt5Window
+        else:
+            base_window_cls = get_local_window_cls(self.window_type)
+
+        # If no size is provided use the size from the configuration file.
         if size is None:
             size = C.window_width, C.window_height
+
+        # Update nubmer of samples to use if specified as a parameter.
+        if samples is not None:
+            self.samples = samples
 
         # Calculate window size
         size = int(size[0] * self.size_mult), int(size[1] * self.size_mult)
@@ -126,23 +138,20 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Create GUI context
         self.imgui_ctx = imgui.create_context()
-        self.imgui = ModernglWindowRenderer(self.wnd)
+        self.imgui = ImGuiRenderer(self.wnd, self.window_type)
         self.imgui_user_interacting = False
 
         # Shaders for rendering the shadow map
         self.raw_depth_prog = self.load_program('shadow_mapping/raw_depth.glsl')
-        self.depth_only_prog = self.load_program('shadow_mapping/depth_only.glsl')
 
         # Shaders for mesh mouse intersection
-        self.frag_map_prog = self.load_program('fragment_picking/frag_map.glsl')
         self.frag_pick_prog = self.load_program('fragment_picking/frag_pick.glsl')
         self.frag_pick_prog['position_texture'].value = 0  # Read from texture channel 0
         self.frag_pick_prog['obj_info_texture'].value = 1  # Read from texture channel 0
-        self.picker_output = self.ctx.buffer(reserve=5*4)  # 3 floats, 2 ints
+        self.picker_output = self.ctx.buffer(reserve=6*4)  # 3 floats, 3 ints
         self.picker_vao = VAO(mode=moderngl.POINTS)
 
         # Shaders for drawing outlines
-        self.outline_prepare_prog = self.load_program('outline/outline_prepare.glsl')
         self.outline_draw_prog = self.load_program('outline/outline_draw.glsl')
         self.outline_quad = geometry.quad_2d(size=(2.0, 2.0), pos=(0.0, 0.0))
 
@@ -167,6 +176,7 @@ class Viewer(moderngl_window.WindowConfig):
             'inspect': self.gui_inspect,
             'shortcuts': self.gui_shortcuts,
             'exit': self.gui_exit,
+            'go_to_frame': self.gui_go_to_frame
         }
 
         # Debug
@@ -197,6 +207,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._lock_selection_key = self.wnd.keys.K
         self._mode_inspect_key = self.wnd.keys.I
         self._mode_view_key = self.wnd.keys.V
+        self._go_to_frame_key = self.wnd.keys.G
         self._shortcut_names = {self.wnd.keys.SPACE: "Space",
                                 self.wnd.keys.C: "C",
                                 self.wnd.keys.D: "D",
@@ -208,13 +219,20 @@ class Viewer(moderngl_window.WindowConfig):
                                 self.wnd.keys.S: "S",
                                 self.wnd.keys.T: "T",
                                 self.wnd.keys.X: "X",
+                                self.wnd.keys.G: "G",
                                 self.wnd.keys.Z: "Z"}
 
         # Disable exit on escape key
         self.window.exit_key = None
 
         # GUI
+        self._render_gui = True
         self._exit_popup_open = False
+        self._screenshot_popup_open = False
+        self._screenshot_popup_just_opened = False
+        self._screenshot_focus_count = 0
+        self._go_to_frame_popup_open = False
+        self._go_to_frame_string = ""
         self._show_shortcuts_window = False
 
     # noinspection PyAttributeOutsideInit
@@ -240,6 +258,13 @@ class Viewer(moderngl_window.WindowConfig):
         self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
         self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
 
+        # If in headlesss mode we create a framebuffer without multisampling that we can use
+        # to resolve the default framebuffer before reading.
+        if self.window_type == 'headless':
+            self.headless_fbo_color = self.ctx.texture(self.wnd.buffer_size, 4)
+            self.headless_fbo_depth = self.ctx.depth_texture(self.wnd.buffer_size)
+            self.headless_fbo = self.ctx.framebuffer(self.headless_fbo_color, self.headless_fbo_depth)
+
     # noinspection PyAttributeOutsideInit
     def reset(self):
         if self.scene is not None:
@@ -252,15 +277,14 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Settings
         self.run_animations = C.run_animations
-        self.dark_mode = C.dark_mode
         self.playback_fps = C.playback_fps
         self.shadows_enabled = C.shadows_enabled
         self.auto_set_floor = C.auto_set_floor
         self.auto_set_camera_target = C.auto_set_camera_target
         self.backface_culling = C.backface_culling
+        self.scene.light_mode = "dark" if C.dark_mode else "default"
         self.lock_selection = False
         self.show_camera_target = False
-        self.selected_mode = 'view'
         self.visualize = False
 
         self._pan_camera = False
@@ -268,6 +292,11 @@ class Viewer(moderngl_window.WindowConfig):
         self._using_temp_camera = False
         self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
+
+        # Outline colors
+        self.outline_color = (0.3, 0.7, 1.0, 1)
+        self.light_outline_color = (0.4, 0.4, 0.4, 1)
+        self.selected_outline_color = (1.0, 0.86, 0.35, 1.0)
 
         # Mouse mesh intersection in inspect mode.
         self.mmi = None
@@ -287,6 +316,13 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_fps = self.playback_fps
         self.export_scale_factor = 1.0
 
+        # Screenshot settings
+        self.screenshot_transparent = False
+        self.screenshot_name = None
+
+        # Set the mode once the viewer has been completely initialized
+        self.selected_mode = 'view'
+
     def _init_scene(self):
         self.scene.make_renderable(self.ctx)
         if self.auto_set_floor:
@@ -294,7 +330,6 @@ class Viewer(moderngl_window.WindowConfig):
             self.scene.backface_culling = self.backface_culling
         if self.auto_set_camera_target:
             self.scene.auto_set_camera_target()
-        self.scene.set_lights(self.dark_mode)
 
     def run(self, *args, log=True):
         """
@@ -324,7 +359,7 @@ class Viewer(moderngl_window.WindowConfig):
         if duration > 0 and log:
             print("Duration: {0:.2f}s @ {1:.2f} FPS".format(duration, self.window.frames / duration))
 
-    def render(self, time, frame_time, export=False):
+    def render(self, time, frame_time, export=False, transparent_background=False):
         """The main drawing function."""
         if self.run_animations:
             # Compute number of frames to advance by.
@@ -341,16 +376,28 @@ class Viewer(moderngl_window.WindowConfig):
         if not export:
             self.streamable_capture()
 
+        # Disable light renderables if exporting
+        if export:
+            for l in self.scene.lights:
+                l.arrow.enabled = False
+
         self.render_fragmap()
         self.render_shadowmap()
-        self.render_prepare()
+        self.render_prepare(transparent_background)
         self.render_scene()
-        self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], (0.3, 0.7, 1, 1))
+        self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], self.outline_color)
+
+        # Re-enable light renderables
+        if export:
+            for l in self.scene.lights:
+                l.arrow.enabled = True
 
         if not export:
+            self.render_outline([l for l in self.scene.lights if l.enabled], self.light_outline_color)
+
             # If the selected object is a Node render its outline.
             if isinstance(self.scene.selected_object, Node):
-                self.render_outline([self.scene.selected_object], (1.0, 0.86, 0.35, 1.0))
+                self.render_outline([self.scene.selected_object], self.selected_outline_color)
 
             # If visualize is True draw a texture with the object id to the screen for debugging.
             if self.visualize:
@@ -383,7 +430,7 @@ class Viewer(moderngl_window.WindowConfig):
                     light.use(self.ctx)
                     light_matrix = light.mvp()
                     for r in rs:
-                        r.render_shadowmap(light_matrix, self.depth_only_prog)
+                        r.render_shadowmap(light_matrix)
 
     def render_fragmap(self):
         """A pass to render the fragment picking map, i.e. render the scene with world coords as colors."""
@@ -392,7 +439,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.offscreen_p.use()
         rs = self.scene.collect_nodes()
         for r in rs:
-            r.render_fragmap(self.ctx, self.scene.camera, self.frag_map_prog)
+            r.render_fragmap(self.ctx, self.scene.camera)
 
     def render_outline(self, nodes, color):
         # Prepare the outline buffer, all objects rendered to this buffer will be outlined.
@@ -400,7 +447,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.outline_framebuffer.use()
         # Render outline of the nodes with outlining enabled, this potentially also renders their children.
         for n in nodes:
-            n.render_outline(self.ctx, self.scene.camera, self.outline_prepare_prog)
+            n.render_outline(self.ctx, self.scene.camera)
 
         # Render the outline effect to the window.
         self.wnd.use()
@@ -418,20 +465,26 @@ class Viewer(moderngl_window.WindowConfig):
                           lights=self.scene.lights,
                           shadows_enabled=self.shadows_enabled,
                           show_camera_target=self.show_camera_target and not self._using_temp_camera,
-                          depth_prepass_prog=self.depth_only_prog)
+                          ambient_strength = self.scene.ambient_strength)
 
-    def render_prepare(self):
+    def render_prepare(self, transparent_background=True):
         """Prepare the framebuffer."""
         self.wnd.use()
         # Clear background and make sure only the flags we want are enabled.
-        if self.dark_mode:
-            self.ctx.clear(0.1, 0.1, 0.1, 1.0)
+        if transparent_background:
+            self.ctx.clear(0, 0, 0, 0)
         else:
-            self.ctx.clear(*self.scene.background_color)
+            if self.scene.light_mode == 'dark':
+                self.ctx.clear(0.1, 0.1, 0.1, 1.0)
+            else:
+                self.ctx.clear(*self.scene.background_color)
 
         self.ctx.enable_only(moderngl.DEPTH_TEST | moderngl.BLEND | moderngl.CULL_FACE)
         self.ctx.cull_face = 'back'
-        self.ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
+        self.ctx.blend_func = (
+            moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA,
+            moderngl.ONE, moderngl.ONE
+        )
 
     def prevent_background_interactions(self):
         """Prevent background interactions when hovering over any imgui window."""
@@ -479,12 +532,12 @@ class Viewer(moderngl_window.WindowConfig):
             and imgui.is_mouse_released(button=1)
             and not self._mouse_moved):
             # Select the object under the cursor
-            if self.select_object(*imgui.get_io().mouse_pos) and hasattr(self.scene.selected_object, 'gui_context_menu'):
+            if self.select_object(*imgui.get_io().mouse_pos) or not isinstance(self.scene.selected_object, Node):
                 imgui.open_popup("Context Menu")
 
         # Draw the context menu for the selected object
         if imgui.begin_popup("Context Menu"):
-            if self.scene.selected_object is None or not hasattr(self.scene.selected_object, 'gui_context_menu'):
+            if self.scene.selected_object is None or not isinstance(self.scene.selected_object, Node):
                 imgui.close_current_popup()
             else:
                 self.scene.selected_object.gui_context_menu(imgui)
@@ -493,8 +546,12 @@ class Viewer(moderngl_window.WindowConfig):
         # Reset user interacting state
         self.imgui_user_interacting = False
 
-        # Render user controls
-        for gc in self.gui_controls.values(): gc()
+        if self._render_gui:
+            # Render user controls.
+            for gc in self.gui_controls.values(): gc()
+        else:
+            # If gui is disabled only render the go to frame window.
+            self.gui_go_to_frame()
 
         # Contains live examples of all possible displays/controls - useful for browsing for new components
         # imgui.show_test_window()
@@ -515,6 +572,7 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_menu(self):
         clicked_export = False
+        clicked_screenshot = False
 
         if imgui.begin_main_menu_bar():
             if imgui.begin_menu("File", True):
@@ -529,20 +587,31 @@ class Viewer(moderngl_window.WindowConfig):
 
                 clicked_screenshot, selected_screenshot = imgui.menu_item(
                     "Screenshot", self._shortcut_names[self._screenshot_key], False, True)
-                if clicked_screenshot:
-                    self.take_screenshot()
 
                 imgui.end_menu()
 
             if imgui.begin_menu("View", True):
+                if imgui.begin_menu("Light modes"):
+                    _, default = imgui.menu_item("Default", None, self.scene.light_mode == "default")
+                    if default:
+                        self.scene.light_mode = "default"
+
+                    _, dark = imgui.menu_item("Dark", self._shortcut_names[self._dark_mode_key],
+                                              self.scene.light_mode == "dark")
+                    if dark:
+                        self.scene.light_mode = "dark"
+
+                    _, diffuse = imgui.menu_item("Diffuse", None, self.scene.light_mode == "diffuse")
+                    if diffuse:
+                        self.scene.light_mode = "diffuse"
+                    imgui.end_menu()
+
                 _, self.shadows_enabled = imgui.menu_item("Render Shadows", self._shortcut_names[self._shadow_key],
                                                           self.shadows_enabled, True)
-                _, self.dark_mode = imgui.menu_item("Dark Mode", self._shortcut_names[self._dark_mode_key],
-                                                    self.dark_mode, True)
 
                 _, self.lock_selection = imgui.menu_item("Lock selection", self._shortcut_names[self._lock_selection_key],
                                                          self.lock_selection, True)
-
+                _, self._render_gui = imgui.menu_item("Render GUI", None, self._render_gui, True)
                 imgui.end_menu()
 
             if imgui.begin_menu("Camera", True):
@@ -603,6 +672,13 @@ class Viewer(moderngl_window.WindowConfig):
             self.export_fps = self.playback_fps
             self.toggle_animation(False)
 
+        if clicked_screenshot:
+            self._screenshot_popup_just_opened = True
+
+        self.gui_export()
+        self.gui_screenshot()
+
+    def gui_export(self):
         imgui.set_next_window_size(570,0)
         if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
             if self.scene.n_frames == 1:
@@ -813,6 +889,79 @@ class Viewer(moderngl_window.WindowConfig):
                 self.prevent_background_interactions()
             imgui.end()
 
+    def gui_go_to_frame(self):
+        if self._go_to_frame_popup_open:
+            imgui.open_popup("Go to frame##go-to-frame-popup")
+            self._go_to_frame_string = str(self.scene.current_frame_id)
+
+        imgui.set_next_window_size(300,0)
+        if imgui.begin_popup_modal("Go to frame##go-to-frame-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_TITLE_BAR)[0]:
+            if self._go_to_frame_popup_open:
+                imgui.set_keyboard_focus_here()
+                u, self._go_to_frame_string = imgui.input_text("Go to frame", self._go_to_frame_string, 64, imgui.INPUT_TEXT_CHARS_DECIMAL | imgui.INPUT_TEXT_ENTER_RETURNS_TRUE | imgui.INPUT_TEXT_AUTO_SELECT_ALL)
+                if u:
+                    try:
+                        frame_id =  int(self._go_to_frame_string)
+                    except:
+                        frame_id = -1
+                        pass
+                    if frame_id >= 0:
+                        self.scene.current_frame_id = frame_id
+                    self._go_to_frame_popup_open = False
+                    imgui.close_current_popup()
+            else:
+                imgui.close_current_popup()
+            imgui.end_popup()
+
+    def gui_screenshot(self):
+        if self._screenshot_popup_just_opened:
+            self._screenshot_popup_just_opened = False
+            self._screenshot_popup_open = True
+            self.screenshot_name = None
+            self._screenshot_focus_count = 2
+            self.toggle_animation(False)
+            imgui.open_popup("Screenshot##screenshot-popup")
+
+        imgui.set_next_window_size(250,0)
+        if imgui.begin_popup_modal("Screenshot##screenshot-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
+            if self._screenshot_popup_open:
+                _, self.screenshot_transparent = imgui.checkbox("Transparent background", self.screenshot_transparent)
+                if self.screenshot_name is None:
+                    self.screenshot_name = 'frame_{:0>6}.png'.format(self.scene.current_frame_id)
+
+                # HACK: we need to set the focus twice when the modal is first opened for it to take effect
+                if self._screenshot_focus_count > 0:
+                    self._screenshot_focus_count -= 1
+                    imgui.set_keyboard_focus_here()
+                _, self.screenshot_name = imgui.input_text("File name", self.screenshot_name, 64, imgui.INPUT_TEXT_AUTO_SELECT_ALL)
+                imgui.spacing()
+
+                button_width = (imgui.get_content_region_available()[0] - imgui.get_style().item_spacing[0]) * 0.5
+
+                # Style the cancel with a grey color
+                imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
+
+                if imgui.button("cancel", width=button_width):
+                    imgui.close_current_popup()
+                    self._screenshot_popup_open = False
+
+                imgui.pop_style_color()
+                imgui.pop_style_color()
+                imgui.pop_style_color()
+
+                imgui.same_line()
+                if imgui.button("save", button_width):
+                    if self.screenshot_name:
+                        self.take_screenshot(self.screenshot_name, self.screenshot_transparent)
+                    imgui.close_current_popup()
+                    self._screenshot_popup_open = False
+
+            else:
+                imgui.close_current_popup()
+            imgui.end_popup()
+
     def gui_exit(self):
         if self._exit_popup_open:
             imgui.open_popup("Exit##exit-popup")
@@ -856,7 +1005,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.offscreen_p_viewpos.use(location=0)
         self.offscreen_p_tri_id.use(location=1)
         self.picker_vao.transform(self.frag_pick_prog, self.picker_output, vertices=1)
-        x, y, z, obj_id, tri_id = struct.unpack('3f2i', self.picker_output.read())
+        x, y, z, obj_id, tri_id, instance_id = struct.unpack('3f3i', self.picker_output.read())
 
         if obj_id >= 0 and tri_id >= 0:
             node = self.scene.get_node_by_uid(obj_id)
@@ -871,9 +1020,9 @@ class Viewer(moderngl_window.WindowConfig):
                 bc_coords = np.array([1, 0, 0])
             else:
                 vert_id = 0
-                bc_coords = np.array(0, 0, 0)
+                bc_coords = np.array([0, 0, 0])
 
-            return MeshMouseIntersection(node, tri_id, vert_id, point_world, point_local, bc_coords)
+            return MeshMouseIntersection(node, instance_id, tri_id, vert_id, point_world, point_local, bc_coords)
 
         return None
 
@@ -888,7 +1037,7 @@ class Viewer(moderngl_window.WindowConfig):
                 if node.is_selectable:
                     # If the selection is locked only allow selecting the locked object
                     if not self.lock_selection or node == self.scene.selected_object:
-                        self.scene.select(node, mmi.node, mmi.tri_id)
+                        self.scene.select(node, mmi.node, mmi.instance_id, mmi.tri_id)
                         return True
                     else:
                         return False
@@ -932,10 +1081,32 @@ class Viewer(moderngl_window.WindowConfig):
                 self._exit_popup_open = False
             return
 
+        if action == self.wnd.keys.ACTION_PRESS and self._screenshot_popup_open:
+            if key == self.wnd.keys.ENTER:
+                if self.screenshot_name:
+                    self.take_screenshot(self.screenshot_name, self.screenshot_transparent)
+                    self._screenshot_popup_open = False
+            elif key == self._exit_key:
+                self._screenshot_popup_open = False
+            return
+
+        if action == self.wnd.keys.ACTION_PRESS and self._go_to_frame_popup_open:
+            if key == self._exit_key:
+                self._go_to_frame_popup_open = False
+            return
+
+        if action == self.wnd.keys.ACTION_PRESS and not self._render_gui:
+            if key == self._exit_key:
+                self._render_gui = True
+                return
+
         if self.imgui.io.want_capture_keyboard:
             return
 
         if action == self.wnd.keys.ACTION_PRESS:
+            if key == self._go_to_frame_key:
+                self._go_to_frame_popup_open = True
+
             if key == self._exit_key:
                 self._exit_popup_open = True
 
@@ -971,11 +1142,11 @@ class Viewer(moderngl_window.WindowConfig):
                 self.selected_mode = 'inspect'
 
             elif key == self._dark_mode_key:
-                self.dark_mode = not self.dark_mode
-                self.scene.set_lights(self.dark_mode)
+                self.scene.light_mode = "dark" if self.scene.light_mode != "dark" else "default"
 
             elif key == self._screenshot_key:
-                self.take_screenshot()
+                self._screenshot_popup_just_opened = True
+
             elif key == self._save_cam_key:
                 if self._using_temp_camera:
                     self.reset_camera()
@@ -1067,21 +1238,36 @@ class Viewer(moderngl_window.WindowConfig):
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
 
-    def save_current_frame_as_image(self, path, scale_factor=None):
+    def save_current_frame_as_image(self, path, scale_factor=None, alpha=False):
         """Saves the current frame as an image to disk."""
-        image = self.get_current_frame_as_image()
+        image = self.get_current_frame_as_image(alpha)
         if scale_factor is not None and scale_factor != 1.0:
             w = int(image.width * scale_factor)
             h = int(image.height * scale_factor)
             image = image.resize((w, h), Image.LANCZOS)
         image.save(path)
 
-    def get_current_frame_as_image(self):
+    def get_current_frame_as_image(self, alpha=False):
         """Return the FBO content as a PIL image."""
-        image = Image.frombytes('RGB',
+        if alpha:
+            fmt = 'RGBA'
+            components = 4
+        else:
+            fmt = 'RGB'
+            components = 3
+
+        # If in headless mode we first resolve the multisampled framebuffer into
+        # a non multisampled one and read from that instead.
+        if self.window_type == 'headless':
+            self.ctx.copy_framebuffer(self.headless_fbo, self.wnd.fbo)
+            fbo = self.headless_fbo
+        else:
+            fbo = self.wnd.fbo
+
+        image = Image.frombytes(fmt,
                                 (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
                                  self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
-                                self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1))
+                                fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components))
         return image.transpose(Image.FLIP_TOP_BOTTOM)
 
     def get_current_depth_image(self):
@@ -1093,11 +1279,20 @@ class Viewer(moderngl_window.WindowConfig):
         Values are between the near and far plane distances of the camera used for rendering,
         everything outside this range is clipped by OpenGL.
         """
+
+        # If in headless mode we first resolve the multisampled framebuffer into
+        # a non multisampled one and read from that instead.
+        if self.window_type == 'headless':
+            self.ctx.copy_framebuffer(self.headless_fbo, self.wnd.fbo)
+            fbo = self.headless_fbo
+        else:
+            fbo = self.wnd.fbo
+
         # Get depth image from depth buffer.
         depth = Image.frombytes('F',
                                 (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
                                  self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
-                                self.wnd.fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype='f4'))
+                                fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype='f4'))
 
         # Convert from [0, 1] range to [-1, 1] range.
         # This is necessary because our projection matrix computes NDC
@@ -1155,27 +1350,33 @@ class Viewer(moderngl_window.WindowConfig):
         # See issue #12 https://github.com/eth-ait/aitviewer/issues/12
         clear_shader_cache()
 
-    def take_screenshot(self):
+    def take_screenshot(self, file_name=None, transparent_background=False):
         """Save the current frame to an image in the screenshots directory inside the export directory"""
-        file_path = os.path.join(C.export_dir, 'screenshots', 'frame_{:0>6}.png'.format(self.scene.current_frame_id))
-        self.export_frame(file_path)
+        if file_name is None:
+            file_name = 'frame_{:0>6}.png'.format(self.scene.current_frame_id)
+        if not file_name.endswith(".png"):
+            file_name += ".png"
+        file_path = os.path.join(C.export_dir, 'screenshots', file_name)
+        self.export_frame(file_path, transparent_background=transparent_background)
         print(f"Screenshot saved to {file_path}")
 
-    def export_frame(self, file_path, scale_factor:float=None):
+    def export_frame(self, file_path, scale_factor:float=None, transparent_background=False):
         """Save the current frame to an image.
         :param file_path: the path where the image is saved.
         :param scale_factor: a scale factor used to scale the image. If None no scale factor is used and
           the image will have the same size as the viewer.
         """
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        dir = os.path.dirname(file_path)
+        if dir:
+            os.makedirs(dir, exist_ok=True)
 
         # Store run_animation old value and set it to false.
         run_animations = self.run_animations
         self.run_animations = False
 
         # Render and save frame.
-        self.render(0, 0, export=True)
-        self.save_current_frame_as_image(file_path, scale_factor)
+        self.render(0, 0, export=True, transparent_background=transparent_background)
+        self.save_current_frame_as_image(file_path, scale_factor, transparent_background)
 
         # Restore run animation and update last frame rendered time.
         self.run_animations = run_animations

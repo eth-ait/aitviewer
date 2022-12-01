@@ -23,6 +23,8 @@ import re
 import pickle
 
 from aitviewer.scene.node import Node
+from aitviewer.shaders import get_depth_only_program, get_flat_lit_with_edges_face_color_program, get_fragmap_program, get_outline_program
+from aitviewer.shaders import get_smooth_lit_with_edges_face_color_program
 from aitviewer.shaders import get_smooth_lit_with_edges_program
 from aitviewer.shaders import get_flat_lit_with_edges_program
 from aitviewer.shaders import get_smooth_lit_texturized_program
@@ -30,11 +32,12 @@ from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
 from aitviewer.utils.decorators import hooked
 from aitviewer.utils.so3 import euler2rot_numpy, rot2euler_numpy
-from aitviewer.utils.utils import compute_vertex_and_face_normals
+from aitviewer.utils.utils import compute_vertex_and_face_normals_sparse
 from functools import lru_cache
 from moderngl_window.opengl.vao import VAO
 from PIL import Image
 from trimesh.triangles import points_to_barycentric
+import trimesh.geometry
 
 
 class Meshes(Node):
@@ -54,6 +57,7 @@ class Meshes(Node):
                  flat_shading=False,
                  draw_edges=False,
                  draw_outline=False,
+                 instance_transforms=None,
                  icon="\u008d",
                  **kwargs):
         """
@@ -68,15 +72,39 @@ class Meshes(Node):
         :param face_colors: A np array of shape (N, F, 4) overriding the uniform or vertex colors.
         :param uv_coords: A np array of shape (V, 2) if the mesh is to be textured.
         :param path_to_texture: Path to an image file that serves as the texture.
+        :param cast_shadow: If True the mesh casts a shadow on other objects.
+        :param pickable: If True the mesh can be selected with a mouse click.
+        :param flat_shading: If True the each face of the mesh is shaded with a constant normal.
+        :param draw_edges: If True the normals the edges of the mesh is drawn on top of the mesh.
+        :param draw_outline: If true an outline is drawn around the mesh.
+        :instance_transforms: np array of size (N, I, 4, 4) or (I, 4, 4) or None. If not None, 'I' instances of
+            the same mesh will be rendered, each with its own transformation matrix.
         """
         if len(vertices.shape) == 2 and vertices.shape[-1] == 3:
             vertices = vertices[np.newaxis]
         assert len(vertices.shape) == 3
         assert len(faces.shape) == 2
-        super(Meshes, self).__init__(n_frames=vertices.shape[0], icon=icon, **kwargs)
+        n_frames = vertices.shape[0]
+
+        # Instancing.
+        if instance_transforms is not None:
+            # Check shape of transforms.
+            if len(instance_transforms.shape) == 3:
+                instance_transforms = instance_transforms[np.newaxis]
+            assert len(instance_transforms.shape) == 4
+
+            # Number of instance frames must match number of frames or be 1.
+            assert n_frames == 1 or instance_transforms.shape[0] == 1 or n_frames == instance_transforms.shape[0]
+            n_frames = max(n_frames, instance_transforms.shape[0])
+
+            self._instance_transforms = instance_transforms
+        else:
+            self._instance_transforms = None
+
+        super(Meshes, self).__init__(n_frames=n_frames, icon=icon, **kwargs)
 
         self._vertices = vertices
-        self.faces = faces.astype(np.int32)
+        self._faces = faces.astype(np.int32)
 
         def _maybe_unsqueeze(x):
             return x[np.newaxis] if x is not None and x.ndim == 2 else x
@@ -113,7 +141,50 @@ class Meshes(Node):
         self.norm_coloring = False
         self.normals_r = None
         self.need_upload = True
-        self._use_uniform_color = self._vertex_colors is None
+        self._use_uniform_color = self._vertex_colors is None and self._face_colors is None
+        self._vertex_faces_sparse = trimesh.geometry.index_sparse(self._vertices.shape[1], self._faces)
+
+    @classmethod
+    def instanced(cls, *args, positions=None, rotations=None, scales=None, **kwargs):
+        """
+        Creates and returns an instanced sequence of N frames and I instances.
+        Each instance will have its own position, rotation and scale.
+        :param positions: np array of size (N, I, 3) or (I, 3) or None.
+        :param rotations: np array of size (N, I, 3, 3) or (I, 3, 3) or None.
+        :param scales: np array of size (N, I) or (I) or None.
+
+        *args, and **kwargs are forwarded to the Meshes constructor.
+        """
+        assert positions is not None or rotations is not None or scales is not None
+
+        n_instances = 0
+        n_frames = 0
+        def check_array(a, dim):
+            nonlocal n_instances, n_frames
+            if a is not None:
+                if len(a.shape) == dim + 1:
+                    a = a[np.newaxis]
+                n_frames = max(n_frames, a.shape[0])
+                n_instances = max(n_instances, a.shape[1])
+            return a
+
+        positions = check_array(positions, 1)
+        rotations = check_array(rotations, 2)
+        scales = check_array(scales, 0)
+
+        if positions is None:
+            positions = np.zeros((n_frames, n_instances, 3))
+        if rotations is None:
+            rotations = np.zeros((n_frames, n_instances, 3, 3))
+            rotations[:, :] = np.eye(3)
+        if scales is None:
+            scales = np.ones((n_frames, n_instances))
+
+        transforms = np.zeros((n_frames, n_instances, 4, 4))
+        transforms[:, :, :3, :3] = (rotations.reshape((-1, 9)) * scales.reshape((-1, 1))).reshape((n_frames, n_instances, 3, 3))
+        transforms[:, :, :3, 3] = positions
+        transforms[:, :, 3, 3] = 1.0
+        return cls(*args, **kwargs, instance_transforms=transforms)
 
     @property
     def vertices(self):
@@ -121,17 +192,30 @@ class Meshes(Node):
 
     @vertices.setter
     def vertices(self, vertices):
+        if len(vertices.shape) == 2:
+            vertices = vertices[np.newaxis]
+
         # Update vertices and redraw
         self._vertices = vertices
         self.n_frames = len(vertices)
 
-        # If vertex normals were supplied, they are no longer valid.
+        # If vertex or face normals were supplied, they are no longer valid.
         self._vertex_normals = None
+        self._face_normals = None
 
         # Must clear all LRU caches where the vertices are used.
         self.compute_vertex_and_face_normals.cache_clear()
 
         self.redraw()
+
+    @property
+    def faces(self):
+        return self._faces
+
+    @faces.setter
+    def faces(self, f):
+        self._faces = f.astype(np.int32)
+        self._vertex_faces_sparse = trimesh.geometry.index_sparse(self.vertices.shape[1], self._faces)
 
     @property
     def current_vertices(self):
@@ -164,10 +248,8 @@ class Meshes(Node):
     def vertex_normals(self):
         """Get or compute all vertex normals (this might take a while for long sequences)."""
         if self._vertex_normals is None:
-            vertex_normals, _ = compute_vertex_and_face_normals(self.vertices, self.faces, self.vertex_faces,
+            vertex_normals, _ = compute_vertex_and_face_normals_sparse(self.vertices, self.faces, self._vertex_faces_sparse,
                                                                 normalize=True)
-            if vertex_normals.ndim < 3:
-                vertex_normals = vertex_normals.unsqueeze(0)
             self._vertex_normals = vertex_normals
         return self._vertex_normals
 
@@ -175,10 +257,8 @@ class Meshes(Node):
     def face_normals(self):
         """Get or compute all face normals (this might take a while for long sequences)."""
         if self._face_normals is None:
-            _, face_normals = compute_vertex_and_face_normals(self.vertices, self.faces, self.vertex_faces,
+            _, face_normals = compute_vertex_and_face_normals_sparse(self.vertices, self.faces, self._vertex_faces_sparse,
                                                               normalize=True)
-            if face_normals.ndim < 3:
-                face_normals = face_normals.unsqueeze(0)
             self._face_normals = face_normals
         return self._face_normals
 
@@ -239,11 +319,22 @@ class Meshes(Node):
 
     @face_colors.setter
     def face_colors(self, face_colors):
-        self._face_colors = face_colors
         if face_colors is not None:
-            self._vertex_colors = np.tile(self.face_colors[:, :, np.newaxis], [1, 1, 3, 1])
+            if len(face_colors.shape) == 2:
+                face_colors = face_colors[np.newaxis]
+            self._face_colors = face_colors
             self._use_uniform_color = False
+        else:
+            self._face_colors = None
         self.redraw()
+
+    @property
+    def current_face_colors(self):
+        if self._use_uniform_color:
+            return np.full((self.n_faces, 4), self.material.color)
+        else:
+            idx = self.current_frame_id if self.face_colors.shape[0] > 1 else 0
+            return self.face_colors[idx]
 
     @Node.color.setter
     def color(self, color):
@@ -282,16 +373,44 @@ class Meshes(Node):
         :return: The vertex and face normals as a np arrays of shape (V, 3) and (F, 3) respectively.
         """
         vs = self.vertices[frame_id:frame_id + 1] if self.vertices.shape[0] > 1 else self.vertices
-        vn, fn = compute_vertex_and_face_normals(vs, self.faces, self.vertex_faces, normalize)
+        vn, fn = compute_vertex_and_face_normals_sparse(vs, self.faces, self._vertex_faces_sparse, normalize)
         return vn.squeeze(0), fn.squeeze(0)
 
     @property
     def bounds(self):
-        return self.get_bounds(self.vertices)
+        if self.instance_transforms is None:
+            return self.get_bounds(self.vertices)
+        else:
+            # Get bounds in local coordinates
+            bounds = self.get_local_bounds(self.vertices)
+
+            # Transform bounds with instance transforms
+            min = np.append(bounds[:, 0], 1.0)
+            max = np.append(bounds[:, 1], 1.0)
+            transforms = self.instance_transforms.reshape((-1, 4, 4))
+            mins = transforms @ min
+            maxs = transforms @ max
+
+            # Return bounds in world coordinates
+            return self.get_bounds(np.vstack((mins, maxs)))
 
     @property
     def current_bounds(self):
-        return self.get_bounds(self.current_vertices)
+        if self.instance_transforms is None:
+            return self.get_bounds(self.current_vertices)
+        else:
+            # Get bounds in local coordinates
+            bounds = self.get_local_bounds(self.current_vertices)
+
+            # Transform bounds with instance transforms
+            min = np.append(bounds[:, 0], 1.0)
+            max = np.append(bounds[:, 1], 1.0)
+            transforms = self.current_instance_transforms.reshape((-1, 4, 4))
+            mins = transforms @ min
+            maxs = transforms @ max
+
+            # Return bounds in world coordinates
+            return self.get_bounds(np.vstack((mins[:, :3], maxs[:, :3])))
 
     def is_transparent(self):
         return self.color[3] < 1.0
@@ -301,6 +420,29 @@ class Meshes(Node):
         super().on_frame_update()
         self.redraw()
 
+    @property
+    def current_instance_transforms(self):
+        if self._instance_transforms is None:
+            return None
+        idx = self.current_frame_id if self._instance_transforms.shape[0] > 1 else 0
+        return self._instance_transforms[idx]
+
+    @property
+    def instance_transforms(self):
+        return self._instance_transforms
+
+    @instance_transforms.setter
+    def instance_transforms(self, instance_transforms):
+        assert self._instance_transforms.shape == instance_transforms
+        self._instance_transforms = instance_transforms
+
+    @property
+    def n_instances(self):
+        if self._instance_transforms is None:
+            return 1
+        else:
+            return self._instance_transforms.shape[1]
+
     def _upload_buffers(self):
         """Upload the current frame data to the GPU for rendering."""
         if not self.is_renderable or not self._need_upload:
@@ -308,69 +450,70 @@ class Meshes(Node):
 
         self._need_upload = False
 
-        # Each write call takes about 1-2 ms
-        vertices = self.current_vertices
-        vertex_colors = self.current_vertex_colors
+        # Write positions.
+        self.vbo_vertices.write(self.current_vertices.astype('f4').tobytes())
 
+        # Write normals.
         if not self.flat_shading:
             vertex_normals = self.vertex_normals_at(self.current_frame_id)
-            if self.face_colors is not None:
-                vn_for_drawing = vertex_normals[self.faces]
-            else:
-                vn_for_drawing = vertex_normals
-            self.vbo_normals.write(vn_for_drawing.astype('f4').tobytes())
+            self.vbo_normals.write(vertex_normals.astype('f4').tobytes())
 
-        if self.face_colors is not None:
-            vertices = vertices[self.faces]
+        if self.face_colors is None:
+            # Write vertex colors.
+            self.vbo_colors.write(self.current_vertex_colors.astype('f4').tobytes())
+        else:
+            # Write face colors.
+            self.ssbo_face_colors.write(self.current_face_colors.astype('f4').tobytes())
 
-        self.vbo_vertices.write(vertices.astype('f4').tobytes())
-        self.vbo_colors.write(vertex_colors.astype('f4').tobytes())
-
+        # Write uvs.
         if self.has_texture:
             self.vbo_uvs.write(self.uv_coords.astype('f4').tobytes())
+
+        # Write instance transforms.
+        if self.instance_transforms is not None:
+            self.ssbo_instance_transforms.write(np.transpose(self.current_instance_transforms.astype('f4'), (0, 2, 1)).tobytes())
 
     def redraw(self, **kwargs):
         self._need_upload = True
 
     # noinspection PyAttributeOutsideInit
     @Node.once
-    def make_renderable(self, ctx):
+    def make_renderable(self, ctx: moderngl.Context):
         """Prepares this object for rendering. This function must be called before `render` is used."""
-        self.smooth_prog = get_smooth_lit_with_edges_program()
-        self.flat_prog = get_flat_lit_with_edges_program()
+
+        vs = "lit_with_edges.glsl"
+        positions_vs = "mesh_positions.vs.glsl"
+        instanced = 1 if self.instance_transforms is not None else 0
+        self.smooth_prog = get_smooth_lit_with_edges_program(vs, instanced)
+        self.flat_prog = get_flat_lit_with_edges_program(vs, instanced)
+        self.smooth_face_prog = get_smooth_lit_with_edges_face_color_program(vs, instanced)
+        self.flat_face_prog = get_flat_lit_with_edges_face_color_program(vs, instanced)
+
+        self.depth_only_program = get_depth_only_program(positions_vs, instanced)
+        self.outline_program = get_outline_program(positions_vs, instanced)
+        self.fragmap_program = get_fragmap_program(positions_vs, instanced)
 
         vertices = self.current_vertices
         vertex_normals = self.vertex_normals_at(self.current_frame_id)
         vertex_colors = self.current_vertex_colors
 
-        # Face colors draw 3 distinct vertices per face.
-        if self.face_colors is not None:
-            vertices = vertices[self.faces]
-            vn_for_drawing = vertex_normals[self.faces]
-        else:
-            vn_for_drawing = vertex_normals
-
         self.vbo_vertices = ctx.buffer(vertices.astype('f4').tobytes())
-        self.vbo_normals = ctx.buffer(vn_for_drawing.astype('f4').tobytes())
-        self.vbo_indices = ctx.buffer(self.faces.tobytes()) if self.face_colors is None else None
+        self.vbo_normals = ctx.buffer(vertex_normals.astype('f4').tobytes())
         self.vbo_colors = ctx.buffer(vertex_colors.astype('f4').tobytes())
+        self.vbo_indices = ctx.buffer(self.faces.tobytes())
 
-        self.smooth_vao = ctx.vertex_array(self.smooth_prog,
-                                           [(self.vbo_vertices, '3f4 /v', 'in_position'),
-                                            (self.vbo_normals, '3f4 /v', 'in_normal'),
-                                            (self.vbo_colors, '4f4 /v', 'in_color')],
-                                           self.vbo_indices)
+        self.vao = VAO()
+        self.vao.buffer(self.vbo_vertices, '3f4', 'in_position')
+        self.vao.buffer(self.vbo_normals, '3f4', 'in_normal')
+        self.vao.buffer(self.vbo_colors, '4f4', 'in_color')
+        self.vao.index_buffer(self.vbo_indices)
 
-        self.flat_vao = ctx.vertex_array(self.flat_prog,
-                                         [(self.vbo_vertices, '3f4 /v', 'in_position'),
-                                          (self.vbo_colors, '4f4 /v', 'in_color')],
-                                         self.vbo_indices)
+        if self.instance_transforms is not None:
+            self.ssbo_instance_transforms = ctx.buffer(np.transpose(self.current_instance_transforms.astype('f4'), (0, 2, 1)).tobytes())
 
-        self.positions_vao = VAO('{}:positions'.format(self.unique_name))
-        self.positions_vao.buffer(self.vbo_vertices, '3f', ['in_position'])
-
-        if self.face_colors is None:
-            self.positions_vao.index_buffer(self.vbo_indices)
+        self.ssbo_face_colors = ctx.buffer(reserve=self.faces.shape[0] * 16)
+        if self.face_colors is not None:
+            self.ssbo_face_colors.write(self.current_face_colors.astype('f4').tobytes())
 
         if self.has_texture:
             img = self.texture_image
@@ -378,54 +521,40 @@ class Meshes(Node):
                 self.texture = ctx.texture(img.shape[:2], img.shape[2], img.tobytes())
             else:
                 self.texture = ctx.texture(img.size, 3, img.tobytes())
-            self.texture_prog = get_smooth_lit_texturized_program()
+            self.texture_prog = get_smooth_lit_texturized_program(vs)
             self.vbo_uvs = ctx.buffer(self.uv_coords.astype('f4').tobytes())
-            self.texture_vao = ctx.vertex_array(self.texture_prog,
-                                                [(self.vbo_vertices, '3f4 /v', 'in_position'),
-                                                 (self.vbo_normals, '3f4 /v', 'in_normal'),
-                                                 (self.vbo_colors, '4f4 /v', 'in_color'),
-                                                 (self.vbo_uvs, '2f4 /v', 'in_uv')],
-                                                self.vbo_indices)
+            self.vao.buffer(self.vbo_uvs, '2f4', 'in_uv')
 
     @hooked
     def release(self):
         if self.is_renderable:
-            self.smooth_vao.release()
-            self.flat_vao.release()
-            self.positions_vao.release(buffer=False)
-
-            self.vbo_vertices.release()
-            if self.vbo_indices is not None:
-                self.vbo_indices.release()
-            self.vbo_normals.release()
-            self.vbo_colors.release()
-
+            self.vao.release()
             if self.has_texture:
-                self.texture_vao.release()
-                self.vbo_uvs.release()
                 self.texture.release()
 
     def render(self, camera, **kwargs):
-        # Check if flat shading changed, in which case we need to update the VBOs.
-        vao = self._prepare_vao(camera, **kwargs)
-        vao.render(moderngl.TRIANGLES)
-
-    def render_positions(self, prog):
-        if self.is_renderable:
-            self._upload_buffers()
-            self.positions_vao.render(prog)
-
-    def _prepare_vao(self, camera, **kwargs):
-        """Prepare the shader pipeline and the VAO."""
         self._upload_buffers()
 
         if self.has_texture and self.show_texture:
-            prog, vao = self.texture_prog, self.texture_vao
+            prog = self.texture_prog
             prog['diffuse_texture'] = 0
             self.texture.use(0)
         else:
-            prog, vao = (self.flat_prog, self.flat_vao) if self.flat_shading else (self.smooth_prog, self.smooth_vao)
+            if self.face_colors is None:
+                if self.flat_shading:
+                    prog = self.flat_prog
+                else:
+                    prog = self.smooth_prog
+            else:
+                if self.flat_shading:
+                    prog = self.flat_face_prog
+                else:
+                    prog = self.smooth_face_prog
+                self.ssbo_face_colors.bind_to_storage_buffer(0)
             prog['norm_coloring'].value = self.norm_coloring
+
+        if self.instance_transforms is not None:
+            self.ssbo_instance_transforms.bind_to_storage_buffer(1)
 
         prog['use_uniform_color'] = self._use_uniform_color
         prog['uniform_color'] = self.material.color
@@ -433,10 +562,19 @@ class Meshes(Node):
         prog['win_size'].value = kwargs['window_size']
 
         self.set_camera_matrices(prog, camera, **kwargs)
-        set_lights_in_program(prog, kwargs['lights'], kwargs['shadows_enabled'])
+        set_lights_in_program(prog, kwargs['lights'], kwargs['shadows_enabled'], kwargs['ambient_strength'])
         set_material_properties(prog, self.material)
         self.receive_shadow(prog, **kwargs)
-        return vao
+        self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_instances)
+
+    def render_positions(self, prog):
+        if self.is_renderable:
+            self._upload_buffers()
+
+            if self.instance_transforms is not None:
+                self.ssbo_instance_transforms.bind_to_storage_buffer(1)
+
+            self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_instances)
 
     def _show_normals(self):
         """Create and add normals at runtime"""
@@ -479,6 +617,12 @@ class Meshes(Node):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
+
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        super().gui_context_menu(imgui)
+
 
     def gui_io(self, imgui):
         if imgui.button('Export OBJ##export_{}'.format(self.unique_name)):
@@ -763,31 +907,36 @@ class VariableTopologyMeshes(Node):
         # Therefore we draw to the fragmap using our own id instead of the mesh id.
         self.current_mesh.render_fragmap(ctx, camera, prog, self.uid)
 
-    def render_outline(self, ctx, camera, prog):
-        self.current_mesh.render_outline(ctx, camera, prog)
+    def render_outline(self, *args, **kwargs):
+        self.current_mesh.render_outline(*args, **kwargs)
 
     def gui_context_menu(self, imgui):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        super().gui_context_menu(imgui)
+
     def gui_affine(self, imgui):
         """ Render GUI for affine transformations"""
         # Position controls
-        up, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
+        up, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 1e-2, format='%.2f')
         if up:
             self.position = pos
 
         # Rotation controls
         euler_angles = rot2euler_numpy(self.rotation[np.newaxis], degrees=True)[0]
-        ur, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1,
+        ur, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 1e-2,
                                              format='%.2f')
         if ur:
             self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
 
         # Scale controls
-        us, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
-                                     max_value=10.0, format='%.3f')
+        us, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 1e-2, min_value=0.001,
+                                     max_value=100.0, format='%.3f')
         if us:
             self.scale = scale
 

@@ -108,9 +108,14 @@ class Node(object):
 
         # Flags to enable rendering passes
         self.cast_shadow = False
-        self.fragmap = False
         self.depth_prepass = False
+        self.fragmap = False
         self.outline = False
+
+        # Programs for render passes. Subclasses are responsible for setting these.
+        self.depth_only_program = None # Required for depth_prepass and cast_shadow passes
+        self.fragmap_program = None    # Required for framap pass
+        self.outline_program = None    # Required for outline pass
 
         # GUI
         self.name = name if name is not None else type(self).__name__
@@ -260,7 +265,7 @@ class Node(object):
     def center(self):
         return self.bounds.mean(-1)
 
-    def get_bounds(self, points):
+    def get_local_bounds(self, points):
         if len(points.shape) == 2 and points.shape[-1] == 3:
             points = points[np.newaxis]
         assert len(points.shape) == 3
@@ -270,6 +275,15 @@ class Node(object):
             [np.nanmin(points[:, :, 0]), np.nanmax(points[:, :, 0])],
             [np.nanmin(points[:, :, 1]), np.nanmax(points[:, :, 1])],
             [np.nanmin(points[:, :, 2]), np.nanmax(points[:, :, 2])]])
+
+        # If any of the elements is NaN return an empty bounding box.
+        if np.isnan(val).any():
+            return np.array([[0, 0], [0, 0], [0, 0]])
+        else:
+            return val
+
+    def get_bounds(self, points):
+        val = self.get_local_bounds(points)
 
         # Transform bounding box with the model matrix.
         val = (self.model_matrix @ np.vstack((val, np.array([1.0, 1.0]))))[:3]
@@ -434,20 +448,20 @@ class Node(object):
     def gui_affine(self, imgui):
         """ Render GUI for affine transformations"""
         # Position controls
-        u, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 0.1, format='%.2f')
-        if u:
+        up, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 1e-2, format='%.2f')
+        if up:
             self.position = pos
 
         # Rotation controls
         euler_angles = rot2euler_numpy(self.rotation[np.newaxis], degrees=True)[0]
-        u, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 0.1, format='%.2f')
-        if u:
+        ur, euler_angles = imgui.drag_float3('Rotation##pos{}'.format(self.unique_name), *euler_angles, 1e-2, format='%.2f')
+        if ur:
             self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
 
         # Scale controls
-        u, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 0.01, min_value=0.001,
-                                    max_value=10.0, format='%.3f')
-        if u:
+        us, scale = imgui.drag_float('Scale##scale{}'.format(self.unique_name), self.scale, 1e-2, min_value=0.001,
+                                    max_value=100.0, format='%.3f')
+        if us:
             self.scale = scale
 
     def gui_material(self, imgui):
@@ -475,6 +489,19 @@ class Node(object):
     def gui_mode_view(self, imgui):
         """ Render custom GUI for view mode """
         pass
+
+    def gui_context_menu(self, imgui):
+        _, self.enabled = imgui.checkbox("Enabled", self.enabled)
+        if any([n._show_in_hierarchy for n in self.nodes]):
+            imgui.spacing()
+            imgui.separator()
+            imgui.spacing()
+            for n in self.nodes:
+                if not n._show_in_hierarchy:
+                    continue
+                if imgui.begin_menu(f"{n.name}##{n.uid}"):
+                    n.gui_context_menu(imgui)
+                    imgui.end_menu()
 
     # Renderable
     @staticmethod
@@ -537,25 +564,23 @@ class Node(object):
             uniform = program[f'shadow_maps']
             uniform.value = 1 if uniform.array_length == 1 else [*range(1, len(lights) + 1)]
 
-    def render_shadowmap(self, light_matrix, prog):
-        if not self.cast_shadow or self.color[3] == 0.0:
+    def render_shadowmap(self, light_matrix):
+        if not self.cast_shadow or self.depth_only_program is None or self.color[3] == 0.0:
             return
 
+        prog = self.depth_only_program
         prog['model_matrix'].write(self.model_matrix.T.tobytes())
         prog['view_projection_matrix'].write(light_matrix.T.tobytes())
 
         self.render_positions(prog)
 
-    def render_fragmap(self, ctx, camera, prog, uid=None):
-        if not self.fragmap:
+    def render_fragmap(self, ctx, camera, uid=None):
+        if not self.fragmap or self.fragmap_program is None:
             return
 
-        p = camera.get_projection_matrix()
-        mv = camera.get_view_matrix() @ self.model_matrix
-
         # Transpose because np is row-major but OpenGL expects column-major.
-        prog['projection'].write(p.T.astype('f4').tobytes())
-        prog['modelview'].write(mv.T.astype('f4').tobytes())
+        prog = self.fragmap_program
+        self.set_camera_matrices(prog, camera)
 
         # Render with the specified object uid, if None use the node uid instead.
         prog['obj_id'] = uid or self.uid
@@ -576,17 +601,17 @@ class Node(object):
             ctx.cull_face = 'back'
 
     def render_depth_prepass(self, camera, **kwargs):
-        if not self.depth_prepass:
+        if not self.depth_prepass or self.depth_only_program is None:
             return
 
-        prog = kwargs['depth_prepass_prog']
+        prog = self.depth_only_program
         self.set_camera_matrices(prog, camera)
         self.render_positions(prog)
 
-    def render_outline(self, ctx, camera, prog):
-        if self.outline:
-            mvp = camera.get_view_projection_matrix() @ self.model_matrix
-            prog['mvp'].write(mvp.T.tobytes())
+    def render_outline(self, ctx, camera):
+        if self.outline and self.outline_program is not None:
+            prog  = self.outline_program
+            self.set_camera_matrices(prog, camera)
 
             if self.backface_culling:
                 ctx.enable(moderngl.CULL_FACE)
@@ -596,7 +621,7 @@ class Node(object):
 
         # Render children node recursively.
         for n in self.nodes:
-            n.render_outline(ctx, camera, prog)
+            n.render_outline(ctx, camera)
 
     def release(self):
         """
@@ -606,11 +631,13 @@ class Node(object):
         for n in self.nodes:
             n.release()
 
-    def on_selection(self, node, tri_id):
+    def on_selection(self, node, instance_id, tri_id):
         """
         Called when the node is selected
 
         :param node:  the node which was clicked (can be None if the selection wasn't a mouse event)
+        :param instance_id: the id of the instance that was clicked, 0 if the object is not instanced
+                            (can be None if the selection wasn't a mouse event)
         :param tri_id: the id of the triangle that was clicked from the 'node' mesh
                        (can be None if the selection wasn't a mouse event)
         """
