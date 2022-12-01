@@ -12,6 +12,7 @@
     uniform mat4 model_matrix;
 
     out vec3 pos;
+    flat out int instance_id;
 
 
     void main() {
@@ -23,6 +24,7 @@
 #endif
         vec3 world_position = (transform * vec4(in_position, 1.0)).xyz;
         gl_Position = view_projection_matrix * vec4(world_position, 1.0);
+        instance_id = gl_InstanceID;
 
         pos = in_position;
     }
