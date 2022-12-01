@@ -78,7 +78,7 @@ class Viewer(moderngl_window.WindowConfig):
     resource_dir = Path(__file__).parent / 'shaders'
     size_mult = 1.0
     samples = 4
-    gl_version = (4, 3)
+    gl_version = (4, 0)
     window_type = C.window_type
 
     def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, samples: int=None, **kwargs):

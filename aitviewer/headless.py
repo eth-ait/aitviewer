@@ -21,7 +21,6 @@ from PIL.Image import Image
 
 
 class HeadlessRenderer(Viewer):
-    gl_version = (4, 0)
     samples = 4
     window_type = 'headless'
 

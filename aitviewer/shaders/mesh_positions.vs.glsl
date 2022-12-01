@@ -1,9 +1,12 @@
-#version 430
+#version 400
 
 #define INSTANCED 0
 
 #if defined VERTEX_SHADER
     in vec3 in_position;
+#if INSTANCED
+    in mat4 instance_transform;
+#endif
 
     uniform mat4 view_projection_matrix;
     uniform mat4 model_matrix;
@@ -11,17 +14,10 @@
     out vec3 pos;
 
 
-#if INSTANCED
-    layout(std430, binding=1) buffer instance_data_buf
-    {
-        mat4 transforms[];
-    } instance_data;
-#endif
-
     void main() {
 
 #if INSTANCED
-        mat4 transform = model_matrix * instance_data.transforms[gl_InstanceID];
+        mat4 transform = model_matrix * instance_transform;
 #else
         mat4 transform = model_matrix;
 #endif

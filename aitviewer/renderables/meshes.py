@@ -463,7 +463,7 @@ class Meshes(Node):
             self.vbo_colors.write(self.current_vertex_colors.astype('f4').tobytes())
         else:
             # Write face colors.
-            self.ssbo_face_colors.write(self.current_face_colors.astype('f4').tobytes())
+            self.face_colors_texture.write(self.current_face_colors.astype('f4').tobytes())
 
         # Write uvs.
         if self.has_texture:
@@ -471,7 +471,7 @@ class Meshes(Node):
 
         # Write instance transforms.
         if self.instance_transforms is not None:
-            self.ssbo_instance_transforms.write(np.transpose(self.current_instance_transforms.astype('f4'), (0, 2, 1)).tobytes())
+            self.vbo_instance_transforms.write(np.transpose(self.current_instance_transforms.astype('f4'), (0, 2, 1)).tobytes())
 
     def redraw(self, **kwargs):
         self._need_upload = True
@@ -509,11 +509,12 @@ class Meshes(Node):
         self.vao.index_buffer(self.vbo_indices)
 
         if self.instance_transforms is not None:
-            self.ssbo_instance_transforms = ctx.buffer(np.transpose(self.current_instance_transforms.astype('f4'), (0, 2, 1)).tobytes())
+            self.vbo_instance_transforms = ctx.buffer(np.transpose(self.current_instance_transforms.astype('f4'), (0, 2, 1)).tobytes())
+            self.vao.buffer(self.vbo_instance_transforms, '16f4/i', 'instance_transform')
 
-        self.ssbo_face_colors = ctx.buffer(reserve=self.faces.shape[0] * 16)
+        self.face_colors_texture = ctx.texture((self.faces.shape[0], 1), 4, dtype='f4')
         if self.face_colors is not None:
-            self.ssbo_face_colors.write(self.current_face_colors.astype('f4').tobytes())
+            self.face_colors_texture.write(self.current_face_colors.astype('f4').tobytes())
 
         if self.has_texture:
             img = self.texture_image
@@ -550,11 +551,9 @@ class Meshes(Node):
                     prog = self.flat_face_prog
                 else:
                     prog = self.smooth_face_prog
-                self.ssbo_face_colors.bind_to_storage_buffer(0)
+                self.face_colors_texture.use(0)
+                prog["face_colors"] = 0
             prog['norm_coloring'].value = self.norm_coloring
-
-        if self.instance_transforms is not None:
-            self.ssbo_instance_transforms.bind_to_storage_buffer(1)
 
         prog['use_uniform_color'] = self._use_uniform_color
         prog['uniform_color'] = self.material.color
@@ -570,10 +569,6 @@ class Meshes(Node):
     def render_positions(self, prog):
         if self.is_renderable:
             self._upload_buffers()
-
-            if self.instance_transforms is not None:
-                self.ssbo_instance_transforms.bind_to_storage_buffer(1)
-
             self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_instances)
 
     def _show_normals(self):
