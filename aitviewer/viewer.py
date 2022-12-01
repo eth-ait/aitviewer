@@ -465,7 +465,8 @@ class Viewer(moderngl_window.WindowConfig):
                           lights=self.scene.lights,
                           shadows_enabled=self.shadows_enabled,
                           show_camera_target=self.show_camera_target and not self._using_temp_camera,
-                          ambient_strength = self.scene.ambient_strength)
+                          ambient_strength = self.scene.ambient_strength,
+                          fbo=self.wnd.fbo)
 
     def render_prepare(self, transparent_background=True):
         """Prepare the framebuffer."""

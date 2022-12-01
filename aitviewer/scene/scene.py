@@ -111,6 +111,8 @@ class Scene(Node):
                 # Otherwise append to transparent list
                 transparent.append(r)
 
+        fbo = kwargs['fbo']
+
         # Draw back to front by sorting transparent objects based on distance to camera.
         # As an approximation we only sort using the origin of the object
         # which may be incorrect for large objects or objects significantly
@@ -118,7 +120,10 @@ class Scene(Node):
         for r in sorted(transparent, key=lambda x: np.linalg.norm(x.position - self.camera.position), reverse=True):
             # Render to depth buffer only
             self.ctx.depth_func = '<'
+
+            fbo.color_mask = (False, False, False, False)
             self.safe_render_depth_prepass(r, **kwargs)
+            fbo.color_mask = (True, True, True, True)
 
             # Turn off backface culling if enabled for the scene
             # and requested by the current object
