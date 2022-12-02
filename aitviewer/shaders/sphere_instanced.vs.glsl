@@ -1,4 +1,4 @@
-#version 430
+#version 400
 
 #include directional_lights.glsl
 

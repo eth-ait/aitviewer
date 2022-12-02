@@ -1,4 +1,4 @@
-#version 430
+#version 400
 
 #define SMOOTH_SHADING 0
 #define TEXTURE 0
@@ -14,6 +14,9 @@
 
 
     in vec3 in_position;
+#if INSTANCED
+    in mat4 instance_transform;
+#endif
 
 #if SMOOTH_SHADING
     in vec3 in_normal;
@@ -41,17 +44,10 @@
     } vs_out;
 
 
-#if INSTANCED
-    layout(std430, binding=1) buffer instance_data_buf
-    {
-        mat4 transforms[];
-    } instance_data;
-#endif
-
     void main() {
 
 #if INSTANCED
-        mat4 transform = model_matrix * instance_data.transforms[gl_InstanceID];
+        mat4 transform = model_matrix * instance_transform;
 #else
         mat4 transform = model_matrix;
 #endif
@@ -72,7 +68,7 @@
 
         for(int i = 0; i < NR_DIR_LIGHTS; i++) {
 #if INSTANCED
-            vs_out.vert_light[i] = dirLights[i].matrix * (instance_data.transforms[gl_InstanceID] * vec4(in_position, 1.0));
+            vs_out.vert_light[i] = dirLights[i].matrix * (instance_transform * vec4(in_position, 1.0));
 #else
             vs_out.vert_light[i] = dirLights[i].matrix * vec4(in_position, 1.0);
 #endif
@@ -109,10 +105,8 @@
     out vec3 g_norm;
 
 #if FACE_COLOR
-layout(std430, binding=0) buffer face_data_buf
-{
-    vec4 colors[];
-} face_data;
+    // [#faces x 1] texture of per face colors.
+    uniform sampler2D face_colors;
 #endif
 
 #if TEXTURE
@@ -168,7 +162,7 @@ layout(std430, binding=0) buffer face_data_buf
 #if !FACE_COLOR
             g_color = gs_in[i].color;
 #else
-            g_color = face_data.colors[gl_PrimitiveIDIn];
+            g_color = texelFetch(face_colors, ivec2(gl_PrimitiveIDIn, 0), 0);
 #endif
 
             for(int j = 0; j < NR_DIR_LIGHTS; j++) {
