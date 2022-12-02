@@ -1,5 +1,6 @@
 title: AITViewer
 description: AITViewer Official Documentation
-theme: just-the-docs
+remote_theme: pmarsceill/just-the-docs
 
-url: https://eth-ait.github.io/aitviewer/
+baseurl: "/aitviewer"
+url: "https://eth-ait.github.io"
