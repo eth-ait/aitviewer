@@ -284,7 +284,6 @@ class Viewer(moderngl_window.WindowConfig):
         self.backface_culling = C.backface_culling
         self.scene.light_mode = "dark" if C.dark_mode else "default"
         self.lock_selection = False
-        self.show_camera_target = False
         self.visualize = False
 
         self._pan_camera = False
@@ -376,10 +375,20 @@ class Viewer(moderngl_window.WindowConfig):
         if not export:
             self.streamable_capture()
 
-        # Disable light renderables if exporting
+        # Disable some renderables for exporting.
+        renderables_to_enable = []
         if export:
+            def disable_for_export(r):
+                if r.enabled:
+                    r.enabled = False
+                    renderables_to_enable.append(r)
+
+            # Disable lights.
             for l in self.scene.lights:
-                l.arrow.enabled = False
+                disable_for_export(l.arrow)
+
+            # Disable camera target.
+            disable_for_export(self.scene.camera_target)
 
         self.render_fragmap()
         self.render_shadowmap()
@@ -387,10 +396,10 @@ class Viewer(moderngl_window.WindowConfig):
         self.render_scene()
         self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], self.outline_color)
 
-        # Re-enable light renderables
+        # Re-enable renderables that were disabled for exporting.
         if export:
-            for l in self.scene.lights:
-                l.arrow.enabled = True
+            for r in renderables_to_enable:
+                r.enabled = True
 
         if not export:
             self.render_outline([l for l in self.scene.lights if l.enabled], self.light_outline_color)
@@ -464,8 +473,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.scene.render(window_size=self.window.size,
                           lights=self.scene.lights,
                           shadows_enabled=self.shadows_enabled,
-                          show_camera_target=self.show_camera_target and not self._using_temp_camera,
-                          ambient_strength = self.scene.ambient_strength,
+                          ambient_strength=self.scene.ambient_strength,
                           fbo=self.wnd.fbo)
 
     def render_prepare(self, transparent_background=True):
@@ -510,6 +518,7 @@ class Viewer(moderngl_window.WindowConfig):
 
     def set_temp_camera(self, camera):
         self.scene.camera = camera
+        self.scene.camera_target.enabled = False
         self._using_temp_camera = True
 
     def lock_to_node(self, node: Node, relative_position, smooth_sigma=None):
@@ -616,8 +625,8 @@ class Viewer(moderngl_window.WindowConfig):
                 imgui.end_menu()
 
             if imgui.begin_menu("Camera", True):
-                _, self.show_camera_target = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
-                                                    self.show_camera_target, True)
+                _, self.scene.camera_target.enabled = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
+                                                                       self.scene.camera_target.enabled , True)
 
                 clicked, _ = imgui.menu_item("Center view on selection", self._shortcut_names[self._center_view_on_selection_key],
                                              False, isinstance(self.scene.selected_object, Node))
@@ -1126,7 +1135,7 @@ class Viewer(moderngl_window.WindowConfig):
                 self.shadows_enabled = not self.shadows_enabled
 
             elif key == self._show_camera_target_key:
-                self.show_camera_target = not self.show_camera_target
+                self.scene.camera_target.enabled  = not self.scene.camera_target.enabled
 
             elif key == self._orthographic_camera_key:
                 if self._using_temp_camera:
