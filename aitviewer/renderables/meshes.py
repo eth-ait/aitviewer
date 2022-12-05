@@ -630,6 +630,9 @@ class Meshes(Node):
         elif key == wnd_keys.E:
             self.draw_edges = not self.draw_edges
 
+    def append(self, vertices):
+        print("Appended frame test")
+
 
 class VariableTopologyMeshes(Node):
     """

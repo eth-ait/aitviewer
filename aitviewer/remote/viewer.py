@@ -3,10 +3,8 @@ import websockets
 import threading
 import subprocess
 import pickle
-import enum
 
-class Message(enum.Enum):
-    MESH = 1
+from .node import Scene
 
 class RemoteViewer:
     def __init__(self, host=None):
@@ -24,6 +22,8 @@ class RemoteViewer:
         self.loop = asyncio.new_event_loop()
         self.thread = threading.Thread(target=self._entry, args=(url,), daemon=True)
         self.thread.start()
+
+        self.scene = Scene(self)
 
     def _entry(self, url):
         asyncio.set_event_loop(self.loop)
@@ -52,19 +52,12 @@ class RemoteViewer:
         except Exception as e:
             print(e)
 
+    def send_msg(self, msg):
+        data = pickle.dumps(msg)
+        self.send(data)
+
     def close(self):
         self.send(None)
         self.thread.join()
         if self.p is not None:
             self.p.wait()
-
-    def message(self, type, **kwargs):
-        return {
-            'type': type,
-            'data': kwargs,
-        }
-
-    def mesh(self, vertices, faces, flat_shading=False, **kwargs):
-        msg = self.message(Message.MESH, vertices=vertices, faces=faces, flat_shading=flat_shading, **kwargs)
-        data = pickle.dumps(msg)
-        self.send(data)

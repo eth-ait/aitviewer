@@ -235,37 +235,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._go_to_frame_string = ""
         self._show_shortcuts_window = False
 
-        import threading, queue
-        import pickle
-
-        # Remote
-        def remote_server(queue: queue.Queue):
-            import asyncio
-            import websockets
-
-            async def echo(websocket):
-                addr = websocket.remote_address
-                print(f"New connection: {addr[0]}:{addr[1]}")
-
-                try:
-                    async for message in websocket:
-                        data = pickle.loads(message)
-                        queue.put_nowait(data)
-                except:
-                    pass
-                print(f"Connection closed: {addr[0]}:{addr[1]}")
-
-            async def main():
-                server = await websockets.serve(echo, "0.0.0.0", 8765)
-                await server.serve_forever()
-
-            asyncio.run(main())
-
-
-        # daemon = true means that the thread is abruptly stopped once the main thread exits.
-        self.queue = queue.Queue()
-        t = threading.Thread(target=remote_server, args=(self.queue,), daemon=True)
-        t.start()
+        self._init_server()
 
     # noinspection PyAttributeOutsideInit
     def create_framebuffers(self):
@@ -362,6 +332,61 @@ class Viewer(moderngl_window.WindowConfig):
         if self.auto_set_camera_target:
             self.scene.auto_set_camera_target()
 
+    def _init_server(self):
+        import threading, queue
+        import pickle
+
+        # Remote
+        def remote_server(queue: queue.Queue):
+            import asyncio
+            import websockets
+
+            async def echo(websocket):
+                addr = websocket.remote_address
+                print(f"New connection: {addr[0]}:{addr[1]}")
+
+                try:
+                    async for message in websocket:
+                        data = pickle.loads(message)
+                        queue.put_nowait(data)
+                except:
+                    pass
+                print(f"Connection closed: {addr[0]}:{addr[1]}")
+
+            async def main():
+                server = await websockets.serve(echo, "0.0.0.0", 8765)
+                await server.serve_forever()
+
+            asyncio.run(main())
+
+        # daemon = true means that the thread is abruptly stopped once the main thread exits.
+        self.queue = queue.Queue()
+        self.server = threading.Thread(target=remote_server, args=(self.queue,), daemon=True)
+        self.server.start()
+
+        self.remote_to_local_id = {}
+
+    def _process_messages(self):
+        from aitviewer.remote.message import Message
+
+        while not self.queue.empty():
+            msg: dict = self.queue.get_nowait()
+
+            def add(msg, type):
+                n = type(*msg['args'], **msg['kwargs'])
+                self.scene.add(n, msg.get('add_kwargs', None))
+                self.remote_to_local_id[msg['uid']] = n.uid
+
+            if msg['type'] == Message.NODE:
+                add(msg, Node)
+
+            if msg['type'] == Message.MESH:
+                add(msg, Meshes)
+
+            if msg['type'] == Message.MESH_APPEND:
+                mesh = self.scene.get_node_by_uid(self.remote_to_local_id[msg['uid']])
+                mesh.append(*msg['args'], **msg['kwargs'])
+
     def run(self, *args, log=True):
         """
         Enter a blocking visualization loop. This is built following `moderngl_window.run_window_config`.
@@ -375,14 +400,9 @@ class Viewer(moderngl_window.WindowConfig):
         self.timer.start()
         self._last_frame_rendered_at = self.timer.time
 
-        from aitviewer.remote import Message
-
         while not self.window.is_closing:
-            while not self.queue.empty():
-                msg = self.queue.get_nowait()
-                if msg['type'] == Message.MESH:
-                    n = Meshes(**msg['data'])
-                    self.scene.add(n)
+            if self.server is not None:
+                self._process_messages()
 
             current_time, delta = self.timer.next_frame()
 
