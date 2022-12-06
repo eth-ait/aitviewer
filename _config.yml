@@ -1,6 +1,10 @@
 title: AITViewer
 description: AITViewer Official Documentation
+#theme: just-the-docs
 remote_theme: pmarsceill/just-the-docs
+
+#logo: "/assets/aitv_logo.svg"
+color_scheme: dark
 
 baseurl: "/aitviewer"
 url: "https://eth-ait.github.io"
