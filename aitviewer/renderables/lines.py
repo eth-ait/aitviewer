@@ -25,6 +25,7 @@ from aitviewer.shaders import get_cylinder_program, get_depth_only_program, get_
 from aitviewer.utils import set_lights_in_program
 from aitviewer.utils import set_material_properties
 from aitviewer.utils import compute_vertex_and_face_normals
+from aitviewer.utils.decorators import hooked
 from aitviewer.utils.so3 import aa2rot_numpy as aa2rot
 from moderngl_window.opengl.vao import VAO
 
@@ -372,6 +373,11 @@ class Lines(Node):
             data = _create_cylinder_from_to(v0s, v1s, radius1=1.0, radius2=1.0)
 
         return data['vertices'][0], data['faces']
+
+    @hooked
+    def release(self):
+        if self.is_renderable:
+            self.vao.release()
 
 class LinesWithGeometryShader(Node):
     """
