@@ -19,6 +19,7 @@ import numpy as np
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_depth_only_program, get_fragmap_program, get_outline_program, get_sphere_instanced_program
+from aitviewer.utils.decorators import hooked
 from aitviewer.utils.utils import set_lights_in_program, set_material_properties
 
 from moderngl_window.opengl.vao import VAO
@@ -247,3 +248,7 @@ class Spheres(Node):
                                         max_value=10.0, format='%.3f')
         super().gui(imgui)
 
+    @hooked
+    def release(self):
+        if self.is_renderable:
+            self.vao.release()

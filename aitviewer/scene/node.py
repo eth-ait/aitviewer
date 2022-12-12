@@ -389,7 +389,10 @@ class Node(object):
     def remove(self, *nodes):
         for n in nodes:
             n.release()
-            self.nodes.remove(n)
+            try:
+                self.nodes.remove(n)
+            except:
+                pass
 
     @property
     def show_in_hierarchy(self):

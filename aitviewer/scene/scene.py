@@ -70,7 +70,7 @@ class Scene(Node):
             [0, -1, 0], [0, 1, 0],
             [0, 0, -1], [0, 0, 1],
         ]) * 0.05, r_base=0.002, color=(0.2, 0.2, 0.2, 1), mode='lines', cast_shadow=False)
-        self.add(self.camera_target, show_in_hierarchy=False)
+        self.add(self.camera_target, show_in_hierarchy=False, enabled=False)
 
         self.custom_font = None
         self.properties_icon = "\u0094"
@@ -86,9 +86,8 @@ class Scene(Node):
     def render(self, **kwargs):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
 
-        # Setup the camera target cursor for rendering
-        self.camera_target.enabled = kwargs['show_camera_target']
-        if self.camera_target.enabled:
+        # Setup the camera target cursor for rendering.
+        if self.camera_target.enabled and isinstance(self.camera, ViewerCamera):
             self.camera_target.position = self.camera.target
 
         # Collect all renderable nodes
