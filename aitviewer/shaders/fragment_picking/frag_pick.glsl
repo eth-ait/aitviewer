@@ -18,14 +18,14 @@ out int out_tri_id;
 out int out_instance_id;
 
 void main() {
-    vec3 viewpos = texelFetch(position_texture, texel_pos, 0).rgb;
-    if (viewpos.z == 0.0) {
+    vec4 viewpos = texelFetch(position_texture, texel_pos, 0).rgba;
+    if (viewpos.w == 0.0) {
         out_position = vec3(0.0);
         out_obj_id = -1;
         out_tri_id = -1;
 
     } else {
-        out_position = viewpos;
+        out_position = viewpos.xyz;
         out_obj_id = int(texelFetch(obj_info_texture, texel_pos, 0).r);
         out_tri_id = int(texelFetch(obj_info_texture, texel_pos, 0).g);
         out_instance_id = int(texelFetch(obj_info_texture, texel_pos, 0).b);

@@ -1020,7 +1020,7 @@ class Viewer(moderngl_window.WindowConfig):
         if obj_id >= 0 and tri_id >= 0:
             node = self.scene.get_node_by_uid(obj_id)
             # Camera space to world space
-            point_world = np.array(np.linalg.inv(self.scene.camera.get_view_matrix()) @ np.array((x, y, z, 1.0)))[:-1]
+            point_world = np.array((x, y, z))
             point_local = (np.linalg.inv(node.model_matrix) @ np.append(point_world, 1.0))[:-1]
             if isinstance(node, Meshes) or isinstance(node, Billboard) or isinstance(node, VariableTopologyMeshes):
                 vert_id = node.closest_vertex_in_triangle(tri_id, point_local)

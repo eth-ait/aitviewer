@@ -14,7 +14,7 @@
     in vec3 instance_base;
     in vec3 instance_tip;
 
-    out vec3 pos;
+    out vec4 pos;
     flat out int instance_id;
 
     mat3 coordinateSystem(vec3 a) {
@@ -52,7 +52,7 @@
         vec3 position = tbn * p + p0;
         vec3 world_position = (model_matrix * vec4(position, 1.0)).xyz;
         gl_Position = view_projection_matrix * vec4(world_position, 1.0);
-        pos = position;
+        pos = vec4(world_position, 1.0);
         instance_id = gl_InstanceID;
     }
 #endif
