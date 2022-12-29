@@ -651,3 +651,12 @@ class Node(object):
         Handle shortcut key presses (if you are the selected object)
         """
         pass
+
+    def update_frames(self, *args, **kwargs):
+        pass
+
+    def add_frames(self, *args, **kwargs):
+        pass
+
+    def remove_frames(self, *args, **kwargs):
+        pass

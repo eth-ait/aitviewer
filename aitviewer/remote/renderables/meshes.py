@@ -1,14 +1,30 @@
-from ..node import Node
+from ..node import RemoteNode
 from ..message import Message, make_message
 
-class Meshes(Node):
+class RemoteMeshes(RemoteNode):
     MESSAGE_TYPE = Message.MESH
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self,
+                 viewer,
+                 vertices,
+                 faces,
+                 **kwargs
+                 ):
+        super().__init__(
+            viewer,
+            vertices=vertices,
+            faces=faces,
+            **kwargs,
+        )
 
-    def append(self, *args, **kwargs):
-        if self.viewer is None:
-            raise ValueError("Append can only be called after the node has been added to the scene")
-        msg = make_message(Message.MESH_APPEND, self.uid, args, kwargs)
-        self.viewer.send_msg(msg)
+    def add_frames(self, vertices):
+        return super().add_frames(vertices=vertices)
+
+    def update_frames(self, vertices, frames):
+        return super().update_frames(vertices=vertices, frames=frames)
+
+    def remove_frames(self, frames):
+        return super().remove_frames(frames=frames)
+
+    def delete(self):
+        return super().delete()

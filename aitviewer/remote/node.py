@@ -1,4 +1,5 @@
 from .message import make_message, Message
+from .viewer import RemoteViewer
 
 GLOBAL_ID = 0
 
@@ -7,41 +8,26 @@ def next_id():
     GLOBAL_ID += 1
     return GLOBAL_ID
 
-class Node:
+class RemoteNode:
     MESSAGE_TYPE=Message.NODE
 
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-        self.add_kwargs = None
+    def __init__(self, viewer: RemoteViewer, *args, **kwargs):
+        self.viewer = viewer
         self.uid = next_id()
+        self._send_msg(self.MESSAGE_TYPE, args, kwargs)
 
-        self.viewer = None
+    def _send_msg(self, type, args, kwargs):
+        msg = make_message(type, self.uid, args, kwargs)
+        self.viewer.send_msg(msg)
 
-        self.nodes = []
+    def delete(self):
+        self._send_msg(Message.DELETE, [], {})
 
-    def add(self, node: 'Node', **kwargs):
-        node.add_kwargs = kwargs
-        self.nodes.append(node)
+    def add_frames(self, *args, **kwargs):
+        self._send_msg(Message.ADD_FRAMES, args, kwargs)
 
-        if self.viewer is not None and node.viewer is None:
-            node._add_node(self.viewer)
+    def update_frames(self, *args, **kwargs):
+        self._send_msg(Message.UPDATE_FRAMES, args, kwargs)
 
-    def _add_node(self, viewer):
-        self.viewer = viewer
-        msg = make_message(self.MESSAGE_TYPE, self.uid, self.args, self.kwargs, self.add_kwargs)
-        viewer.send_msg(msg)
-        self._clear()
-        for n in self.nodes:
-            if n.viewer is None:
-                n._add_node(viewer)
-
-    def _clear(self):
-        self.args = None
-        self.kwargs = None
-        self.add_kwargs = None
-
-class Scene(Node):
-    def __init__(self, viewer):
-        super().__init__()
-        self.viewer = viewer
+    def remove_frames(self, *args, **kwargs):
+        self._send_msg(Message.REMOVE_FRAMES, args, kwargs)
