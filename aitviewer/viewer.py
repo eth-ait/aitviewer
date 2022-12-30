@@ -239,6 +239,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._go_to_frame_string = ""
         self._show_shortcuts_window = False
 
+        self.server = None
         if C.remote_server_enabled:
             self._init_server(C.remote_server_port)
 
@@ -1615,5 +1616,6 @@ class Viewer(moderngl_window.WindowConfig):
 
 if __name__ == "__main__":
     v = Viewer(config={'remote_server_enabled': True})
+    v.scene.floor.enabled = False
     print("OK", flush=True)
     v.run()
