@@ -5,12 +5,12 @@
       <stop offset="0.507" stop-color="#e090cf"/>
       <stop offset="1" stop-color="#5d82fa"/>
     </linearGradient>
-    <clipPath id="clip-aitviewer-logo">
+    <clipPath id="clip-aitviewer_logo">
       <rect width="229" height="48"/>
     </clipPath>
   </defs>
-  <g id="aitviewer-logo" clip-path="url(#clip-aitviewer-logo)">
+  <g id="aitviewer_logo" clip-path="url(#clip-aitviewer_logo)">
     <path id="Path_34" data-name="Path 34" d="M173.254-348.333l0-.007a74.443,74.443,0,0,1-14.322-17.106c-5.544-9.642-7.855-21.464-7.855-21.464l16.108,9.4a15.092,15.092,0,0,1,4.615,4.952,17.592,17.592,0,0,1,1.432,7.081c0,.015,0,.026,0,.035l.025,17.1Zm2.077,0V-365.48c.072-1.382.354-4.99,1.426-7.075a15.622,15.622,0,0,1,4.859-5.073l15.893-9.28a81.041,81.041,0,0,1-7.883,20.45C184.082-356.815,175.331-348.336,175.331-348.336Zm-1-29.119h-.121c-3.033,0-6.7-2.341-6.772-2.314l-14.226-8.3a145.869,145.869,0,0,1,21-1.747,149.783,149.783,0,0,1,21.168,1.747l-14.151,8.255C180.558-379.44,177.177-377.515,174.329-377.455Z" transform="translate(-148.291 393.201)" fill="url(#linear-gradient)"/>
-    <text id="aitviewer" transform="translate(55 37)" fill="#3d464b" font-size="41" font-family="Open Sans"><tspan x="0" y="0">ai</tspan><tspan y="0" letter-spacing="0.05em">t</tspan><tspan y="0" font-weight="300" letter-spacing="0.05em">v</tspan><tspan y="0" font-weight="300">iewer</tspan></text>
+    <text id="aitviewer" transform="translate(55 36)" fill="#3d464b" font-size="38" font-family="Open Sans"><tspan x="0" y="0">ai</tspan><tspan y="0" letter-spacing="0.05em">t</tspan><tspan y="0" font-weight="300" letter-spacing="0.05em">v</tspan><tspan y="0" font-weight="300">iewer</tspan></text>
   </g>
 </svg>
