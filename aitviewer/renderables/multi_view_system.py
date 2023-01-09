@@ -27,7 +27,7 @@ from aitviewer.renderables.billboard import Billboard
 class MultiViewSystem(Node):
     """A multi view camera system which can be used to visualize cameras and images"""
 
-    def __init__(self, camera_info_path, camera_images_path, cols, rows, viewer, **kwargs):
+    def __init__(self, camera_info_path, camera_images_path, cols, rows, viewer, start_frame=0, **kwargs):
         """
         Load a MultiViewSystem from a file with camera information for M cameras
         and the path to a directory with M subdirectories, containing N images each.
@@ -47,7 +47,8 @@ class MultiViewSystem(Node):
             camera_images_path/2/image002.png
         :param cols: width  of the image in pixels, matching the size of the image expected by the intrinsics matrix
         :param rows: height of the image in pixels, matching the size of the image expected by the intrinsics matrix
-        :param viewer: the viewer, used for changing the view to one of the cameras'
+        :param viewer: the viewer, used for changing the view to one of the cameras.
+        :param start_frame: crops the sequence of all cameras to start with the frame that has this ID.
         """
         # Load camera information.
         camera_info = np.load(camera_info_path)
@@ -57,7 +58,9 @@ class MultiViewSystem(Node):
         for id in camera_info['ids']:
             path = os.path.join(camera_images_path, str(id))
             if os.path.isdir(path):
-                camera_n_frames.append(len(os.listdir(path)))
+                n_frames = len(os.listdir(path)) - start_frame
+                assert n_frames > 0, f"Camera {id} has no images after frame {start_frame}"
+                camera_n_frames.append(n_frames)
 
         n_frames = max(camera_n_frames) if camera_n_frames else 1
 
@@ -92,6 +95,7 @@ class MultiViewSystem(Node):
         self.camera_images_path = camera_images_path
         self.cols = cols
         self.rows = rows
+        self.start_frame = start_frame
 
         # Maps from active camera index to its billboard or None if billboards are disabled.
         self.active_cameras = OrderedDict()
@@ -111,7 +115,7 @@ class MultiViewSystem(Node):
             return
 
         # Sort images by the frame number in the filename.
-        files = os.listdir(camera_path)
+        files = [x for x in os.listdir(camera_path) if x.endswith(".jpg")]
         regex = re.compile(r"(\d*)$")
 
         def sort_key(x):
@@ -123,6 +127,7 @@ class MultiViewSystem(Node):
             print(f"Camera images not found at {camera_path}")
             return
 
+        paths = paths[self.start_frame:]
         # Create a new billboard for the currently active camera.
         billboard = Billboard.from_camera_and_distance(self.cameras[camera_index], self.billboard_distance, self.cols,
                                                        self.rows, paths)
