@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="48" height="48" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="linear-gradient" x1="0.066" x2="0.929" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffb957"/>
+      <stop offset="0.507" stop-color="#e090cf"/>
+      <stop offset="1" stop-color="#5d82fa"/>
+    </linearGradient>
+    <clipPath id="clip-aitviewer-icon">
+      <rect width="48" height="48"/>
+    </clipPath>
+  </defs>
+  <g id="aitviewer-icon" clip-path="url(#clip-aitviewer-icon)">
+    <path id="Path_34" data-name="Path 34" d="M173.045-348.333l0-.007a74.242,74.242,0,0,1-14.187-17.106c-5.492-9.642-7.782-21.464-7.782-21.464l15.957,9.4a15.03,15.03,0,0,1,4.572,4.952,17.738,17.738,0,0,1,1.418,7.081c0,.015,0,.026,0,.035l.025,17.1Zm2.057,0V-365.48c.072-1.382.35-4.99,1.413-7.075a15.548,15.548,0,0,1,4.814-5.073l15.744-9.28a81.533,81.533,0,0,1-7.809,20.45C183.771-356.815,175.1-348.336,175.1-348.336Zm-.993-29.119h-.12c-3,0-6.639-2.341-6.709-2.314l-14.093-8.3a143.176,143.176,0,0,1,20.8-1.747,147.018,147.018,0,0,1,20.969,1.747l-14.018,8.255C180.281-379.44,176.932-377.515,174.11-377.455Z" transform="translate(-150.073 393.074)" fill="url(#linear-gradient)"/>
+  </g>
+</svg>
