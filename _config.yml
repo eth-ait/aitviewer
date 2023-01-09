@@ -1,10 +1,23 @@
-title: AITViewer
-description: AITViewer Official Documentation
+title: aitviewer
+description: aitviewer - official documentation
 #theme: just-the-docs
 remote_theme: pmarsceill/just-the-docs
 
-#logo: "/assets/aitv_logo.svg"
-color_scheme: dark
+logo: "/assets/aitviewer_logo.svg"
+
+
+color_scheme: light
+
+aux_links:
+  "GitHub":
+    - "//github.com/eth-ait/aitviewer"
+  "AIT Lab":
+    - "//ait.ethz.ch"
+
+mermaid:
+  # Version of mermaid library
+  # Pick an available version from https://cdn.jsdelivr.net/npm/mermaid/
+  version: "9.3.0"
 
 baseurl: "/aitviewer"
 url: "https://eth-ait.github.io"

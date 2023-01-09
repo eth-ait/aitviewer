@@ -3,23 +3,21 @@ title: Introduction
 layout: home
 nav_order: 0
 ---
-
-# [![AITV](https://raw.githubusercontent.com/eth-ait/aitviewer/main/aitv_logo.svg)](https://github.com/eth-ait/aitviewer) AITViewer
-
-A set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and Mac OS X.
+## Overview
+The official page for aitviewer, a set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS.
 
 ## Features
-* Easy to use Python interface.
-* Load [SMPL[-H/-X]](https://smpl.is.tue.mpg.de/) / [MANO](https://mano.is.tue.mpg.de/) / [FLAME](https://flame.is.tue.mpg.de/) sequences and display them in an interactive viewer.
-* Support for the [STAR model](https://github.com/ahmedosman/STAR).
-* Manually editable SMPL sequences.
+* Native Python interface, easy to use and hack.
+* Load [SMPL[-H/-X]](https://smpl.is.tue.mpg.de/) / [MANO](https://mano.is.tue.mpg.de/) / [FLAME](https://flame.is.tue.mpg.de/) / [STAR](https://github.com/ahmedosman/STAR) sequences and display them in an interactive viewer.
+* Headless mode for server rendering of videos/images.
+* Remote mode for non-blocking integration of visualization code.
 * Render 3D data on top of images via weak-perspective or OpenCV camera models.
-* Built-in extensible GUI (based on Dear ImGui).
-* Export the scene to a video (mp4/gif) via the GUI or render videos/images in headless mode.
 * Animatable camera paths.
+* Edit SMPL sequences and poses manually.
 * Prebuilt renderable primitives (cylinders, spheres, point clouds, etc).
-* Support live data feeds and rendering (e.g., webcam).
-* Modern OpenGL shader-based rendering pipeline for high performance (via ModernGL / ModernGL Window).
+* Built-in extensible GUI (based on Dear ImGui).
+* Export screenshots, videos and turntable views (as mp4/gif)
+* High-Performance ModernGL-based rendering pipeline (running at 100fps+ on most laptops).
 
 ![AITV SMPL Editing](https://user-images.githubusercontent.com/5639197/188625764-351100e9-992e-430c-b170-69d4f142f5dd.gif)
 
@@ -47,7 +45,7 @@ and download the respective body models from the official website.
 
 
 ## Quickstart
-Display the SMPL T-pose:
+Display an SMPL T-pose (Requires SMPL models):
 ```py
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
@@ -59,8 +57,8 @@ if __name__ == '__main__':
 ```
 
 
-## Projects using the AITViewer
-The following projects have used the AITViewer:
+## Projects using the aitviewer
+A sampling of projects using the aitviewer. Let us know if you want to add you!
 - Dong et al., [Shape-aware Multi-Person Pose Estimation from Multi-view Images](https://ait.ethz.ch/projects/2021/multi-human-pose/), ICCV 2021
 - Kaufmann et al., [EM-POSE: 3D Human Pose Estimation from Sparse Electromagnetic Trackers](https://ait.ethz.ch/projects/2021/em-pose/), ICCV 2021
 - Vechev et al., [Computational Design of Kinesthetic Garments](https://ait.ethz.ch/projects/2022/cdkg/), Eurographics 2021
@@ -70,11 +68,11 @@ The following projects have used the AITViewer:
 ## Citation
 If you use this software, please cite it as below.
 ```commandline
-@software{Kaufmann_Vechev_AITViewer_2022,
+@software{Kaufmann_Vechev_aitviewer_2022,
   author = {Kaufmann, Manuel and Vechev, Velko and Mylonopoulos, Dario},
   doi = {10.5281/zenodo.1234},
   month = {7},
-  title = {{AITViewer}},
+  title = {{aitviewer}},
   url = {https://github.com/eth-ait/aitviewer},
   year = {2022}
 }
