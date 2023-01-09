@@ -14,13 +14,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import numpy as np
 import moderngl
+import numpy as np
+from moderngl_window.opengl.vao import VAO
 
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_outline_program, get_simple_unlit_program
 from aitviewer.utils.decorators import hooked
-from moderngl_window.opengl.vao import VAO
 
 
 class PointClouds(Node):
@@ -28,15 +28,17 @@ class PointClouds(Node):
     Draw a point clouds man!
     """
 
-    def __init__(self,
-                 points,
-                 colors=None,
-                 point_size=5.0,
-                 color=(0.0, 0.0, 1.0, 1.0),
-                 z_up=False,
-                 icon="\u008c",
-                 pickable=True,
-                 **kwargs):
+    def __init__(
+        self,
+        points,
+        colors=None,
+        point_size=5.0,
+        color=(0.0, 0.0, 1.0, 1.0),
+        z_up=False,
+        icon="\u008c",
+        pickable=True,
+        **kwargs,
+    ):
         """
         A sequence of point clouds. Each point cloud can have a varying number of points.
         :param points: Sequence of points (F, P, 3)
@@ -50,7 +52,9 @@ class PointClouds(Node):
             assert len(colors) == len(points)
 
         self.points = points
-        super(PointClouds, self).__init__(n_frames=len(self.points), color=color, icon=icon, **kwargs)
+        super(PointClouds, self).__init__(
+            n_frames=len(self.points), color=color, icon=icon, **kwargs
+        )
 
         self.fragmap = pickable
 
@@ -64,7 +68,9 @@ class PointClouds(Node):
         self.vao = VAO("points", mode=moderngl.POINTS)
 
         if z_up:
-            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
+            self.rotation = np.matmul(
+                np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation
+            )
 
     @property
     def points(self):
@@ -102,7 +108,9 @@ class PointClouds(Node):
         # though to change the alpha, even if a point cloud has per-point colors.
         self.material.color = color
         if self.is_renderable:
-            single_color = isinstance(self.colors[0], tuple) and len(self.colors[0]) == 4
+            single_color = (
+                isinstance(self.colors[0], tuple) and len(self.colors[0]) == 4
+            )
             if single_color:
                 self.colors = tuple(color)
             else:
@@ -154,8 +162,8 @@ class PointClouds(Node):
         if not self.is_renderable:
             return
 
-        points = self.current_points.astype('f4').tobytes()
-        colors = self.current_colors.astype('f4').tobytes()
+        points = self.current_points.astype("f4").tobytes()
+        colors = self.current_colors.astype("f4").tobytes()
 
         # Resize the VBOs if necessary. This can happen if new points are set after the `make_renderable` has been
         # called.
@@ -180,13 +188,15 @@ class PointClouds(Node):
 
         self.vbo_points = ctx.buffer(reserve=self.max_n_points * 3 * 4, dynamic=True)
         self.vbo_colors = ctx.buffer(reserve=self.max_n_points * 4 * 4, dynamic=True)
-        self.vbo_points.write(self.current_points.astype('f4').tobytes())
-        self.vbo_colors.write(self.current_colors.astype('f4').tobytes())
-        self.vao.buffer(self.vbo_points, '3f', ['in_position'])
-        self.vao.buffer(self.vbo_colors, '4f', ['in_color'])
+        self.vbo_points.write(self.current_points.astype("f4").tobytes())
+        self.vbo_colors.write(self.current_colors.astype("f4").tobytes())
+        self.vao.buffer(self.vbo_points, "3f", ["in_position"])
+        self.vao.buffer(self.vbo_colors, "4f", ["in_color"])
 
-        self.positions_vao = VAO('{}:positions'.format(self.unique_name), mode=moderngl.POINTS)
-        self.positions_vao.buffer(self.vbo_points, '3f', ['in_position'])
+        self.positions_vao = VAO(
+            "{}:positions".format(self.unique_name), mode=moderngl.POINTS
+        )
+        self.positions_vao.buffer(self.vbo_points, "3f", ["in_position"])
 
     def render(self, camera, **kwargs):
         self.set_camera_matrices(self.prog, camera, **kwargs)

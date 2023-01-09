@@ -1,14 +1,20 @@
 import asyncio
-import websockets
-import threading
-import subprocess
 import pickle
+import subprocess
+import threading
+
+import websockets
+
 
 class RemoteViewer:
     def __init__(self, host=None, port=8417):
         if host is None:
             # self.p = subprocess.Popen(["python", "-um", "aitviewer.viewer"], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE)
-            self.p = subprocess.Popen(["python", "-um", "aitviewer.viewer"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            self.p = subprocess.Popen(
+                ["python", "-um", "aitviewer.viewer"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
             for l in self.p.stdout:
                 if "OK" in l.decode():
                     break
@@ -61,7 +67,9 @@ class RemoteViewer:
     def send(self, data):
         try:
             if self.connected:
-                asyncio.run_coroutine_threadsafe(self._async_send(data), self.loop).result()
+                asyncio.run_coroutine_threadsafe(
+                    self._async_send(data), self.loop
+                ).result()
         except Exception as e:
             print(f"Send loop exception: {e}")
 

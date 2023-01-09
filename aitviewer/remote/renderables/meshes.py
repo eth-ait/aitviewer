@@ -1,15 +1,11 @@
-from ..node import RemoteNode
 from ..message import Message, make_message
+from ..node import RemoteNode
+
 
 class RemoteMeshes(RemoteNode):
     MESSAGE_TYPE = Message.MESH
 
-    def __init__(self,
-                 viewer,
-                 vertices,
-                 faces,
-                 **kwargs
-                 ):
+    def __init__(self, viewer, vertices, faces, **kwargs):
         super().__init__(
             viewer,
             vertices=vertices,

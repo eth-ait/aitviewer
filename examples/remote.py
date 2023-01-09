@@ -1,10 +1,10 @@
-from aitviewer.remote.viewer import RemoteViewer
-from aitviewer.remote.renderables.meshes import RemoteMeshes
-
-import trimesh
 import numpy as np
+import trimesh
 
-cube = trimesh.load('resources/cube.obj')
+from aitviewer.remote.renderables.meshes import RemoteMeshes
+from aitviewer.remote.viewer import RemoteViewer
+
+cube = trimesh.load("resources/cube.obj")
 
 # Create a RemoteViewer instance. This represents a connection to a remote viewer and
 # must be passed as the first argument to every Remote* renderable constructor.
@@ -16,7 +16,9 @@ v = RemoteViewer()
 
 # Create a cube with a single frame on the remote viewer.
 # All arguments after the first argument (the remote viewer) are forwarded to the Meshes constructor.
-m = RemoteMeshes(v, cube.vertices, cube.faces, flat_shading=True, name=f"Cube", position=(1, 0, 0))
+m = RemoteMeshes(
+    v, cube.vertices, cube.faces, flat_shading=True, name=f"Cube", position=(1, 0, 0)
+)
 
 
 # Append 100 frames of vertex data of shape (V, 3) to the remote viewer one by one.
@@ -32,7 +34,9 @@ m.add_frames(vertices)
 m.update_frames(cube.vertices * 0.5, frames=3)
 
 # Update two frames.
-vals = np.append((cube.vertices * 0.2)[np.newaxis], (cube.vertices * 3)[np.newaxis], axis=0)
+vals = np.append(
+    (cube.vertices * 0.2)[np.newaxis], (cube.vertices * 3)[np.newaxis], axis=0
+)
 m.update_frames(vals, frames=[80, 83])
 
 

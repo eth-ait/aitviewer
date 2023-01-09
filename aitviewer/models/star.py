@@ -16,14 +16,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import collections
 import os
+
 import torch
 import torch.nn.functional as F
 
 try:
-    from star.pytorch.star import STAR
     from star.config import cfg
+    from star.pytorch.star import STAR
 except Exception as e:
-    raise ImportError(f"Cannot import STAR. Please run `pip install git+https://github.com/ahmedosman/STAR.git`\n{e}")
+    raise ImportError(
+        f"Cannot import STAR. Please run `pip install git+https://github.com/ahmedosman/STAR.git`\n{e}"
+    )
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.utils.so3 import aa2rot_torch as aa2rot
@@ -33,7 +36,9 @@ from aitviewer.utils.so3 import rot2aa_torch as rot2aa
 class STARLayer(STAR):
     """Wraps the publicly available STAR model to match SMPLX model interface"""
 
-    def __init__(self, gender='male', num_betas=300, device=C.device, dtype=C.f_precision):
+    def __init__(
+        self, gender="male", num_betas=300, device=C.device, dtype=C.f_precision
+    ):
         """
         Initializer.
         :param gender: Which gender to load.
@@ -52,7 +57,7 @@ class STARLayer(STAR):
         super(STARLayer, self).__init__(gender=gender, num_betas=num_betas)
 
         self.device = device
-        self.model_type = 'star'
+        self.model_type = "star"
         self._parents = None
         self._children = None
 
@@ -79,7 +84,10 @@ class STARLayer(STAR):
         joint skeleton[1, i]."""
         kintree_table = self.kintree_table
         kintree_table[:, 0] = -1
-        return {'all': kintree_table, 'body': kintree_table[:, :self.n_joints_body + 1]}
+        return {
+            "all": kintree_table,
+            "body": kintree_table[:, : self.n_joints_body + 1],
+        }
 
     @property
     def n_joints_body(self):
@@ -89,7 +97,9 @@ class STARLayer(STAR):
     def n_joints_total(self):
         return self.n_joints_body + 1
 
-    def forward(self, poses_body, betas=None, poses_root=None, trans=None, normalize_root=False):
+    def forward(
+        self, poses_body, betas=None, poses_root=None, trans=None, normalize_root=False
+    ):
         """
         forwards the model
         :param poses_body: Pose parameters.
@@ -99,21 +109,29 @@ class STARLayer(STAR):
         :param normalize_root: Makes poses relative to the root joint (useful for globally rotated captures).
         :return: Deformed surface vertices, transformed joints
         """
-        poses, betas, trans = self.preprocess(poses_body, betas, poses_root, trans, normalize_root)
+        poses, betas, trans = self.preprocess(
+            poses_body, betas, poses_root, trans, normalize_root
+        )
 
         v = super().forward(pose=poses, betas=betas, trans=trans)
         J = v.J_transformed
         return v, J
 
-    def preprocess(self, poses_body, betas=None, poses_root=None, trans=None, normalize_root=False):
+    def preprocess(
+        self, poses_body, betas=None, poses_root=None, trans=None, normalize_root=False
+    ):
         batch_size = poses_body.shape[0]
 
         if poses_root is None:
-            poses_root = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=self.device)
+            poses_root = torch.zeros([batch_size, 3]).to(
+                dtype=poses_body.dtype, device=self.device
+            )
         if trans is None:
             # If we don't supply the root translation explicitly, it falls back to using self.bm.trans
             # which might not be zero since it is a trainable param that can get updated.
-            trans = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=self.device)
+            trans = torch.zeros([batch_size, 3]).to(
+                dtype=poses_body.dtype, device=self.device
+            )
 
         if normalize_root:
             # Make everything relative to the first root orientation.
@@ -121,13 +139,17 @@ class STARLayer(STAR):
             first_root_ori = torch.inverse(root_ori[0:1])
             root_ori = torch.matmul(first_root_ori, root_ori)
             poses_root = rot2aa(root_ori)
-            trans = torch.matmul(first_root_ori.unsqueeze(0), trans.unsqueeze(-1)).squeeze()
+            trans = torch.matmul(
+                first_root_ori.unsqueeze(0), trans.unsqueeze(-1)
+            ).squeeze()
             trans = trans - trans[0:1]
 
         poses = torch.cat((poses_root, poses_body), dim=1)
 
         if betas is None:
-            betas = torch.zeros([batch_size, self.num_betas]).to(dtype=poses_body.dtype, device=self.device)
+            betas = torch.zeros([batch_size, self.num_betas]).to(
+                dtype=poses_body.dtype, device=self.device
+            )
 
         # Batch shapes if they don't match batch dimension.
         if betas.shape[0] != batch_size:
@@ -138,6 +160,6 @@ class STARLayer(STAR):
             betas = torch.nn.functional.pad(betas, [0, self.num_betas - betas.shape[1]])
 
         # Upper bound betas
-        betas = betas[:, :self.num_betas]
+        betas = betas[:, : self.num_betas]
 
         return poses, betas, trans

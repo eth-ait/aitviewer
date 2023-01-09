@@ -16,8 +16,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
 
-from aitviewer.scene.node import Node
 from aitviewer.renderables.lines import Lines
+from aitviewer.scene.node import Node
 
 
 class Arrows(Node):
@@ -25,14 +25,16 @@ class Arrows(Node):
     Draw an arrow.
     """
 
-    def __init__(self,
-                 origins,
-                 tips,
-                 r_base=0.01,
-                 r_head=0.02,
-                 p=0.1,
-                 color=(0.0, 0.0, 0.5, 1.0),
-                 **kwargs):
+    def __init__(
+        self,
+        origins,
+        tips,
+        r_base=0.01,
+        r_head=0.02,
+        p=0.1,
+        color=(0.0, 0.0, 0.5, 1.0),
+        **kwargs,
+    ):
         """
         Initializer.
         :param origins: Set of 3D coordinates of the base of the arrows as a np array of shape (N, B, 3).
@@ -42,7 +44,7 @@ class Arrows(Node):
         :param p: Percentage of arrow head on the entire length.
         :param color: Color of the line (4-tuple).
         """
-        assert (origins.shape == tips.shape)
+        assert origins.shape == tips.shape
         if len(origins.shape) == 2:
             origins = origins[np.newaxis]
             tips = tips[np.newaxis]
@@ -58,10 +60,23 @@ class Arrows(Node):
 
         # Nodes
         self.material.color = color
-        self.bases_r = Lines(lines=self.get_line_coords(self.origins, self.mid_points), mode='lines', r_base=r_base,
-                             color=color, cast_shadow=False, is_selectable=False)
-        self.arrows_r = Lines(lines=self.get_line_coords(self.mid_points, self.tips), mode='lines', r_base=r_head,
-                              r_tip=0.0, color=color, cast_shadow=False, is_selectable=False)
+        self.bases_r = Lines(
+            lines=self.get_line_coords(self.origins, self.mid_points),
+            mode="lines",
+            r_base=r_base,
+            color=color,
+            cast_shadow=False,
+            is_selectable=False,
+        )
+        self.arrows_r = Lines(
+            lines=self.get_line_coords(self.mid_points, self.tips),
+            mode="lines",
+            r_base=r_head,
+            r_tip=0.0,
+            color=color,
+            cast_shadow=False,
+            is_selectable=False,
+        )
 
         self._add_nodes(self.bases_r, self.arrows_r, show_in_hierarchy=False)
 
@@ -98,7 +113,9 @@ class Arrows(Node):
         return self.origins + (self.tips - self.origins) * (1 - self.p)
 
     def get_line_coords(self, starts, ends):
-        c = np.zeros((len(self), (starts.shape[1] + ends.shape[1]), 3), dtype=starts.dtype)
+        c = np.zeros(
+            (len(self), (starts.shape[1] + ends.shape[1]), 3), dtype=starts.dtype
+        )
         c[:, 0::2] = starts
         c[:, 1::2] = ends
         return c

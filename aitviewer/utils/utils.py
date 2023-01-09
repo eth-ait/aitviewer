@@ -14,14 +14,15 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import numpy as np
-import torch
 import os
 import subprocess
 
+import numpy as np
+import torch
+from scipy.interpolate import CubicSpline
+
 from aitviewer.utils.so3 import aa2rot_torch as aa2rot
 from aitviewer.utils.so3 import rot2aa_torch as rot2aa
-from scipy.interpolate import CubicSpline
 
 
 def to_torch(x, dtype, device):
@@ -39,13 +40,13 @@ def to_numpy(x):
 
 
 def get_video_paths(video_path):
-    is_mp4 = video_path.endswith('.mp4')
-    is_gif = video_path.endswith('.gif')
+    is_mp4 = video_path.endswith(".mp4")
+    is_gif = video_path.endswith(".gif")
     if not (is_mp4 or is_gif):
-        video_path += '.mp4'
+        video_path += ".mp4"
         is_mp4 = True
 
-    suffix = '.gif' if is_gif else '.mp4'
+    suffix = ".gif" if is_gif else ".mp4"
 
     dir_of_file = os.path.dirname(os.path.abspath(video_path))
     if not os.path.exists(dir_of_file):
@@ -53,34 +54,44 @@ def get_video_paths(video_path):
 
     # Make sure we don't override an existing video.
     counter = 0
-    video_path_candidate = video_path.replace(suffix, f'_{counter}{suffix}')
+    video_path_candidate = video_path.replace(suffix, f"_{counter}{suffix}")
     while os.path.exists(video_path_candidate):
         counter += 1
-        video_path_candidate = video_path.replace(suffix, f'_{counter}{suffix}')
+        video_path_candidate = video_path.replace(suffix, f"_{counter}{suffix}")
 
     if is_mp4:
         return video_path_candidate, None, is_gif
     else:
-        video_path_mp4 = video_path_candidate.replace(suffix, f'_temp.mp4')
+        video_path_mp4 = video_path_candidate.replace(suffix, f"_temp.mp4")
         return video_path_mp4, video_path_candidate, is_gif
 
 
 def video_to_gif(path_mp4, path_gif, remove=False):
-    command = ['ffmpeg',
-               '-i', path_mp4,
-               '-y',
-               '-filter_complex', f"[0:v] split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
-               path_gif]
+    command = [
+        "ffmpeg",
+        "-i",
+        path_mp4,
+        "-y",
+        "-filter_complex",
+        f"[0:v] split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
+        path_gif,
+    ]
 
-    with open(os.devnull, 'w') as FNULL:
+    with open(os.devnull, "w") as FNULL:
         subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
 
     if remove:
         os.remove(path_mp4)
 
 
-def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_fps=60, output_fps=60,
-                    start_frame=0):
+def images_to_video(
+    frame_dir,
+    video_path,
+    frame_format="frame_%06d.png",
+    input_fps=60,
+    output_fps=60,
+    start_frame=0,
+):
     """Convert the rendered images into a video. The video path format determines whether this will be rendered as
     a GIF or an MP4 (default)."""
     if not os.path.exists(frame_dir):
@@ -91,21 +102,35 @@ def images_to_video(frame_dir, video_path, frame_format='frame_%06d.png', input_
     print("Rendering to video {}".format(os.path.abspath(path_mp4)))
 
     # Create mp4 from frames.
-    command = ['ffmpeg',
-               '-framerate', str(input_fps),  # must be this early in the command, otherwise it is not applied.
-               '-start_number', str(start_frame),
-               '-i', os.path.join(frame_dir, frame_format),
-               '-c:v', 'libx264',
-               '-preset', 'slow',
-               '-profile:v', 'high',
-               '-level:v', '4.0',
-               '-pix_fmt', 'yuv420p',
-               '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',  # Avoid error when image res is not divisible by 2.
-               '-r', str(output_fps),
-               '-y',
-               path_mp4]
+    command = [
+        "ffmpeg",
+        "-framerate",
+        str(
+            input_fps
+        ),  # must be this early in the command, otherwise it is not applied.
+        "-start_number",
+        str(start_frame),
+        "-i",
+        os.path.join(frame_dir, frame_format),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "slow",
+        "-profile:v",
+        "high",
+        "-level:v",
+        "4.0",
+        "-pix_fmt",
+        "yuv420p",
+        "-vf",
+        "pad=ceil(iw/2)*2:ceil(ih/2)*2",  # Avoid error when image res is not divisible by 2.
+        "-r",
+        str(output_fps),
+        "-y",
+        path_mp4,
+    ]
 
-    with open(os.devnull, 'w') as FNULL:
+    with open(os.devnull, "w") as FNULL:
         subprocess.Popen(command, stdout=FNULL, stderr=FNULL).wait()
 
     # If GIF we first create a temporary mp4 and then convert that to GIF to reduce palette artifacts.
@@ -142,7 +167,9 @@ def resample_positions(positions, fps_in, fps_out):
     return interpolate_positions(positions, ts_in, ts_out)
 
 
-def compute_vertex_and_face_normals_torch(vertices, faces, vertex_faces, normalize=False):
+def compute_vertex_and_face_normals_torch(
+    vertices, faces, vertex_faces, normalize=False
+):
     """
     Compute (unnormalized) vertex normals for the given vertices.
     :param vertices: A tensor of shape (N, V, 3).
@@ -152,16 +179,22 @@ def compute_vertex_and_face_normals_torch(vertices, faces, vertex_faces, normali
     :return: The vertex and face normals as tensors of shape (N, V, 3) and (N, F, 3) respectively.
     """
     vs = vertices[:, faces.to(dtype=torch.long)]
-    face_normals = torch.cross(vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], dim=-1)  # (N, F, 3)
+    face_normals = torch.cross(
+        vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], dim=-1
+    )  # (N, F, 3)
 
     ns_all_faces = face_normals[:, vertex_faces]  # (N, V, MAX_VERTEX_DEGREE, 3)
     ns_all_faces[:, vertex_faces == -1] = 0.0
     vertex_degrees = (vertex_faces > -1).sum(dim=-1).to(dtype=ns_all_faces.dtype)
-    vertex_normals = ns_all_faces.sum(dim=-2) / vertex_degrees[None, :, None]  # (N, V, 3)
+    vertex_normals = (
+        ns_all_faces.sum(dim=-2) / vertex_degrees[None, :, None]
+    )  # (N, V, 3)
 
     if normalize:
         face_normals = face_normals / torch.norm(face_normals, dim=-1).unsqueeze(-1)
-        vertex_normals = vertex_normals / torch.norm(vertex_normals, dim=-1).unsqueeze(-1)
+        vertex_normals = vertex_normals / torch.norm(vertex_normals, dim=-1).unsqueeze(
+            -1
+        )
 
     return vertex_normals, face_normals
 
@@ -180,21 +213,31 @@ def compute_vertex_and_face_normals(vertices, faces, vertex_faces, normalize=Fal
     :return: The vertex and face normals as a np arrays of shape (N, V, 3) and (N, F, 3) respectively.
     """
     vs = vertices[:, faces]
-    face_normals = np.cross(vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], axis=-1)  # (N, F, 3)
+    face_normals = np.cross(
+        vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], axis=-1
+    )  # (N, F, 3)
 
     ns_all_faces = face_normals[:, vertex_faces]  # (N, V, MAX_VERTEX_DEGREE, 3)
     ns_all_faces[:, vertex_faces == -1] = 0.0
     vertex_degrees = np.sum(vertex_faces > -1, axis=-1)
-    vertex_normals = np.sum(ns_all_faces, axis=-2) / vertex_degrees[np.newaxis, :, np.newaxis]  # (N, V, 3)
+    vertex_normals = (
+        np.sum(ns_all_faces, axis=-2) / vertex_degrees[np.newaxis, :, np.newaxis]
+    )  # (N, V, 3)
 
     if normalize:
-        face_normals = face_normals / np.linalg.norm(face_normals, axis=-1)[..., np.newaxis]
-        vertex_normals = vertex_normals / np.linalg.norm(vertex_normals, axis=-1)[..., np.newaxis]
+        face_normals = (
+            face_normals / np.linalg.norm(face_normals, axis=-1)[..., np.newaxis]
+        )
+        vertex_normals = (
+            vertex_normals / np.linalg.norm(vertex_normals, axis=-1)[..., np.newaxis]
+        )
 
     return vertex_normals, face_normals
 
 
-def compute_vertex_and_face_normals_sparse(vertices, faces, vertex_faces_sparse, normalize=False):
+def compute_vertex_and_face_normals_sparse(
+    vertices, faces, vertex_faces_sparse, normalize=False
+):
     """
     Compute (unnormalized) vertex normals for the given vertices. This is a rather expensive operation despite it being
     fully optimized with numpy. For a typical SMPL mesh this can take 5-10ms per call. Not normalizing the resulting
@@ -210,7 +253,7 @@ def compute_vertex_and_face_normals_sparse(vertices, faces, vertex_faces_sparse,
     """
     triangles = vertices[:, faces]
     vectors = np.diff(triangles, axis=2)
-    crosses = np.cross(vectors[:,:, 0], vectors[:,:, 1])
+    crosses = np.cross(vectors[:, :, 0], vectors[:, :, 1])
 
     normals = np.moveaxis(crosses, 0, 2)
     normals = normals.reshape((normals.shape[0], -1))
@@ -241,6 +284,7 @@ def spherical_coordinates_from_direction(v, degrees=False):
     else:
         return theta, phi
 
+
 def direction_from_spherical_coordinates(theta, phi, degrees=False):
     """
     Converts from spherical coordinates to a direction vector.
@@ -268,16 +312,20 @@ def direction_from_spherical_coordinates(theta, phi, degrees=False):
 def set_lights_in_program(prog, lights, shadows_enabled, ambient_strength):
     """Set program lighting from scene lights"""
     for i, light in enumerate(lights):
-        prog[f'dirLights[{i}].direction'].value = tuple(light.direction)
-        prog[f'dirLights[{i}].color'].value = light.light_color
-        prog[f'dirLights[{i}].strength'].value = light.strength if light.enabled else 0.0
-        prog[f'dirLights[{i}].shadow_enabled'].value = shadows_enabled and light.shadow_enabled
-    prog['ambient_strength'] = ambient_strength
+        prog[f"dirLights[{i}].direction"].value = tuple(light.direction)
+        prog[f"dirLights[{i}].color"].value = light.light_color
+        prog[f"dirLights[{i}].strength"].value = (
+            light.strength if light.enabled else 0.0
+        )
+        prog[f"dirLights[{i}].shadow_enabled"].value = (
+            shadows_enabled and light.shadow_enabled
+        )
+    prog["ambient_strength"] = ambient_strength
 
 
 def set_material_properties(prog, material):
-    prog['diffuse_coeff'].value = material.diffuse
-    prog['ambient_coeff'].value = material.ambient
+    prog["diffuse_coeff"].value = material.diffuse
+    prog["ambient_coeff"].value = material.ambient
 
 
 def compute_union_of_bounds(nodes):
@@ -304,7 +352,7 @@ def compute_union_of_current_bounds(nodes):
     return bounds
 
 
-def local_to_global(poses, parents, output_format='aa', input_format='aa'):
+def local_to_global(poses, parents, output_format="aa", input_format="aa"):
     """
     Convert relative joint angles to global ones by unrolling the kinematic chain.
     :param poses: A tensor of shape (N, N_JOINTS*3) defining the relative poses in angle-axis format.
@@ -313,11 +361,11 @@ def local_to_global(poses, parents, output_format='aa', input_format='aa'):
     :param input_format: 'aa' or 'rotmat'
     :return: The global joint angles as a tensor of shape (N, N_JOINTS*DOF).
     """
-    assert output_format in ['aa', 'rotmat']
-    assert input_format in ['aa', 'rotmat']
-    dof = 3 if input_format == 'aa' else 9
+    assert output_format in ["aa", "rotmat"]
+    assert input_format in ["aa", "rotmat"]
+    dof = 3 if input_format == "aa" else 9
     n_joints = poses.shape[-1] // dof
-    if input_format == 'aa':
+    if input_format == "aa":
         local_oris = aa2rot(poses.reshape((-1, 3)))
     else:
         local_oris = poses
@@ -333,7 +381,7 @@ def local_to_global(poses, parents, output_format='aa', input_format='aa'):
             local_rot = local_oris[..., j, :, :]
             global_oris[..., j, :, :] = torch.matmul(parent_rot, local_rot)
 
-    if output_format == 'aa':
+    if output_format == "aa":
         global_oris = rot2aa(global_oris.reshape((-1, 3, 3)))
         res = global_oris.reshape((-1, n_joints * 3))
     else:

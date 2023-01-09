@@ -16,23 +16,26 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
 
+from aitviewer.renderables.lines import Lines
+from aitviewer.renderables.spheres import Spheres
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
-from aitviewer.renderables.spheres import Spheres
-from aitviewer.renderables.lines import Lines
 
 
 class Skeletons(Node):
     """
     Render a skeleton as a set of spheres that are connected with cone-shaped lines.
     """
-    def __init__(self,
-                 joint_positions,
-                 joint_connections,
-                 radius=0.01,
-                 color=(1.0, 177 / 255, 1 / 255, 1.0),
-                 icon="\u0089",
-                 **kwargs):
+
+    def __init__(
+        self,
+        joint_positions,
+        joint_connections,
+        radius=0.01,
+        color=(1.0, 177 / 255, 1 / 255, 1.0),
+        icon="\u0089",
+        **kwargs,
+    ):
         """
         Initializer.
         :param joint_positions: A np array of shape (F, J, 3) containing J joint positions over F many time steps.
@@ -45,7 +48,9 @@ class Skeletons(Node):
         if not isinstance(joint_connections, np.ndarray):
             joint_connections = np.array(joint_connections)
 
-        super(Skeletons, self).__init__(n_frames=joint_positions.shape[0], color=color, icon=icon, **kwargs)
+        super(Skeletons, self).__init__(
+            n_frames=joint_positions.shape[0], color=color, icon=icon, **kwargs
+        )
 
         self._joint_positions = joint_positions
         self.joint_connections = joint_connections
@@ -57,9 +62,17 @@ class Skeletons(Node):
 
         # Nodes.
         material = Material(color=color)
-        self.spheres = Spheres(joint_positions, radius=radius, material=material, is_selectable=False)
-        self.lines = Lines(lines=self.joint_positions[:, self.skeleton].reshape(len(self), -1, 3),
-                           mode='lines', r_base=radius, r_tip=radius / 10.0, material=material, is_selectable=False)
+        self.spheres = Spheres(
+            joint_positions, radius=radius, material=material, is_selectable=False
+        )
+        self.lines = Lines(
+            lines=self.joint_positions[:, self.skeleton].reshape(len(self), -1, 3),
+            mode="lines",
+            r_base=radius,
+            r_tip=radius / 10.0,
+            material=material,
+            is_selectable=False,
+        )
         self._add_nodes(self.spheres, self.lines, show_in_hierarchy=False)
 
     @property
@@ -86,12 +99,16 @@ class Skeletons(Node):
         self._joint_positions[idx] = positions
 
     def redraw(self, **kwargs):
-        if kwargs.get('current_frame_only', False):
+        if kwargs.get("current_frame_only", False):
             self.spheres.current_sphere_positions = self.current_joint_positions
-            self.lines.current_lines = self.current_joint_positions[self.skeleton].reshape(-1, 3)
+            self.lines.current_lines = self.current_joint_positions[
+                self.skeleton
+            ].reshape(-1, 3)
         else:
             self.spheres.sphere_positions = self.joint_positions
-            self.lines.lines = self.joint_positions[:, self.skeleton].reshape(len(self), -1, 3)
+            self.lines.lines = self.joint_positions[:, self.skeleton].reshape(
+                len(self), -1, 3
+            )
         super().redraw(**kwargs)
 
     @property

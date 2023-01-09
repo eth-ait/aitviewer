@@ -26,10 +26,13 @@ def look_at(position, target, up):
     :return: Returns the 4-by-4 affine transform that transforms a point in world space into the camera space, i.e.
       it returns the inverse of the camera's 6D pose matrix. Assumes right-multiplication, i.e. x' = [R|t] * x.
     """
+
     def _normalize(x):
         return x / np.linalg.norm(x)
 
-    forward = _normalize(position - target)  # forward actually points in the other direction than `target` is.
+    forward = _normalize(
+        position - target
+    )  # forward actually points in the other direction than `target` is.
     right = _normalize(np.cross(up, forward))
     camera_up = np.cross(forward, right)
 

@@ -16,13 +16,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import os
 
-from aitviewer.viewer import Viewer
 from PIL.Image import Image
+
+from aitviewer.viewer import Viewer
 
 
 class HeadlessRenderer(Viewer):
     samples = 4
-    window_type = 'headless'
+    window_type = "headless"
 
     def __init__(self, **kwargs):
         """

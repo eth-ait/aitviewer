@@ -1,15 +1,17 @@
-from .message import make_message, Message
+from .message import Message, make_message
 from .viewer import RemoteViewer
 
 GLOBAL_ID = 0
+
 
 def next_id():
     global GLOBAL_ID
     GLOBAL_ID += 1
     return GLOBAL_ID
 
+
 class RemoteNode:
-    MESSAGE_TYPE=Message.NODE
+    MESSAGE_TYPE = Message.NODE
 
     def __init__(self, viewer: RemoteViewer, *args, **kwargs):
         self.viewer = viewer

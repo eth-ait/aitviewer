@@ -23,6 +23,7 @@ Window class adapted from  moderngl_window.context.pyqt5.Window.
 Only slight changes are made to avoid a crash with Python >= 3.10.
 """
 
+
 class PyQt5Window(Window):
     def __init__(self, **kwargs):
         super(Window, self).__init__(**kwargs)
@@ -60,7 +61,8 @@ class PyQt5Window(Window):
         if self.resizable:
             # Ensure a valid resize policy when window is resizable
             size_policy = QtWidgets.QSizePolicy(
-                QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding,
+                QtWidgets.QSizePolicy.Expanding,
+                QtWidgets.QSizePolicy.Expanding,
             )
             self._widget.setSizePolicy(size_policy)
             self._widget.resize(self.width, self.height)

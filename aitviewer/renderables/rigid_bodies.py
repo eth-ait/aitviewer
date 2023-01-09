@@ -16,25 +16,31 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
 
-from aitviewer.scene.node import Node
-from aitviewer.renderables.spheres import Spheres
 from aitviewer.renderables.arrows import Arrows
-from aitviewer.utils.utils import compute_union_of_bounds, compute_union_of_current_bounds
+from aitviewer.renderables.spheres import Spheres
+from aitviewer.scene.node import Node
+from aitviewer.utils.utils import (
+    compute_union_of_bounds,
+    compute_union_of_current_bounds,
+)
 
 
 class RigidBodies(Node):
     """
     A sequence of N 3D positions and orientations in space.
     """
-    def __init__(self,
-                 rb_pos,
-                 rb_ori,
-                 radius=0.02,
-                 length=0.2,
-                 radius_cylinder=None,
-                 color=(0.0, 1.0, 0.5, 1.0),
-                 icon="\u0086",
-                 **kwargs):
+
+    def __init__(
+        self,
+        rb_pos,
+        rb_ori,
+        radius=0.02,
+        length=0.2,
+        radius_cylinder=None,
+        color=(0.0, 1.0, 0.5, 1.0),
+        icon="\u0086",
+        **kwargs,
+    ):
         """
         Initializer.
         :param rb_pos: A np array of shape (F, N, 3) containing N rigid-body centers over F time steps.
@@ -46,7 +52,9 @@ class RigidBodies(Node):
         """
         self.rb_pos = rb_pos[np.newaxis] if rb_pos.ndim == 2 else rb_pos
         self.rb_ori = rb_ori[np.newaxis] if rb_ori.ndim == 3 else rb_ori
-        super(RigidBodies, self).__init__(n_frames=self.rb_pos.shape[0], color=color, icon=icon, **kwargs)
+        super(RigidBodies, self).__init__(
+            n_frames=self.rb_pos.shape[0], color=color, icon=icon, **kwargs
+        )
 
         self.radius = radius
         self.length = length
@@ -63,8 +71,14 @@ class RigidBodies(Node):
             line = line / np.linalg.norm(line, axis=-1, keepdims=True) * length
             color = c.copy()
             color[i] = 1.0
-            axs = Arrows(self.rb_pos, self.rb_pos + line, r_base=r_base, r_head=r_head, color=tuple(color),
-                         is_selectable=False)
+            axs = Arrows(
+                self.rb_pos,
+                self.rb_pos + line,
+                r_base=r_base,
+                r_head=r_head,
+                color=tuple(color),
+                is_selectable=False,
+            )
             self._add_node(axs, show_in_hierarchy=False)
             self.coords.append(axs)
 
@@ -102,7 +116,7 @@ class RigidBodies(Node):
         return compute_union_of_current_bounds(self.coords)
 
     def redraw(self, **kwargs):
-        if kwargs.get('current_frame_only', False):
+        if kwargs.get("current_frame_only", False):
             self.spheres.current_sphere_positions = self.current_rb_pos
 
             for i in range(3):
@@ -127,6 +141,12 @@ class RigidBodies(Node):
         self.spheres.color_one(index, color)
 
     def gui(self, imgui):
-        _, self.spheres.radius = imgui.drag_float('Sphere Radius'.format(self.unique_name), self.spheres.radius,
-                                    0.01, min_value=0.001, max_value=10.0, format='%.3f')
+        _, self.spheres.radius = imgui.drag_float(
+            "Sphere Radius".format(self.unique_name),
+            self.spheres.radius,
+            0.01,
+            min_value=0.001,
+            max_value=10.0,
+            format="%.3f",
+        )
         super(RigidBodies, self).gui(imgui)

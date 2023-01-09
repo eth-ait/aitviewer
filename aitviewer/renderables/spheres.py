@@ -14,16 +14,21 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+import moderngl
 import numpy as np
+from moderngl_window.opengl.vao import VAO
 
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
-from aitviewer.shaders import get_depth_only_program, get_fragmap_program, get_outline_program, get_sphere_instanced_program
+from aitviewer.shaders import (
+    get_depth_only_program,
+    get_fragmap_program,
+    get_outline_program,
+    get_sphere_instanced_program,
+)
 from aitviewer.utils.decorators import hooked
 from aitviewer.utils.utils import set_lights_in_program, set_material_properties
 
-from moderngl_window.opengl.vao import VAO
-import moderngl
 
 def _create_sphere(radius=1.0, rings=16, sectors=32):
     """
@@ -54,12 +59,12 @@ def _create_sphere(radius=1.0, rings=16, sectors=32):
     i = 0
     for r in range(rings - 1):
         for s in range(sectors - 1):
-            faces[i] = np.array([r * sectors + s,
-                                 (r + 1) * sectors + (s + 1),
-                                 r * sectors + (s + 1)])
-            faces[i + 1] = np.array([r * sectors + s,
-                                    (r + 1) * sectors + s,
-                                    (r + 1) * sectors + (s + 1)])
+            faces[i] = np.array(
+                [r * sectors + s, (r + 1) * sectors + (s + 1), r * sectors + (s + 1)]
+            )
+            faces[i + 1] = np.array(
+                [r * sectors + s, (r + 1) * sectors + s, (r + 1) * sectors + (s + 1)]
+            )
             i += 2
 
     return vertices, faces
@@ -68,14 +73,16 @@ def _create_sphere(radius=1.0, rings=16, sectors=32):
 class Spheres(Node):
     """Render some simple spheres."""
 
-    def __init__(self,
-                 positions,
-                 radius=0.01,
-                 color=(0.0, 0.0, 1.0, 1.0),
-                 rings=16,
-                 sectors=32,
-                 icon="\u008d",
-                 **kwargs):
+    def __init__(
+        self,
+        positions,
+        radius=0.01,
+        color=(0.0, 0.0, 1.0, 1.0),
+        rings=16,
+        sectors=32,
+        icon="\u008d",
+        **kwargs,
+    ):
         """
         Initializer.
         :param positions: A numpy array of shape (F, N, 3) or (N, 3) containing N sphere positions for F time steps.
@@ -90,8 +97,10 @@ class Spheres(Node):
 
         # Define a default material in case there is None.
         if isinstance(color, tuple) or len(color.shape) == 1:
-            kwargs['material'] = kwargs.get('material', Material(color=color, ambient=0.2))
-            self.sphere_colors = kwargs['material'].color
+            kwargs["material"] = kwargs.get(
+                "material", Material(color=color, ambient=0.2)
+            )
+            self.sphere_colors = kwargs["material"].color
         else:
             assert color.shape[1] == 4 and positions.shape[1] == color.shape[0]
             self.sphere_colors = color
@@ -100,7 +109,9 @@ class Spheres(Node):
         self._sphere_positions = positions
         self.radius = radius
 
-        self.vertices, self.faces = _create_sphere(radius=1.0, rings=rings, sectors=sectors)
+        self.vertices, self.faces = _create_sphere(
+            radius=1.0, rings=rings, sectors=sectors
+        )
         self.n_vertices = self.vertices.shape[0]
         self.n_spheres = self.sphere_positions.shape[1]
 
@@ -131,7 +142,7 @@ class Spheres(Node):
         if len(self._sphere_colors.shape) == 1:
             return np.full((self.n_spheres * self.n_vertices, 4), self._sphere_colors)
         else:
-            return np.tile(self._sphere_colors, (self.n_vertices,1))
+            return np.tile(self._sphere_colors, (self.n_vertices, 1))
 
     def color_one(self, index, color):
         new_colors = np.tile(np.array(self.material.color), (self.n_spheres, 1))
@@ -197,8 +208,8 @@ class Spheres(Node):
         self.depth_only_program = get_depth_only_program(vs_path)
         self.fragmap_program = get_fragmap_program(vs_path)
 
-        self.vbo_vertices = ctx.buffer(self.vertices.astype('f4').tobytes())
-        self.vbo_indices = ctx.buffer(self.faces.astype('i4').tobytes())
+        self.vbo_vertices = ctx.buffer(self.vertices.astype("f4").tobytes())
+        self.vbo_indices = ctx.buffer(self.faces.astype("i4").tobytes())
 
         self.vbo_instance_position = ctx.buffer(reserve=self.n_spheres * 12)
         self.vbo_instance_color = ctx.buffer(reserve=self.n_spheres * 16)
@@ -213,7 +224,9 @@ class Spheres(Node):
         if not self.is_renderable or not self._need_upload:
             return
         self._need_upload = False
-        self.vbo_instance_position.write(self.current_sphere_positions.astype("f4").tobytes())
+        self.vbo_instance_position.write(
+            self.current_sphere_positions.astype("f4").tobytes()
+        )
         if len(self._sphere_colors.shape) > 1:
             self.vbo_instance_color.write(self._sphere_colors.astype("f4").tobytes())
 
@@ -223,15 +236,20 @@ class Spheres(Node):
         prog = self.prog
         prog["radius"] = self.radius
         if len(self._sphere_colors.shape) == 1:
-            prog['use_uniform_color'] = True
-            prog['uniform_color'] = tuple(self._sphere_colors)
+            prog["use_uniform_color"] = True
+            prog["uniform_color"] = tuple(self._sphere_colors)
         else:
-            prog['use_uniform_color'] = False
-        prog['draw_edges'].value = 1.0 if self.draw_edges else 0.0
-        prog['win_size'].value = kwargs['window_size']
+            prog["use_uniform_color"] = False
+        prog["draw_edges"].value = 1.0 if self.draw_edges else 0.0
+        prog["win_size"].value = kwargs["window_size"]
 
         self.set_camera_matrices(prog, camera, **kwargs)
-        set_lights_in_program(prog, kwargs['lights'], kwargs['shadows_enabled'], kwargs['ambient_strength'])
+        set_lights_in_program(
+            prog,
+            kwargs["lights"],
+            kwargs["shadows_enabled"],
+            kwargs["ambient_strength"],
+        )
         set_material_properties(prog, self.material)
         self.receive_shadow(prog, **kwargs)
         self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_spheres)
@@ -243,9 +261,9 @@ class Spheres(Node):
             self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_spheres)
 
     def gui(self, imgui):
-        _, self.radius = imgui.drag_float('Radius', self.radius, 0.01,
-                                        min_value=0.001,
-                                        max_value=10.0, format='%.3f')
+        _, self.radius = imgui.drag_float(
+            "Radius", self.radius, 0.01, min_value=0.001, max_value=10.0, format="%.3f"
+        )
         super().gui(imgui)
 
     @hooked

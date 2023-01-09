@@ -14,20 +14,23 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import numpy as np
 import os
 
+import numpy as np
+
+from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
-from aitviewer.configuration import CONFIG as C
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Load 3DPW sequence. This uses the SMPL model. This might return more than one sequence because some 3DPW
     # sequences contain multiple people.
     seqs_3dpw = SMPLSequence.from_3dpw(
-        pkl_data_path=os.path.join(C.datasets.threedpw.ori, "test/downtown_sitOnStairs_00.pkl"),
-        name="3DPW Sit on Stairs")
+        pkl_data_path=os.path.join(
+            C.datasets.threedpw.ori, "test/downtown_sitOnStairs_00.pkl"
+        ),
+        name="3DPW Sit on Stairs",
+    )
 
     # Display in the viewer.
     v = Viewer()

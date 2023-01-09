@@ -1,5 +1,6 @@
 import enum
 
+
 class Message(enum.Enum):
     NODE = 1
     MESH = 2
@@ -12,9 +13,9 @@ class Message(enum.Enum):
 
 def make_message(type, uid, args, kwargs):
     msg = {
-        'type': type,
-        'uid': uid,
-        'args': args,
-        'kwargs': kwargs,
+        "type": type,
+        "uid": uid,
+        "args": args,
+        "kwargs": kwargs,
     }
     return msg

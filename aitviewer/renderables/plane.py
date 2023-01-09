@@ -19,9 +19,8 @@ import numpy as np
 
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.scene.node import Node
-from aitviewer.shaders import get_smooth_lit_with_edges_program, get_chessboard_program
-from aitviewer.utils import set_lights_in_program
-from aitviewer.utils import set_material_properties
+from aitviewer.shaders import get_chessboard_program, get_smooth_lit_with_edges_program
+from aitviewer.utils import set_lights_in_program, set_material_properties
 from aitviewer.utils.decorators import hooked
 
 
@@ -29,14 +28,17 @@ class Plane(Node):
     """
     Draw a plane.
     """
-    def __init__(self,
-                 center,
-                 v1,
-                 v2,
-                 size=10.0,
-                 color=(0.5, 0.5, 0.5, 1.0),
-                 icon="\u008b",
-                 **kwargs):
+
+    def __init__(
+        self,
+        center,
+        v1,
+        v2,
+        size=10.0,
+        color=(0.5, 0.5, 0.5, 1.0),
+        icon="\u008b",
+        **kwargs,
+    ):
         """
         Initializer.
         :param center: Center of the plane.
@@ -47,7 +49,7 @@ class Plane(Node):
         """
         super(Plane, self).__init__(color=color, icon=icon, **kwargs)
         if np.dot(v1, v2) > 0.00001:
-            raise ValueError('v1 and v2 are not orthogonal.')
+            raise ValueError("v1 and v2 are not orthogonal.")
 
         self.plane_center = center
         self.v1 = v1 / np.linalg.norm(v1)
@@ -73,27 +75,36 @@ class Plane(Node):
         self.material.color = color
         self.colors = np.full((self.vertices.shape[0], 4), color)
         if self.is_renderable:
-            self.vbo_colors.write(self.colors.astype('f4').tobytes())
+            self.vbo_colors.write(self.colors.astype("f4").tobytes())
 
     # noinspection PyAttributeOutsideInit
     @Node.once
     def make_renderable(self, ctx):
         self.prog = get_smooth_lit_with_edges_program()
-        self.vbo_vertices = ctx.buffer(self.vertices.astype('f4').tobytes())
-        self.vbo_normals = ctx.buffer(self.normals.astype('f4').tobytes())
-        self.vbo_colors = ctx.buffer(self.colors.astype('f4').tobytes())
+        self.vbo_vertices = ctx.buffer(self.vertices.astype("f4").tobytes())
+        self.vbo_normals = ctx.buffer(self.normals.astype("f4").tobytes())
+        self.vbo_colors = ctx.buffer(self.colors.astype("f4").tobytes())
 
-        self.vao = ctx.vertex_array(self.prog,
-                                    [(self.vbo_vertices, '3f4 /v', 'in_position'),
-                                     (self.vbo_normals, '3f4 /v', 'in_normal'),
-                                     (self.vbo_colors, '4f4 /v', 'in_color')])
+        self.vao = ctx.vertex_array(
+            self.prog,
+            [
+                (self.vbo_vertices, "3f4 /v", "in_position"),
+                (self.vbo_normals, "3f4 /v", "in_normal"),
+                (self.vbo_colors, "4f4 /v", "in_color"),
+            ],
+        )
 
     def render(self, camera, **kwargs):
-        self.prog['norm_coloring'].value = False
-        self.prog['win_size'].value = kwargs['window_size']
+        self.prog["norm_coloring"].value = False
+        self.prog["win_size"].value = kwargs["window_size"]
 
         self.set_camera_matrices(self.prog, camera, **kwargs)
-        set_lights_in_program(self.prog, kwargs['lights'], kwargs['shadows_enabled'], kwargs['ambient_strength'])
+        set_lights_in_program(
+            self.prog,
+            kwargs["lights"],
+            kwargs["shadows_enabled"],
+            kwargs["ambient_strength"],
+        )
         set_material_properties(self.prog, self.material)
         self.receive_shadow(self.prog, **kwargs)
         self.vao.render(moderngl.TRIANGLE_STRIP)
@@ -109,16 +120,19 @@ class Plane(Node):
 
 class ChessboardPlane(Node):
     """A plane that is textured like a chessboard."""
-    def __init__(self,
-                 side_length,
-                 n_tiles,
-                 color1=(0.0, 0.0, 0.0, 1.0),
-                 color2=(1.0, 1.0, 1.0, 1.0),
-                 plane='xz',
-                 height=0.0,
-                 tiling=True,
-                 icon="\u008b",
-                 **kwargs):
+
+    def __init__(
+        self,
+        side_length,
+        n_tiles,
+        color1=(0.0, 0.0, 0.0, 1.0),
+        color2=(1.0, 1.0, 1.0, 1.0),
+        plane="xz",
+        height=0.0,
+        tiling=True,
+        icon="\u008b",
+        **kwargs,
+    ):
         """
         Initializer.
         :param side_length: Length of one side of the plane.
@@ -129,7 +143,7 @@ class ChessboardPlane(Node):
         :param height: The height of the plane.
         :param kwargs: Remaining kwargs.
         """
-        assert plane in ['xz', 'xy', 'yz']
+        assert plane in ["xz", "xy", "yz"]
         super(ChessboardPlane, self).__init__(icon=icon, **kwargs)
         self.side_length = side_length
         self.n_tiles = n_tiles
@@ -150,7 +164,9 @@ class ChessboardPlane(Node):
             v1 = np.array([0, 1, 0], dtype=np.float32)
             v2 = np.array([0, 0, 1], dtype=np.float32)
 
-        self.vertices, self.normals, self.uvs = self._get_renderable_data(v1, v2, side_length)
+        self.vertices, self.normals, self.uvs = self._get_renderable_data(
+            v1, v2, side_length
+        )
         self.backface_culling = False
 
     def _get_renderable_data(self, v1, v2, size):
@@ -161,12 +177,7 @@ class ChessboardPlane(Node):
 
         normals = np.tile(np.cross(v2, v1), (4, 1))
 
-        uvs = np.array([
-            0, 0,
-            0, 1,
-            1, 0,
-            1, 1
-        ], dtype=np.float32)
+        uvs = np.array([0, 0, 0, 1, 1, 0, 1, 1], dtype=np.float32)
 
         return np.row_stack([p1, p0, p2, p3]), normals, uvs
 
@@ -174,25 +185,34 @@ class ChessboardPlane(Node):
     @Node.once
     def make_renderable(self, ctx):
         self.prog = get_chessboard_program()
-        self.vbo_vertices = ctx.buffer(self.vertices.astype('f4').tobytes())
-        self.vbo_normals = ctx.buffer(self.normals.astype('f4').tobytes())
-        self.vbo_uvs = ctx.buffer(self.uvs.astype('f4').tobytes())
+        self.vbo_vertices = ctx.buffer(self.vertices.astype("f4").tobytes())
+        self.vbo_normals = ctx.buffer(self.normals.astype("f4").tobytes())
+        self.vbo_uvs = ctx.buffer(self.uvs.astype("f4").tobytes())
 
-        self.vao = ctx.vertex_array(self.prog,
-                                    [(self.vbo_vertices, '3f4 /v', 'in_position'),
-                                     (self.vbo_normals, '3f4 /v', 'in_normal'),
-                                     (self.vbo_uvs, '2f4 /v', 'in_uv')])
+        self.vao = ctx.vertex_array(
+            self.prog,
+            [
+                (self.vbo_vertices, "3f4 /v", "in_position"),
+                (self.vbo_normals, "3f4 /v", "in_normal"),
+                (self.vbo_uvs, "2f4 /v", "in_uv"),
+            ],
+        )
 
     def render(self, camera, **kwargs):
-        self.prog['color_1'].value = (self.c1[0], self.c1[1], self.c1[2], self.c1[3])
-        self.prog['color_2'].value = (self.c2[0], self.c2[1], self.c2[2], self.c2[3])
-        self.prog['n_tiles'].value = self.n_tiles
-        self.prog['tiling_enabled'].value = self.tiling
+        self.prog["color_1"].value = (self.c1[0], self.c1[1], self.c1[2], self.c1[3])
+        self.prog["color_2"].value = (self.c2[0], self.c2[1], self.c2[2], self.c2[3])
+        self.prog["n_tiles"].value = self.n_tiles
+        self.prog["tiling_enabled"].value = self.tiling
 
         self.set_camera_matrices(self.prog, camera, **kwargs)
         self.receive_shadow(self.prog, **kwargs)
 
-        set_lights_in_program(self.prog, kwargs['lights'], kwargs['shadows_enabled'], kwargs['ambient_strength'])
+        set_lights_in_program(
+            self.prog,
+            kwargs["lights"],
+            kwargs["shadows_enabled"],
+            kwargs["ambient_strength"],
+        )
         set_material_properties(self.prog, self.material)
 
         self.vao.render(moderngl.TRIANGLE_STRIP)
@@ -206,23 +226,30 @@ class ChessboardPlane(Node):
         return self.bounds
 
     def gui(self, imgui):
-        _, self.c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
-        _, self.c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True)
-        _, self.tiling = imgui.checkbox('Toggle Tiling', self.tiling)
-        _, self.n_tiles = imgui.drag_int('Number of tiles', self.n_tiles, 1.0, 1, 200)
+        _, self.c1 = imgui.color_edit4(
+            "Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True
+        )
+        _, self.c2 = imgui.color_edit4(
+            "Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True
+        )
+        _, self.tiling = imgui.checkbox("Toggle Tiling", self.tiling)
+        _, self.n_tiles = imgui.drag_int("Number of tiles", self.n_tiles, 1.0, 1, 200)
 
 
 class Chessboard(Node):
     """A plane that is textured like a chessboard."""
-    def __init__(self,
-                 side_length,
-                 n_tiles,
-                 color1=(0.0, 0.0, 0.0, 1.0),
-                 color2=(1.0, 1.0, 1.0, 1.0),
-                 plane='xz',
-                 height=0.0,
-                 tiling=True,
-                 **kwargs):
+
+    def __init__(
+        self,
+        side_length,
+        n_tiles,
+        color1=(0.0, 0.0, 0.0, 1.0),
+        color2=(1.0, 1.0, 1.0, 1.0),
+        plane="xz",
+        height=0.0,
+        tiling=True,
+        **kwargs,
+    ):
         """
         Initializer.
         :param side_length: Length of one side of the plane.
@@ -233,7 +260,7 @@ class Chessboard(Node):
         :param height: The height of the plane.
         :param kwargs: Remaining kwargs.
         """
-        assert plane in ['xz', 'xy', 'yz']
+        assert plane in ["xz", "xy", "yz"]
         super(Chessboard, self).__init__(**kwargs)
         self.side_length = side_length
         self.n_tiles = n_tiles
@@ -261,9 +288,9 @@ class Chessboard(Node):
         c1_idxs = []  # Store indices into face_colors containing color 1.
         c2_idxs = []  # Store indices into face_colors containing color 2.
         tl = self.side_length / self.n_tiles
-        dim1 = 'xyz'.index(self.plane[0])
-        dim2 = 'xyz'.index(self.plane[1])
-        up = 'xyz'.index('xyz'.replace(self.plane[0], '').replace(self.plane[1], ''))
+        dim1 = "xyz".index(self.plane[0])
+        dim2 = "xyz".index(self.plane[1])
+        up = "xyz".index("xyz".replace(self.plane[0], "").replace(self.plane[1], ""))
 
         for r in range(self.n_tiles):
             for c in range(self.n_tiles):
@@ -319,16 +346,20 @@ class Chessboard(Node):
         self.mesh.face_colors = self.fcs_tiled
 
     def gui(self, imgui):
-        u, c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
+        u, c1 = imgui.color_edit4(
+            "Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True
+        )
         if u:
             self.c1 = c1
             self._update_colors()
 
-        u, c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True)
+        u, c2 = imgui.color_edit4(
+            "Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True
+        )
         if u:
             self.c2 = c2
             self._update_colors()
 
-        u, self.tiling = imgui.checkbox('Toggle Tiling', self.tiling)
+        u, self.tiling = imgui.checkbox("Toggle Tiling", self.tiling)
         if u:
             self._update_colors()
