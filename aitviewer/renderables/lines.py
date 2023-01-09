@@ -293,6 +293,7 @@ class Lines(Node):
     @lines.setter
     def lines(self, value):
         self._lines = value if len(value.shape) == 3 else value[np.newaxis]
+        self.n_frames = self.lines.shape[0]
         self.redraw()
 
     @property
@@ -395,96 +396,18 @@ class Lines(Node):
         if self.is_renderable:
             self.vao.release()
 
-
-class LinesWithGeometryShader(Node):
-    """
-    Draw a line between n points using a cylinder geometry shader.
-    Two radii can be set resulting in a cylinder, tapered cylinder, or an arrow (r_tip = 0.0)
-    """
-
-    def __init__(
-        self,
-        lines,
-        r_base=0.01,
-        r_tip=None,
-        color=(0.0, 0.0, 1.0, 1.0),
-        mode="line_strip",
-        **kwargs,
-    ):
-        """
-        Initializer.
-        :param lines: Set of 3D coordinates as a np array of shape (N, L, 3).
-        :param r_base: Thickness of the line.
-        :param r_tip: If set, the thickness of the line will taper from r_base to r_tip
-        :param color: Color of the line (4-tuple).
-        :param mode: 'lines' or 'line_strip' -> ModernGL drawing mode - LINE_STRIP oder LINES
-        """
-        assert len(color) == 4
-        assert len(lines.shape) >= 2
-        assert mode == "lines" or mode == "line_strip"
-        lines = lines if len(lines.shape) == 3 else lines[np.newaxis]
-
-        super(LinesWithGeometryShader, self).__init__(
-            n_frames=len(lines), color=color, **kwargs
-        )
-
-        self.r_base = r_base
-        self.r_tip = r_tip if r_tip is not None else r_base
-        self.lines = lines
-        self.colors = np.full((self.n_lines, 4), self.color)
-        self.mode = moderngl.LINE_STRIP if mode == "line_strip" else moderngl.LINES
-        self.vao = VAO("cylinder", mode=self.mode)
-
-    @classmethod
-    def from_start_end_points(cls, v0, v1, **kwargs):
-        """Create lines that connect from v0[i, j] to v1[i, j] for frame i and line j."""
-        vs = np.zeros((v0.shape[0], v0.shape[1] * 2, 3))
-        vs[:, ::2] = v0
-        vs[:, 1::2] = v1
-        return cls(vs, mode="lines", **kwargs)
-
-    def on_frame_update(self):
+    @hooked
+    def release(self):
         if self.is_renderable:
-            self.vbo_vertices.write(self.lines_current.astype("f4").tobytes())
+            self.vao.release()
 
-    def update_data(self, lines):
-        self.lines = lines
-        self.on_frame_update()
+    def update_frames(self, lines, frames):
+        self.lines[frames] = lines
 
-    @property
-    def n_lines(self):
-        return self.lines.shape[1]
+    def add_frames(self, lines):
+        if len(lines.shape) == 2:
+            lines = lines[np.newaxis]
+        self.lines = np.append(self.lines, lines, axis=0)
 
-    @property
-    def lines_current(self):
-        return self.lines[self.current_frame_id]
-
-    @Node.color.setter
-    def color(self, color):
-        self.material.color = color
-        self.colors = np.full((self.n_lines, 4), self.color)
-        if self.is_renderable:
-            self.vbo_colors.write(self.colors.astype("f4").tobytes())
-
-    # noinspection PyAttributeOutsideInit
-    @Node.once
-    def make_renderable(self, ctx):
-        self.prog = get_cylinder_program()
-        self.prog["r1"] = self.r_base
-        self.prog["r2"] = self.r_tip
-
-        self.vbo_vertices = ctx.buffer(self.lines_current.astype("f4").tobytes())
-        self.vbo_colors = ctx.buffer(self.colors.astype("f4").tobytes())
-        self.vao.buffer(self.vbo_vertices, "3f", ["in_position"])
-        self.vao.buffer(self.vbo_colors, "4f", ["in_color"])
-
-    def render(self, camera, **kwargs):
-        self.set_camera_matrices(self.prog, camera, **kwargs)
-        set_lights_in_program(
-            self.prog,
-            kwargs["lights"],
-            kwargs["shadows_enabled"],
-            kwargs["ambient_strength"],
-        )
-        set_material_properties(self.prog, self.material)
-        self.vao.render(self.prog)
+    def remove_frames(self, frames):
+        self.lines = np.delete(self.lines, frames, axis=0)

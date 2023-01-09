@@ -1,9 +1,9 @@
-from ..message import Message, make_message
+from ..message import Message
 from ..node import RemoteNode
 
 
 class RemoteMeshes(RemoteNode):
-    MESSAGE_TYPE = Message.MESH
+    MESSAGE_TYPE = Message.MESHES
 
     def __init__(self, viewer, vertices, faces, **kwargs):
         super().__init__(
@@ -18,9 +18,3 @@ class RemoteMeshes(RemoteNode):
 
     def update_frames(self, vertices, frames):
         return super().update_frames(vertices=vertices, frames=frames)
-
-    def remove_frames(self, frames):
-        return super().remove_frames(frames=frames)
-
-    def delete(self):
-        return super().delete()

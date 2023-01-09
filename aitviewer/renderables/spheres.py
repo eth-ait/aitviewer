@@ -191,6 +191,7 @@ class Spheres(Node):
         if len(pos.shape) == 2:
             pos = pos[np.newaxis]
         self._sphere_positions = pos
+        self.n_frames = len(self._sphere_positions)
         self.redraw()
 
     def on_frame_update(self):
@@ -270,3 +271,14 @@ class Spheres(Node):
     def release(self):
         if self.is_renderable:
             self.vao.release()
+
+    def update_frames(self, positions, frames):
+        self.sphere_positions[frames] = positions
+
+    def add_frames(self, positions):
+        if len(positions.shape) == 2:
+            positions = positions[np.newaxis]
+        self.sphere_positions = np.append(self.sphere_positions, positions, axis=0)
+
+    def remove_frames(self, frames):
+        self.sphere_positions = np.delete(self.sphere_positions, frames, axis=0)

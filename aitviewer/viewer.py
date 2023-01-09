@@ -38,10 +38,15 @@ from PIL import Image
 from tqdm import tqdm
 
 from aitviewer.configuration import CONFIG as C
+from aitviewer.models.smpl import SMPLLayer
 from aitviewer.remote.message import Message
+from aitviewer.renderables.arrows import Arrows
 from aitviewer.renderables.billboard import Billboard
+from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.renderables.point_clouds import PointClouds
+from aitviewer.renderables.smpl import SMPLSequence
+from aitviewer.renderables.spheres import Spheres
 from aitviewer.scene.camera import PinholeCamera, ViewerCamera
 from aitviewer.scene.node import Node
 from aitviewer.scene.scene import Scene
@@ -394,8 +399,17 @@ class Viewer(moderngl_window.WindowConfig):
         if msg["type"] == Message.NODE:
             add(msg, Node)
 
-        elif msg["type"] == Message.MESH:
+        elif msg["type"] == Message.MESHES:
             add(msg, Meshes)
+
+        elif msg["type"] == Message.SPHERES:
+            add(msg, Spheres)
+
+        elif msg["type"] == Message.LINES:
+            add(msg, Lines)
+
+        elif msg["type"] == Message.ARROWS:
+            add(msg, Arrows)
 
         elif msg["type"] == Message.DELETE:
             node: Node = self.scene.get_node_by_uid(self.remote_to_local_id[msg["uid"]])

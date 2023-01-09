@@ -122,12 +122,35 @@ class Arrows(Node):
 
     def redraw(self, **kwargs):
         self.bases_r.lines = self.get_line_coords(self.origins, self.mid_points)
-        self.bases_r.redraw(**kwargs)
         self.arrows_r.lines = self.get_line_coords(self.mid_points, self.tips)
-        self.arrows_r.redraw(**kwargs)
 
     @Node.color.setter
     def color(self, color):
         self.material.color = color
         self.bases_r.color = color
         self.arrows_r.color = color
+
+    def update_frames(self, origins, tips, frames):
+        self.origins[frames] = origins
+        self.tips[frames] = tips
+        self.n_frames = self.origins.shape[0]
+        self.redraw()
+
+    def add_frames(self, origins, tips):
+        if len(origins.shape) == 2:
+            origins = origins[np.newaxis]
+        self.origins = np.append(self.origins, origins, axis=0)
+
+        if len(tips.shape) == 2:
+            tips = tips[np.newaxis]
+        self.tips = np.append(self.tips, tips, axis=0)
+
+        self.n_frames = self.origins.shape[0]
+        self.redraw()
+
+    def remove_frames(self, frames):
+        self.origins = np.delete(self.origins, frames, axis=0)
+        self.tips = np.delete(self.tips, frames, axis=0)
+
+        self.n_frames = self.origins.shape[0]
+        self.redraw()
