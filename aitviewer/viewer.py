@@ -239,6 +239,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._go_to_frame_string = ""
         self._show_shortcuts_window = False
 
+        self.server = None
         if C.remote_server_enabled:
             self._init_server(C.remote_server_port)
 
