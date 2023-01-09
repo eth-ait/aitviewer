@@ -38,4 +38,6 @@ backface_culling: True
 background_color: [1.0, 1.0, 1.0, 1.0]
 window_type: "pyqt5"
 
-
+# Remote viewer.
+remote_server_enabled: False
+remote_server_port: 8417

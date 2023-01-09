@@ -630,6 +630,18 @@ class Meshes(Node):
         elif key == wnd_keys.E:
             self.draw_edges = not self.draw_edges
 
+    def update_frames(self, vertices, frames):
+        self.vertices[frames] = vertices
+
+    def add_frames(self, vertices):
+        if len(vertices.shape) == 2:
+            vertices = vertices[np.newaxis]
+        self.vertices = np.append(self.vertices, vertices, axis=0)
+        self.n_frames = max(self.n_frames, self.vertices.shape[0])
+
+    def remove_frames(self, frames):
+        self.vertices = np.delete(self.vertices, frames, axis=0)
+
 
 class VariableTopologyMeshes(Node):
     """
