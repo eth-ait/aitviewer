@@ -50,8 +50,8 @@ class RigidBodies(Node):
         :param radius_cylinder: Radius of the cylinder representing the orientation, default is length / 50
         :param color: Color of the rigid body centers (4-tuple).
         """
-        self.rb_pos = rb_pos[np.newaxis] if rb_pos.ndim == 2 else rb_pos
-        self.rb_ori = rb_ori[np.newaxis] if rb_ori.ndim == 3 else rb_ori
+        self._rb_pos = rb_pos[np.newaxis] if rb_pos.ndim == 2 else rb_pos
+        self._rb_ori = rb_ori[np.newaxis] if rb_ori.ndim == 3 else rb_ori
         super(RigidBodies, self).__init__(
             n_frames=self.rb_pos.shape[0], color=color, icon=icon, **kwargs
         )
@@ -108,6 +108,24 @@ class RigidBodies(Node):
         self.rb_ori[idx] = ori
 
     @property
+    def rb_pos(self):
+        return self._rb_pos
+
+    @rb_pos.setter
+    def rb_pos(self, rb_pos):
+        self._rb_pos = rb_pos if len(rb_pos.shape) == 3 else rb_pos[np.newaxis]
+        self.n_frames = self._rb_pos.shape[0]
+
+    @property
+    def rb_ori(self):
+        return self._rb_ori
+
+    @rb_ori.setter
+    def rb_ori(self, rb_ori):
+        self._rb_ori = rb_ori if len(rb_ori.shape) == 4 else rb_ori[np.newaxis]
+        self.n_frames = self._rb_ori.shape[0]
+
+    @property
     def bounds(self):
         return compute_union_of_bounds(self.coords)
 
@@ -150,3 +168,28 @@ class RigidBodies(Node):
             format="%.3f",
         )
         super(RigidBodies, self).gui(imgui)
+
+    def update_frames(self, rb_pos, rb_ori, frames):
+        self.rb_pos[frames] = rb_pos
+        self.rb_ori[frames] = rb_ori
+        self.n_frames = self.rb_pos.shape[0]
+        self.redraw()
+
+    def add_frames(self, rb_pos, rb_ori):
+        if len(rb_pos.shape) == 2:
+            rb_pos = rb_pos[np.newaxis]
+        self.rb_pos = np.append(self.rb_pos, rb_pos, axis=0)
+
+        if len(rb_ori.shape) == 3:
+            rb_ori = rb_ori[np.newaxis]
+        self.rb_ori = np.append(self.rb_ori, rb_ori, axis=0)
+
+        self.n_frames = self.rb_pos.shape[0]
+        self.redraw()
+
+    def remove_frames(self, frames):
+        self.rb_pos = np.delete(self.rb_pos, frames, axis=0)
+        self.rb_ori = np.delete(self.rb_ori, frames, axis=0)
+
+        self.n_frames = self.rb_pos.shape[0]
+        self.redraw()

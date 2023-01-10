@@ -3,7 +3,12 @@ import enum
 
 class Message(enum.Enum):
     NODE = 1
-    MESH = 2
+    MESHES = 2
+    SPHERES = 3
+    LINES = 4
+    ARROWS = 5
+    RIGID_BODIES = 6
+    SMPL = 10
 
     DELETE = 100
     ADD_FRAMES = 101
