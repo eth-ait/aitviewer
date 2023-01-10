@@ -52,8 +52,8 @@ class Arrows(Node):
             assert len(origins.shape) == 3
         super(Arrows, self).__init__(n_frames=len(origins), **kwargs)
 
-        self.origins = origins
-        self.tips = tips
+        self._origins = origins
+        self._tips = tips
 
         # Percentage of arrow head on entire length
         self.p = p
@@ -107,6 +107,24 @@ class Arrows(Node):
     def current_tips(self, tips):
         idx = self.current_frame_id if self.tips.shape[0] > 1 else 0
         self.tips[idx] = tips
+
+    @property
+    def origins(self):
+        return self._origins
+
+    @origins.setter
+    def origins(self, origins):
+        self._origins = origins if len(origins.shape) == 3 else origins[np.newaxis]
+        self.n_frames = self._origins.shape[0]
+
+    @property
+    def tips(self):
+        return self._tips
+
+    @tips.setter
+    def tips(self, tips):
+        self._tips = tips if len(tips.shape) == 3 else tips[np.newaxis]
+        self.n_frames = self._tips.shape[0]
 
     @property
     def mid_points(self):

@@ -108,6 +108,8 @@ class SMPLSequence(Node):
 
         self.smpl_layer = smpl_layer
         self.post_fk_func = post_fk_func
+        self.dtype = dtype
+        self.device = device
 
         self.poses_body = to_torch(poses_body, dtype=dtype, device=device)
         self.poses_left_hand = to_torch(poses_left_hand, dtype=dtype, device=device)
@@ -729,3 +731,78 @@ class SMPLSequence(Node):
     def render_outline(self, *args, **kwargs):
         # Only render outline of the mesh, skipping skeleton and rigid bodies.
         self.mesh_seq.render_outline(*args, **kwargs)
+
+    def add_frames(self, poses_body, poses_root=None, trans=None, betas=None):
+        # Append poses_body.
+        if len(poses_body.shape) == 1:
+            poses_body = poses_body[np.newaxis]
+        self.poses_body = torch.cat(
+            (self.poses_body, to_torch(poses_body, self.dtype, self.device))
+        )
+
+        # Append poses_root or zeros.
+        if poses_root is None:
+            poses_root = torch.zeros([len(poses_body), 3])
+        elif len(poses_root.shape) == 1:
+            poses_root = poses_root[np.newaxis]
+        self.poses_root = torch.cat(
+            (self.poses_root, to_torch(poses_root, self.dtype, self.device))
+        )
+
+        # Append trans or zeros.
+        if trans is None:
+            trans = torch.zeros([len(poses_body), 3])
+        elif len(trans.shape) == 1:
+            trans = trans[np.newaxis]
+        self.trans = torch.cat((self.trans, to_torch(trans, self.dtype, self.device)))
+
+        # Append betas or zeros .
+        if betas is None:
+            # If we have only 1 frame of betas we don't need to append zeros, as the first
+            # frame of betas will be broadcasted to all frames.
+            if betas.shape[0] > 1:
+                self.betas = torch.cat(
+                    (
+                        self.betas,
+                        to_torch(
+                            torch.zeros([1, self.smpl_layer.num_betas]),
+                            self.dtype,
+                            self.device,
+                        ),
+                    )
+                )
+        else:
+            if len(betas.shape) == 1:
+                betas = betas[np.newaxis]
+            self.betas = torch.cat(
+                (self.betas, to_torch(betas, self.dtype, self.device))
+            )
+
+        self.n_frames = len(self.poses_body)
+        self.redraw()
+
+    def update_frames(
+        self, poses_body, frames, poses_root=None, trans=None, betas=None
+    ):
+        self.poses_body[frames] = to_torch(poses_body, self.dtype, self.device)
+        if poses_root is not None:
+            self.poses_root[frames] = to_torch(poses_root, self.dtype, self.device)
+        if trans is not None:
+            self.trans[frames] = to_torch(trans, self.dtype, self.device)
+        if betas is not None:
+            self.betas[frames] = to_torch(betas, self.dtype, self.device)
+        self.redraw()
+
+    def remove_frames(self, frames):
+        frames_to_keep = torch.from_numpy(
+            np.setdiff1d(np.arange(self.n_frames), frames)
+        ).to(dtype=torch.long, device=self.device)
+
+        self.poses_body = self.poses_body[frames_to_keep]
+        self.poses_root = self.poses_root[frames_to_keep]
+        self.trans = self.trans[frames_to_keep]
+        if self.betas.shape != 1:
+            self.betas = self.betas[frames_to_keep]
+
+        self.n_frames = len(self.poses_body)
+        self.redraw()

@@ -45,6 +45,7 @@ from aitviewer.renderables.billboard import Billboard
 from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.renderables.point_clouds import PointClouds
+from aitviewer.renderables.rigid_bodies import RigidBodies
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.renderables.spheres import Spheres
 from aitviewer.scene.camera import PinholeCamera, ViewerCamera
@@ -410,6 +411,23 @@ class Viewer(moderngl_window.WindowConfig):
 
         elif msg["type"] == Message.ARROWS:
             add(msg, Arrows)
+
+        elif msg["type"] == Message.RIGID_BODIES:
+            add(msg, RigidBodies)
+
+        elif msg["type"] == Message.SMPL:
+            layer_arg_names = {"model_type", "gender", "num_betas"}
+            layer_kwargs = {
+                k: v for k, v in msg["kwargs"].items() if k in layer_arg_names
+            }
+            layer = SMPLLayer(**layer_kwargs)
+
+            sequence_kwargs = {
+                k: v for k, v in msg["kwargs"].items() if k not in layer_arg_names
+            }
+            n = SMPLSequence(*msg["args"], smpl_layer=layer, **sequence_kwargs)
+            self.scene.add(n)
+            self.remote_to_local_id[msg["uid"]] = n.uid
 
         elif msg["type"] == Message.DELETE:
             node: Node = self.scene.get_node_by_uid(self.remote_to_local_id[msg["uid"]])

@@ -17,8 +17,18 @@ class RemoteSMPLSequence(RemoteNode):
             **kwargs,
         )
 
-    def add_frames(self, poses_body, betas):
-        return super().add_frames(poses_body=poses_body, betas=betas)
+    def add_frames(self, poses_body, poses_root=None, trans=None, betas=None):
+        return super().add_frames(
+            poses_body=poses_body, poses_root=poses_root, trans=trans, betas=betas
+        )
 
-    def update_frames(self, poses_body, betas):
-        return super().update_frames(poses_body=poses_body, betas=betas)
+    def update_frames(
+        self, poses_body, frames, poses_root=None, trans=None, betas=None
+    ):
+        return super().update_frames(
+            poses_body=poses_body,
+            frames=frames,
+            poses_root=poses_root,
+            trans=trans,
+            betas=betas,
+        )
