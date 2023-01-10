@@ -1,9 +1,9 @@
 ---
-title: Introduction
+title: Getting Started
 layout: home
 nav_order: 0
 ---
-## Overview
+# Overview
 The official page for aitviewer, a set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS.
 
 ## Features

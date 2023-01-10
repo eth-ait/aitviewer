@@ -1,6 +1,7 @@
 ---
 title: Keyboard Shortcuts
 layout: default
+parent: Viewer Frontend
 ---
 
 The viewer supports the following keyboard shortcuts, all of this functionality is also accessible from the menus and windows in the GUI.

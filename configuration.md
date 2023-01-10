@@ -1,7 +1,7 @@
 ---
 title: Configuration
 layout: default
-nav_order: 2
+parent: Viewer Frontend
 ---
 
 The viewer loads default configuration parameters from [`aitvconfig.yaml`](aitviewer/aitvconfig.yaml). There are three ways how to override these parameters:

@@ -1,8 +1,10 @@
 ---
 title: Headless Rendering
 layout: default
+nav_order: 3
 ---
 
+# Headless Rendering
 Headless rendering is supported. An example script below saves frames to disk on a server. 
 
 ```python
@@ -23,3 +25,10 @@ Xvfb :0 -screen 0 640x480x24 &
 ```
 
 See this [Github Issue](https://github.com/eth-ait/aitviewer/issues/10) for more details.
+
+
+## Remote Viewer
+To be filled in once implemented
+
+## Custom Remote Viewer
+Link to example

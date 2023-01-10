@@ -1,10 +1,12 @@
 ---
-title: Architecture
+title: Technical Details
 layout: default
-has_children: true
+nav_order: 7
 ---
 
+# Technical Details
 Details describing the implementation of the viewer will be added here. Example flowchart using Mermaid.
+
 
 ```mermaid
 flowchart TB
@@ -17,6 +19,14 @@ flowchart TB
     end
 
 ```
+
+## Rendering pipeline
+
+## Scene Components
+Scene, Nodes, and Renderables
+
+## How we handle transparency
+
 
 
 
