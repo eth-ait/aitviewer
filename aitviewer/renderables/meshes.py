@@ -764,7 +764,7 @@ class VariableTopologyMeshes(Node):
           but allows interactive animations.
         """
         assert len(vertices) == len(faces)
-        super(VariableTopologyMeshes, self).__init__(n_frames=len(vertices))
+        super(VariableTopologyMeshes, self).__init__(n_frames=len(vertices), **kwargs)
         self.preload = preload
 
         self.vertices = vertices
