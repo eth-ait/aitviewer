@@ -43,5 +43,6 @@ setup(
         "joblib",
         "scikit-video",
         "Pillow",
+        "websockets",
     ],
 )
