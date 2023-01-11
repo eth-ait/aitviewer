@@ -1931,5 +1931,4 @@ class Viewer(moderngl_window.WindowConfig):
 if __name__ == "__main__":
     v = Viewer(config={"remote_server_enabled": True})
     v.scene.floor.enabled = False
-    print("OK", flush=True)
     v.run()

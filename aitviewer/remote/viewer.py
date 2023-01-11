@@ -7,23 +7,20 @@ import websockets
 
 
 class RemoteViewer:
-    def __init__(self, host=None, port=8417):
+    def __init__(self, host=None, port=8417, timeout=10):
         if host is None:
-            # self.p = subprocess.Popen(["python", "-um", "aitviewer.viewer"], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP, stdout=subprocess.PIPE)
             self.p = subprocess.Popen(
                 ["python", "-um", "aitviewer.viewer"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
             )
-            for l in self.p.stdout:
-                if "OK" in l.decode():
-                    break
             host = "localhost"
         else:
             self.p = None
 
         url = f"ws://{host}:{port}"
 
+        self.timeout = timeout
         self.connected = False
         self.semaphore = threading.Semaphore(0)
 
@@ -42,13 +39,24 @@ class RemoteViewer:
 
     async def _async_entry(self, url):
         self.queue = asyncio.Queue()
+
+        # Attempt to connect until 'self.timeout' seconds passed.
+        start_time = self.loop.time()
+        while self.loop.time() < start_time + self.timeout:
+            try:
+                self.websocket = await websockets.connect(url)
+                self.connected = True
+                break
+            except:
+                pass
+
+        # Notify main thread of connection status.
+        self.semaphore.release()
+        if not self.connected:
+            return
+
+        # Message loop.
         try:
-            self.websocket = await websockets.connect(url)
-
-            # Notify main thread of connection
-            self.connected = True
-            self.semaphore.release()
-
             while True:
                 data = await self.queue.get()
                 if data is None:
