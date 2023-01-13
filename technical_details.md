@@ -2,6 +2,8 @@
 title: Technical Details
 layout: default
 nav_order: 7
+has_children: true
+usemathjax: true
 ---
 
 # Technical Details
@@ -19,15 +21,5 @@ flowchart TB
     end
 
 ```
-
-## Rendering pipeline
-
-## Scene Components
-Scene, Nodes, and Renderables
-
-## How we handle transparency
-
-
-
 
 

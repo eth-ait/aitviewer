@@ -21,3 +21,5 @@ mermaid:
 
 baseurl: "/aitviewer"
 url: "https://eth-ait.github.io"
+
+include: ["technical_details", "img"]
