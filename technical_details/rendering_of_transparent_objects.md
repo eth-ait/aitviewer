@@ -34,7 +34,7 @@ For transparent objects that are non-convex, different parts of the object could
 Correctly handling self-overlap would require either splitting the object into convex parts and sorting them or sorting the triangle themselves depending on the view position (assuming there aren't any intersecting triangles).
 Both of these options are fairly involved, therefore our rendering pipeline takes a simpler approach of that doesn't correctly handle this case but avoids the artifacts of self overlapping objects by rendering a depth-prepass.
 
-| ![alt-text-1](/aitviewer/img/depth_prepass_without.png) | ![alt-text-2](/aitviewer/img/depth_prepass_with.png) |
+| ![alt-text-1](/aitviewer/assets/images/depth_prepass_without.png) | ![alt-text-2](/aitviewer/assets/images/depth_prepass_with.png) |
 |:--:| :--:|
 | _**Without** depth-prepass_ | _**With** depth-prepass_ |
 
@@ -47,7 +47,7 @@ The transparency rendering logic is implemented in the `Scene.render()` method i
 - Sort all transparent objects (those for which `Node.is_transparent()` returns `True`) from back to front based on distance to camera.
 - For each transparent object in order, draw it to the depth buffer only and then draw it again with the `<=` depth function.
 
-Drawing to the depth buffer is implemented in the `Node.render_depth_prepasss()` method, which sets up uniform buffers and only draws the triangles with an empty fragment shader bound using the `Node.render_positions()` method discussed in the [Rendering Pipeline]({% link technical_details/rendering_pipeline.md %}) section.
+Drawing to the depth buffer is implemented in the `Node.render_depth_prepasss()` method, which sets up uniform buffers and only draws the triangles with an empty fragment shader bound using the `Node.render_positions()` method discussed in the [Rendering Pipeline]({{ site.baseurl }}{% link technical_details/rendering_pipeline.md %}) section.
 
 ## Order independent transparency
 The main limitation of the current implementation is that the intersecting objects and self overlap issues are not completely solved. There are other approaches to handle transparency that don't rely on sorting. These are often referred to as order independent transparency methods, one simpler approach is [depth peeling](https://developer.download.nvidia.com/assets/gamedev/docs/OrderIndependentTransparency.pdf) but [more advanced approaches](https://interplayoflight.wordpress.com/2022/06/25/order-independent-transparency-part-1/) also exist. In the future one of these methods could be implemented to improve the quality of scenes with more complex transparent objects.
