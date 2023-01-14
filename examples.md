@@ -5,7 +5,7 @@ nav_order: 10
 ---
 
 
-Check out the [examples](https://github.com/eth-ait/aitviewer/blob/main/examples/) for a few https://github.com/eth-ait/aitviewer/blob/main/examples how to use the viewer:
+Check out the [examples](https://github.com/eth-ait/aitviewer/blob/main/examples/) directory for a few examples of how to use the viewer:
  * [`animation.py`](https://github.com/eth-ait/aitviewer/blob/main/examples/animation.py): Example of how 3D primitives can be animated.
 
  * [`camera_path.py`](https://github.com/eth-ait/aitviewer/blob/main/examples/camera_path.py): Example how to use camera paths.

@@ -32,11 +32,11 @@ To handle overlap between different transparent objects we need to ensure the ob
 ## Self overlap
 For transparent objects that are non-convex, different parts of the object could end up covering the same pixel and we need to ensure that they are rendered in the right order. Triangles that are drawn in the same OpenGL draw call are processed in submission order, meaning that triangles are blended into the framebuffer in the same order as they are specified in the index buffer. Therefore the blending order might or might not be correct based on the order of triangles and the view position. Since meshes usually don't follow strict ordering conventions for triangles this could result in unpleasant artifacts when some nearby triangles aren't ordered consistently.
 Correctly handling self-overlap would require either splitting the object into convex parts and sorting them or sorting the triangle themselves depending on the view position (assuming there aren't any intersecting triangles).
-Both of these options are fairly involved, therefore our rendering pipeline takes a simpler approach of that doesn't correctly handle this case but avoids the artifacts of self overlapping objects by rendering a depth-prepass.
+Both of these options are fairly involved, therefore our rendering pipeline takes a simpler approach that doesn't correctly handle this case but avoids the artifacts of self overlapping objects by rendering a depth prepass.
 
 | ![alt-text-1](/aitviewer/assets/images/depth_prepass_without.png) | ![alt-text-2](/aitviewer/assets/images/depth_prepass_with.png) |
 |:--:| :--:|
-| _**Without** depth-prepass_ | _**With** depth-prepass_ |
+| _**Without** depth prepass_ | _**With** depth prepass_ |
 
 
 The way this works is that when we draw a transparent object, we first draw it only to the depth buffer, we do this by using an empty fragment shader and setting the color mask of the framebuffer to all zeros. After this depth-only prepass we draw the object again normally, but using an `<=` depth comparison function, meaning that instead of keeping only pixels that are closer to the camera than what has already been drawn to the depth buffer, we also keep pixels that are exactly at the same depth. This ensures that only the first layer of triangles closer to the camera survives the depth test and is blended with the background. The result is that we avoid order-related blending artifacts, but we only blend the side of the object that is closer to the camera with the background and not with itself.
