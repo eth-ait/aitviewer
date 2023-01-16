@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import pickle
-from typing import List
+from typing import List, Union
 
 import cv2
 import moderngl
@@ -37,25 +37,24 @@ class Billboard(Node):
     """A billboard for displaying a sequence of images as an object in the world"""
 
     def __init__(
-        self, vertices, texture_paths, img_process_fn=None, icon="\u0096", **kwargs
+        self, vertices, textures, img_process_fn=None, icon="\u0096", **kwargs
     ):
         """Initializer.
         :param vertices:
             A np array of 4 billboard vertices in world space coordinates of shape (4, 3)
             or an array of shape (N, 4, 3) containing 4 vertices for each frame of the sequence
-        :param texture_paths: A list of length N containing paths to the textures as image files.
+        :param texture_paths: A list of length N containing paths to the textures as image files
+            or a numpy array or PIL Image of shape (N, H, W, C) containing N images of image data with C channels.
         :param img_process_fn: A function with signature f(img, current_frame_id) -> img. This function is called
             once per image before it is displayed so it can be used to process the image in any way.
         """
-        super(Billboard, self).__init__(
-            n_frames=len(texture_paths), icon=icon, **kwargs
-        )
+        super(Billboard, self).__init__(n_frames=len(textures), icon=icon, **kwargs)
 
         if len(vertices.shape) == 2:
             vertices = vertices[np.newaxis]
         else:
             assert vertices.shape[0] == 1 or vertices.shape[0] == len(
-                texture_paths
+                textures
             ), "the length of the sequence of vertices must be 1 or match the number of textures"
 
         center = np.mean(vertices, axis=(0, 1))
@@ -84,7 +83,7 @@ class Billboard(Node):
             axis=0,
         )
 
-        self.texture_paths = texture_paths
+        self.textures = textures
 
         self.texture = None
         self.texture_alpha = 1.0
@@ -97,12 +96,17 @@ class Billboard(Node):
         self.outline = True
 
     @classmethod
-    def from_images(cls, texture_paths, scale=1.0, **kwargs):
+    def from_images(cls, textures, scale=1.0, **kwargs):
         """
         Initialize Billboards at default location with the given textures.
         """
         # Load a single image so we can determine the aspect ratio.
-        img = cv2.imread(texture_paths[0])
+        if isinstance(textures, list) and isinstance(textures[0], str):
+            img = cv2.imread(textures[0])
+        else:
+            img = textures[0]
+            if not isinstance(img, np.ndarray):
+                img = np.asarray(img)
         ar = img.shape[1] / img.shape[0]
 
         corners = (
@@ -117,8 +121,7 @@ class Billboard(Node):
             * scale
         )
 
-        billboard = cls(corners, texture_paths, **kwargs)
-        return billboard
+        return cls(corners, textures, **kwargs)
 
     @classmethod
     def from_camera_and_distance(
@@ -127,7 +130,7 @@ class Billboard(Node):
         distance: float,
         cols: int,
         rows: int,
-        texture_paths: List[str],
+        textures: Union[List[str], np.ndarray],
         image_process_fn=None,
         **kwargs,
     ):
@@ -185,7 +188,7 @@ class Billboard(Node):
 
                 image_process_fn = undistort
 
-        return cls(all_corners, texture_paths, image_process_fn, **kwargs)
+        return cls(all_corners, textures, image_process_fn, **kwargs)
 
     # noinspection PyAttributeOutsideInit
     @Node.once
@@ -221,14 +224,22 @@ class Billboard(Node):
             if self.texture:
                 self.texture.release()
 
-            path = self.texture_paths[self.current_frame_id]
-            if path.endswith((".pickle", "pkl")):
-                img = pickle.load(open(path, "rb"))
+            if isinstance(self.textures, list) and isinstance(self.textures[0], str):
+                path = self.textures[self.current_frame_id]
+                if path.endswith((".pickle", "pkl")):
+                    img = pickle.load(open(path, "rb"))
+                else:
+                    img = cv2.cvtColor(cv2.flip(cv2.imread(path), 0), cv2.COLOR_BGR2RGB)
             else:
-                img = cv2.cvtColor(cv2.flip(cv2.imread(path), 0), cv2.COLOR_BGR2RGB)
+                img = self.textures[self.current_frame_id]
+                if not isinstance(img, np.ndarray):
+                    img = np.asarray(img)
+
             img = self.img_process_fn(img, self.current_frame_id)
             self.texture = self.ctx.texture(
-                (img.shape[1], img.shape[0]), img.shape[2], img.tobytes()
+                (img.shape[1], img.shape[0]),
+                img.shape[2] if len(img.shape) > 2 else 1,
+                img.tobytes(),
             )
             self._current_texture_id = self.current_frame_id
 
