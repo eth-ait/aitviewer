@@ -43,7 +43,7 @@ class Billboard(Node):
         :param vertices:
             A np array of 4 billboard vertices in world space coordinates of shape (4, 3)
             or an array of shape (N, 4, 3) containing 4 vertices for each frame of the sequence
-        :param texture_paths: A list of length N containing paths to the textures as image files
+        :param texture: A list of length N containing paths to the textures as image files
             or a numpy array or PIL Image of shape (N, H, W, C) containing N images of image data with C channels.
         :param img_process_fn: A function with signature f(img, current_frame_id) -> img. This function is called
             once per image before it is displayed so it can be used to process the image in any way.
@@ -71,10 +71,10 @@ class Billboard(Node):
             np.array(
                 [
                     [
-                        [0.0, 0.0],
                         [0.0, 1.0],
-                        [1.0, 0.0],
+                        [0.0, 0.0],
                         [1.0, 1.0],
+                        [1.0, 0.0],
                     ]
                 ],
                 np.float32,
@@ -229,7 +229,7 @@ class Billboard(Node):
                 if path.endswith((".pickle", "pkl")):
                     img = pickle.load(open(path, "rb"))
                 else:
-                    img = cv2.cvtColor(cv2.flip(cv2.imread(path), 0), cv2.COLOR_BGR2RGB)
+                    img = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
             else:
                 img = self.textures[self.current_frame_id]
                 if not isinstance(img, np.ndarray):
