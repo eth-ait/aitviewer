@@ -29,8 +29,6 @@ import imgui
 import moderngl
 import moderngl_window
 import numpy as np
-import skvideo.io
-import trimesh
 from moderngl_window import activate_context, geometry, get_local_window_cls
 from moderngl_window.opengl.vao import VAO
 from omegaconf.dictconfig import DictConfig
@@ -53,8 +51,9 @@ from aitviewer.scene.node import Node
 from aitviewer.scene.scene import Scene
 from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
-from aitviewer.utils import PerfTimer, path
+from aitviewer.utils import path
 from aitviewer.utils.imgui_integration import ImGuiRenderer
+from aitviewer.utils.perf_timer import PerfTimer
 from aitviewer.utils.utils import get_video_paths, video_to_gif
 
 MeshMouseIntersection = namedtuple(
@@ -94,7 +93,7 @@ class Viewer(moderngl_window.WindowConfig):
 
     def __init__(
         self,
-        title="AITViewer",
+        title="aitviewer",
         size: Tuple[int, int] = None,
         config: Union[DictConfig, dict] = None,
         samples: int = None,
@@ -1424,6 +1423,8 @@ class Viewer(moderngl_window.WindowConfig):
         for path in paths:
             base, ext = os.path.splitext(path)
             if ext == ".obj" or ext == ".ply":
+                import trimesh
+
                 obj = trimesh.load(path)
                 obj_mesh = Meshes(obj.vertices, obj.faces, name=os.path.basename(base))
                 self.scene.add(obj_mesh)
@@ -1788,6 +1789,9 @@ class Viewer(moderngl_window.WindowConfig):
         seconds_per_rotation=10.0,
         scale_factor=None,
     ):
+        # Load this module to reduce load time.
+        import skvideo.io
+
         if rotate_camera and not isinstance(self.scene.camera, ViewerCamera):
             print(
                 "Cannot export a video with camera rotation while using a camera that is not a ViewerCamera"

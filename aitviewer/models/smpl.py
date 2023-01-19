@@ -21,7 +21,6 @@ import numpy as np
 import smplx
 import torch
 import torch.nn as nn
-import trimesh
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.utils.so3 import aa2rot_torch as aa2rot
@@ -108,6 +107,8 @@ class SMPLLayer(nn.Module, ABC):
         """Return a matrix that returns a list of faces each vertex is contributing to. `vertices` should have
         have shape (V, 3)."""
         if self._vertex_faces is None:
+            import trimesh
+
             mesh = trimesh.Trimesh(
                 vertices.detach().cpu().numpy(), self.faces.cpu().numpy(), process=False
             )

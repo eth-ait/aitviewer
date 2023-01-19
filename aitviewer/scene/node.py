@@ -141,7 +141,7 @@ class Node(object):
         self.depth_only_program = (
             None  # Required for depth_prepass and cast_shadow passes
         )
-        self.fragmap_program = None  # Required for framap pass
+        self.fragmap_program = None  # Required for fragmap pass
         self.outline_program = None  # Required for outline pass
 
         # GUI
