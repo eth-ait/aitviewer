@@ -1,4 +1,4 @@
-from .message import Message, make_message
+from .message import Message
 from .viewer import RemoteViewer
 
 GLOBAL_ID = 0
@@ -19,8 +19,7 @@ class RemoteNode:
         self._send_msg(self.MESSAGE_TYPE, *args, **kwargs)
 
     def _send_msg(self, type, *args, **kwargs):
-        msg = make_message(type, self.uid, args, kwargs)
-        self.viewer.send_msg(msg)
+        self.viewer.send_message(type, self.uid, args, kwargs)
 
     def add_frames(self, *args, **kwargs):
         self._send_msg(Message.ADD_FRAMES, *args, **kwargs)

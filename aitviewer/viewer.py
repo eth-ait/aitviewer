@@ -16,10 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import copy
 import os
-import pickle
-import queue
 import struct
-import threading
 from array import array
 from collections import namedtuple
 from pathlib import Path
@@ -36,19 +33,14 @@ from PIL import Image
 from tqdm import tqdm
 
 from aitviewer.configuration import CONFIG as C
-from aitviewer.models.smpl import SMPLLayer
 from aitviewer.remote.message import Message
-from aitviewer.renderables.arrows import Arrows
 from aitviewer.renderables.billboard import Billboard
-from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.renderables.point_clouds import PointClouds
-from aitviewer.renderables.rigid_bodies import RigidBodies
-from aitviewer.renderables.smpl import SMPLSequence
-from aitviewer.renderables.spheres import Spheres
 from aitviewer.scene.camera import PinholeCamera, ViewerCamera
 from aitviewer.scene.node import Node
 from aitviewer.scene.scene import Scene
+from aitviewer.server import ViewerServer
 from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
 from aitviewer.utils import path
@@ -258,8 +250,8 @@ class Viewer(moderngl_window.WindowConfig):
         self._show_shortcuts_window = False
 
         self.server = None
-        if C.remote_server_enabled:
-            self._init_server(C.remote_server_port)
+        if C.server_enabled:
+            self.server = ViewerServer(self, C.server_port)
 
     # noinspection PyAttributeOutsideInit
     def create_framebuffers(self):
@@ -357,101 +349,11 @@ class Viewer(moderngl_window.WindowConfig):
         if self.auto_set_camera_target:
             self.scene.auto_set_camera_target()
 
-    def _init_server(self, port):
-        # Remote
-        def remote_server(queue: queue.Queue):
-            import asyncio
+    def get_node_by_remote_uid(self, remote_uid: int):
+        return self.server.get_node_by_remote_uid(remote_uid)
 
-            import websockets
-
-            async def serve(websocket):
-                addr = websocket.remote_address
-                print(f"New connection: {addr[0]}:{addr[1]}")
-                try:
-                    async for message in websocket:
-                        data = pickle.loads(message)
-                        queue.put_nowait(data)
-                except:
-                    pass
-                print(f"Connection closed: {addr[0]}:{addr[1]}")
-
-            async def main():
-                server = await websockets.serve(serve, "0.0.0.0", port)
-                await server.serve_forever()
-
-            asyncio.run(main())
-
-        # daemon = true means that the thread is abruptly stopped once the main thread exits.
-        self.queue = queue.Queue()
-        self.server = threading.Thread(
-            target=remote_server, args=(self.queue,), daemon=True
-        )
-        self.server.start()
-
-        self.remote_to_local_id = {}
-
-    def process_message(self, msg):
-        def add(msg, type):
-            n = type(*msg["args"], **msg["kwargs"])
-            self.scene.add(n)
-            self.remote_to_local_id[msg["uid"]] = n.uid
-
-        if msg["type"] == Message.NODE:
-            add(msg, Node)
-
-        elif msg["type"] == Message.MESHES:
-            add(msg, Meshes)
-
-        elif msg["type"] == Message.SPHERES:
-            add(msg, Spheres)
-
-        elif msg["type"] == Message.LINES:
-            add(msg, Lines)
-
-        elif msg["type"] == Message.ARROWS:
-            add(msg, Arrows)
-
-        elif msg["type"] == Message.RIGID_BODIES:
-            add(msg, RigidBodies)
-
-        elif msg["type"] == Message.SMPL:
-            layer_arg_names = {"model_type", "gender", "num_betas"}
-            layer_kwargs = {
-                k: v for k, v in msg["kwargs"].items() if k in layer_arg_names
-            }
-            layer = SMPLLayer(**layer_kwargs)
-
-            sequence_kwargs = {
-                k: v for k, v in msg["kwargs"].items() if k not in layer_arg_names
-            }
-            n = SMPLSequence(*msg["args"], smpl_layer=layer, **sequence_kwargs)
-            self.scene.add(n)
-            self.remote_to_local_id[msg["uid"]] = n.uid
-
-        elif msg["type"] == Message.DELETE:
-            node: Node = self.scene.get_node_by_uid(self.remote_to_local_id[msg["uid"]])
-            if node and node.parent:
-                node.parent.remove(node)
-
-        elif msg["type"] == Message.UPDATE_FRAMES:
-            node: Node = self.scene.get_node_by_uid(self.remote_to_local_id[msg["uid"]])
-            if node:
-                node.update_frames(*msg["args"], **msg["kwargs"])
-
-        elif msg["type"] == Message.ADD_FRAMES:
-            node: Node = self.scene.get_node_by_uid(self.remote_to_local_id[msg["uid"]])
-            if node:
-                node.add_frames(*msg["args"], **msg["kwargs"])
-
-        elif msg["type"] == Message.REMOVE_FRAMES:
-            node: Node = self.scene.get_node_by_uid(self.remote_to_local_id[msg["uid"]])
-            if node:
-                node.remove_frames(*msg["args"], **msg["kwargs"])
-
-    def _process_messages(self):
-        while not self.queue.empty():
-            msg = self.queue.get_nowait()
-            self.process_message(msg)
+    def process_message(self, type: Message, remote_uid: int, args, kwargs):
+        self.server.process_message(type, remote_uid, args, kwargs)
 
     def run(self, *args, log=True):
         """
@@ -468,7 +370,7 @@ class Viewer(moderngl_window.WindowConfig):
 
         while not self.window.is_closing:
             if self.server is not None:
-                self._process_messages()
+                self.server.process_messages()
 
             current_time, delta = self.timer.next_frame()
 
@@ -1930,9 +1832,3 @@ class Viewer(moderngl_window.WindowConfig):
         self.scene.current_frame_id = saved_curr_frame
         self.run_animations = saved_run_animations
         self._last_frame_rendered_at = self.timer.time
-
-
-if __name__ == "__main__":
-    v = Viewer(config={"remote_server_enabled": True})
-    v.scene.floor.enabled = False
-    v.run()

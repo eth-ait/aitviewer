@@ -5,12 +5,21 @@ import threading
 
 import websockets
 
+from .message import make_message
+
 
 class RemoteViewer:
-    def __init__(self, host=None, port=8417, timeout=10):
+    def __init__(self, host=None, port=8417, timeout=10, args=None):
         if host is None:
+            if args is None:
+                popen_args = ["python", "-m", "aitviewer.server"]
+            else:
+                if isinstance(args, list):
+                    popen_args = ["python"] + args
+                else:
+                    popen_args = ["python", str(args)]
             self.p = subprocess.Popen(
-                ["python", "-um", "aitviewer.viewer"],
+                popen_args,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
             )
@@ -81,7 +90,8 @@ class RemoteViewer:
         except Exception as e:
             print(f"Send loop exception: {e}")
 
-    def send_msg(self, msg):
+    def send_message(self, type, uid=None, args=[], kwargs={}):
+        msg = make_message(type, uid, args, kwargs)
         data = pickle.dumps(msg)
         self.send(data)
 

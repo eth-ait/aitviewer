@@ -15,6 +15,8 @@ class Message(enum.Enum):
     UPDATE_FRAMES = 102
     REMOVE_FRAMES = 103
 
+    USER_MESSAGE = 10000
+
 
 def make_message(type, uid, args, kwargs):
     msg = {
