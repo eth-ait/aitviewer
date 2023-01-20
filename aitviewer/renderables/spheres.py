@@ -274,6 +274,7 @@ class Spheres(Node):
 
     def update_frames(self, positions, frames):
         self.sphere_positions[frames] = positions
+        self.redraw()
 
     def add_frames(self, positions):
         if len(positions.shape) == 2:
@@ -282,3 +283,4 @@ class Spheres(Node):
 
     def remove_frames(self, frames):
         self.sphere_positions = np.delete(self.sphere_positions, frames, axis=0)
+        self.redraw()

@@ -718,6 +718,7 @@ class Meshes(Node):
 
     def update_frames(self, vertices, frames):
         self.vertices[frames] = vertices
+        self.redraw()
 
     def add_frames(self, vertices):
         if len(vertices.shape) == 2:
@@ -727,6 +728,7 @@ class Meshes(Node):
 
     def remove_frames(self, frames):
         self.vertices = np.delete(self.vertices, frames, axis=0)
+        self.redraw()
 
 
 class VariableTopologyMeshes(Node):

@@ -19,11 +19,9 @@ import numpy as np
 import trimesh
 from moderngl_window.opengl.vao import VAO
 
-from aitviewer.renderables.meshes import Meshes
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
 from aitviewer.shaders import (
-    get_cylinder_program,
     get_depth_only_program,
     get_fragmap_program,
     get_lines_instanced_program,
@@ -403,6 +401,7 @@ class Lines(Node):
 
     def update_frames(self, lines, frames):
         self.lines[frames] = lines
+        self.redraw()
 
     def add_frames(self, lines):
         if len(lines.shape) == 2:
@@ -411,3 +410,4 @@ class Lines(Node):
 
     def remove_frames(self, frames):
         self.lines = np.delete(self.lines, frames, axis=0)
+        self.redraw()
