@@ -7,19 +7,6 @@ usemathjax: true
 ---
 
 # Technical Details
-Details describing the implementation of the viewer will be added here. Example flowchart using Mermaid.
-
-
-```mermaid
-flowchart TB
-    remote_viewer<-->local_viewer
-    subgraph server
-    renderer --> local_viewer
-    end
-    subgraph client
-    remote_viewer
-    end
-
-```
+In this section we describe some internal details of the viewer. Most of the topics covered here are intended for advanced users or contributors to the project that want to know more about how the viewer works internally and how to approach implementing new features or modifying existing code.
 
 
