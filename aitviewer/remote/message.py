@@ -15,6 +15,10 @@ class Message(enum.Enum):
     UPDATE_FRAMES = 102
     REMOVE_FRAMES = 103
 
+    SET_FRAME = 200
+    NEXT_FRAME = 201
+    PREVIOUS_FRAME = 202
+
     USER_MESSAGE = 10000
 
 

@@ -45,6 +45,7 @@ if len(sys.argv) == 1:
             name=f"Cube {i}",
             position=(i, 0, 0),
             scale=0.1,
+            flat_shading=True,
         )
         time.sleep(1)
 

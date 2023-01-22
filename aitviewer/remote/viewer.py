@@ -5,11 +5,22 @@ import threading
 
 import websockets
 
-from .message import make_message
+from .message import Message, make_message
 
 
 class RemoteViewer:
     def __init__(self, host=None, port=8417, timeout=10, args=None):
+        """
+        Initializer.
+        :param host: the ip address of a host to connect to as a string or None.
+          if None, an empty viewer is created in a new process on the local host.
+        :param port: the TCP port to connect to.
+        :param timeout: a timeout in seconds for attempting to connect to the viewer.
+        :param args: if host is None this parameter can be used to specify an argument or
+          a list of arguments that is used to create the local viewer process.
+          e.g: args = ["path/to/script.py", "arg1", "arg2"] will invoke the following command:
+                python path/to/script.py arg1 arg2
+        """
         if host is None:
             if args is None:
                 popen_args = ["python", "-m", "aitviewer.server"]
@@ -91,11 +102,38 @@ class RemoteViewer:
             print(f"Send loop exception: {e}")
 
     def send_message(self, type, uid=None, args=[], kwargs={}):
+        """
+        Send a message to the viewer. See Viewer.process_message()
+        for information about how these parameters are interpreted
+        by the viewer.
+        """
         msg = make_message(type, uid, args, kwargs)
         data = pickle.dumps(msg)
         self.send(data)
 
+    def set_frame(self, frame: int):
+        """
+        Set the current active frame of the remote viewer.
+
+        :param frame: an integer representing the id of the frame.
+        """
+        self.send_message(Message.SET_FRAME, None, [frame])
+
+    def next_frame(self):
+        """Set the current active frame of the remote viewer to the next frame"""
+        self.send_message(Message.NEXT_FRAME)
+
+    def previous_frame(self):
+        """Set the current active frame of the remote viewer to the previous frame"""
+        self.send_message(Message.PREVIOUS_FRAME)
+
     def wait_close(self, print_viewer_output=True):
+        """
+        If the viewer was created locally in a separate process wait for it
+        to exit and optionally print the standard output of the remote viewer.
+
+        :param print_viewer_output: if True print the output of the remote viewer.
+        """
         self.send(None)
         self.thread.join()
         if self.p is not None:

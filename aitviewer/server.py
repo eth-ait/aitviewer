@@ -14,6 +14,12 @@ from aitviewer.scene.node import Node
 
 class ViewerServer:
     def __init__(self, viewer, port):
+        """
+        Initializer.
+        :param viewer: the viewer for which the server processes messages.
+        :param port: the TCP port number to which the websocket for listening to incoming
+          connections will be bound.
+        """
         self.viewer = viewer
         self.remote_to_local_id = {}
         self.queue = queue.Queue()
@@ -47,6 +53,7 @@ class ViewerServer:
         self.thread.start()
 
     def process_messages(self):
+        """Processes all messages received since the last time this method was called."""
         while not self.queue.empty():
             msg = self.queue.get_nowait()
             # Call process_message on the viewer so that subclasses of a viewer can intercept messages.
@@ -56,6 +63,15 @@ class ViewerServer:
             )
 
     def process_message(self, type: Message, remote_uid: int, args, kwargs):
+        """
+        Default processing of messages.
+
+        :param type: the type of the message.
+        :param remote_uid: the remote id of the node that this message refers to.
+        :param args: positional arguments received with the message.
+        :param kwargs: keyword arguments received with the message.
+        """
+
         def add(remote_uid, args, kwargs, type):
             n = type(*args, **kwargs)
             self.viewer.scene.add(n)
@@ -111,10 +127,32 @@ class ViewerServer:
             if node:
                 node.remove_frames(*args, **kwargs)
 
+        elif type == Message.SET_FRAME:
+            if not self.viewer.run_animations:
+                self.viewer.scene.current_frame_id = args[0]
+
+        elif type == Message.NEXT_FRAME:
+            if not self.viewer.run_animations:
+                self.viewer.scene.next_frame()
+
+        elif type == Message.PREVIOUS_FRAME:
+            if not self.viewer.run_animations:
+                self.viewer.scene.previous_frame()
+
     def get_node_by_remote_uid(self, remote_uid):
-        return self.viewer.scene.get_node_by_uid(self.remote_to_local_id[remote_uid])
+        """
+        Returns the Node corresponding to the remote uid passed in.
+
+        :param remote_uid: the remote uid to look up.
+        :return: Node corresponding to the remote uid.
+        """
+        return self.viewer.scene.get_node_by_uid(
+            self.remote_to_local_id.get(remote_uid, None)
+        )
 
 
+# If this module is invoke directly it starts an empty viewer
+# with the server functionality enabled.
 if __name__ == "__main__":
     from aitviewer.viewer import Viewer
 

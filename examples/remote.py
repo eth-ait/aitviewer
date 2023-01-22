@@ -17,7 +17,13 @@ v = RemoteViewer()
 # Create a cube with a single frame on the remote viewer.
 # All arguments after the first argument (the remote viewer) are forwarded to the Meshes constructor.
 m = RemoteMeshes(
-    v, cube.vertices, cube.faces, flat_shading=True, name=f"Cube", position=(1, 0, 0)
+    v,
+    cube.vertices,
+    cube.faces,
+    flat_shading=True,
+    name=f"Cube",
+    position=(1, 0, 0),
+    scale=0.1,
 )
 
 
@@ -48,6 +54,10 @@ m.remove_frames(frames=85)
 # back the following frames.
 m.remove_frames(frames=range(90, 100))
 
+# Change the current displayed frame of the viewer.
+#
+# You can also use v.next_frame() and v.previous_frame() to change the current frame.
+v.set_frame(50)
 
 # Uncomment the following line to remove the node completely from the viewer.
 # m.delete()
@@ -55,7 +65,7 @@ m.remove_frames(frames=range(90, 100))
 
 # Wait until the viewer is closed.
 #
-# This is required if the viewer is running locally as a child process of this script,
-# otherwise exiting this script would also exit the viewer.
+# If the viewer is running locally in a new process this will
+# wait for it to exit and print its output to the console.
 # If the viewer is not running locally this call will return immediately.
 v.wait_close()
