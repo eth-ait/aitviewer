@@ -77,9 +77,7 @@ if __name__ == "__main__":
     smpl_sequence.mesh_seq.draw_outline = True
 
     # Transform y_up coordinates to z_up coordinates.
-    z_up_from_y_up = np.array(
-        [[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]], np.float32
-    ).T
+    z_up_from_y_up = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]], np.float32).T
 
     # Camera extrinsics expect z up data, we transform each frame to expect y up data instead
     # since this is the coordinate system used by the viewer.
@@ -108,10 +106,7 @@ if __name__ == "__main__":
         3.0,
         cols,
         rows,
-        [
-            os.path.join(images_path, f)
-            for f in sorted(os.listdir(images_path), key=sort_key)
-        ],
+        [os.path.join(images_path, f) for f in sorted(os.listdir(images_path), key=sort_key)],
     )
 
     # Add all objects to the scene.

@@ -101,11 +101,7 @@ class Meshes(Node):
             assert len(instance_transforms.shape) == 4
 
             # Number of instance frames must match number of frames or be 1.
-            assert (
-                n_frames == 1
-                or instance_transforms.shape[0] == 1
-                or n_frames == instance_transforms.shape[0]
-            )
+            assert n_frames == 1 or instance_transforms.shape[0] == 1 or n_frames == instance_transforms.shape[0]
             n_frames = max(n_frames, instance_transforms.shape[0])
 
             self._instance_transforms = instance_transforms
@@ -134,11 +130,7 @@ class Meshes(Node):
             if self.use_pickle_texture:
                 self.texture_image = pickle.load(open(path_to_texture, "rb"))
             else:
-                self.texture_image = (
-                    Image.open(path_to_texture)
-                    .transpose(method=Image.FLIP_TOP_BOTTOM)
-                    .convert("RGB")
-                )
+                self.texture_image = Image.open(path_to_texture).transpose(method=Image.FLIP_TOP_BOTTOM).convert("RGB")
         else:
             self.texture_image = None
 
@@ -156,12 +148,8 @@ class Meshes(Node):
         self.norm_coloring = False
         self.normals_r = None
         self.need_upload = True
-        self._use_uniform_color = (
-            self._vertex_colors is None and self._face_colors is None
-        )
-        self._vertex_faces_sparse = trimesh.geometry.index_sparse(
-            self._vertices.shape[1], self._faces
-        )
+        self._use_uniform_color = self._vertex_colors is None and self._face_colors is None
+        self._vertex_faces_sparse = trimesh.geometry.index_sparse(self._vertices.shape[1], self._faces)
 
     @classmethod
     def instanced(cls, *args, positions=None, rotations=None, scales=None, **kwargs):
@@ -201,9 +189,9 @@ class Meshes(Node):
             scales = np.ones((n_frames, n_instances))
 
         transforms = np.zeros((n_frames, n_instances, 4, 4))
-        transforms[:, :, :3, :3] = (
-            rotations.reshape((-1, 9)) * scales.reshape((-1, 1))
-        ).reshape((n_frames, n_instances, 3, 3))
+        transforms[:, :, :3, :3] = (rotations.reshape((-1, 9)) * scales.reshape((-1, 1))).reshape(
+            (n_frames, n_instances, 3, 3)
+        )
         transforms[:, :, :3, 3] = positions
         transforms[:, :, 3, 3] = 1.0
         return cls(*args, **kwargs, instance_transforms=transforms)
@@ -237,9 +225,7 @@ class Meshes(Node):
     @faces.setter
     def faces(self, f):
         self._faces = f.astype(np.int32)
-        self._vertex_faces_sparse = trimesh.geometry.index_sparse(
-            self.vertices.shape[1], self._faces
-        )
+        self._vertex_faces_sparse = trimesh.geometry.index_sparse(self.vertices.shape[1], self._faces)
 
     @property
     def current_vertices(self):
@@ -293,9 +279,7 @@ class Meshes(Node):
         if self._vertex_normals is None:
             vn, _ = self.compute_vertex_and_face_normals(frame_id, normalize=True)
         else:
-            assert (
-                len(self._vertex_normals.shape) == 3
-            ), f"Got shape {self._vertex_normals.shape}"
+            assert len(self._vertex_normals.shape) == 3, f"Got shape {self._vertex_normals.shape}"
             vn = self._vertex_normals[frame_id]
         return vn
 
@@ -304,18 +288,14 @@ class Meshes(Node):
         if self._face_normals is None:
             _, fn = self.compute_vertex_and_face_normals(frame_id, normalize=True)
         else:
-            assert (
-                len(self._face_normals.shape) == 3
-            ), f"Got shape {self._face_normals.shape}"
+            assert len(self._face_normals.shape) == 3, f"Got shape {self._face_normals.shape}"
             fn = self._face_normals[frame_id]
         return fn
 
     @property
     def vertex_colors(self):
         if self._vertex_colors is None:
-            self._vertex_colors = np.full(
-                (self.n_frames, self.n_vertices, 4), self.material.color
-            )
+            self._vertex_colors = np.full((self.n_frames, self.n_vertices, 4), self.material.color)
         return self._vertex_colors
 
     @vertex_colors.setter
@@ -331,9 +311,7 @@ class Meshes(Node):
         else:
             if len(vertex_colors.shape) == 2:
                 assert vertex_colors.shape[0] == self.n_vertices
-                vertex_colors = np.repeat(
-                    vertex_colors[np.newaxis], self.n_frames, axis=0
-                )
+                vertex_colors = np.repeat(vertex_colors[np.newaxis], self.n_frames, axis=0)
             assert len(vertex_colors.shape) == 3
             self._vertex_colors = vertex_colors
             self._use_uniform_color = False
@@ -388,15 +366,11 @@ class Meshes(Node):
             self.redraw()
 
     def closest_vertex_in_triangle(self, tri_id, point):
-        face_vertex_id = np.linalg.norm(
-            (self.current_vertices[self.faces[tri_id]] - point), axis=-1
-        ).argmin()
+        face_vertex_id = np.linalg.norm((self.current_vertices[self.faces[tri_id]] - point), axis=-1).argmin()
         return self.faces[tri_id][face_vertex_id]
 
     def get_bc_coords_from_points(self, tri_id, points):
-        return points_to_barycentric(
-            self.current_vertices[self.faces[[tri_id]]], points
-        )[0]
+        return points_to_barycentric(self.current_vertices[self.faces[[tri_id]]], points)[0]
 
     @lru_cache(2048)
     def compute_vertex_and_face_normals(self, frame_id, normalize=False):
@@ -410,14 +384,8 @@ class Meshes(Node):
           enforce unit length of normals anyway.
         :return: The vertex and face normals as a np arrays of shape (V, 3) and (F, 3) respectively.
         """
-        vs = (
-            self.vertices[frame_id : frame_id + 1]
-            if self.vertices.shape[0] > 1
-            else self.vertices
-        )
-        vn, fn = compute_vertex_and_face_normals_sparse(
-            vs, self.faces, self._vertex_faces_sparse, normalize
-        )
+        vs = self.vertices[frame_id : frame_id + 1] if self.vertices.shape[0] > 1 else self.vertices
+        vn, fn = compute_vertex_and_face_normals_sparse(vs, self.faces, self._vertex_faces_sparse, normalize)
         return vn.squeeze(0), fn.squeeze(0)
 
     @property
@@ -507,9 +475,7 @@ class Meshes(Node):
             self.vbo_colors.write(self.current_vertex_colors.astype("f4").tobytes())
         else:
             # Write face colors.
-            self.face_colors_texture.write(
-                self.current_face_colors.astype("f4").tobytes()
-            )
+            self.face_colors_texture.write(self.current_face_colors.astype("f4").tobytes())
 
         # Write uvs.
         if self.has_texture:
@@ -518,9 +484,7 @@ class Meshes(Node):
         # Write instance transforms.
         if self.instance_transforms is not None:
             self.vbo_instance_transforms.write(
-                np.transpose(
-                    self.current_instance_transforms.astype("f4"), (0, 2, 1)
-                ).tobytes()
+                np.transpose(self.current_instance_transforms.astype("f4"), (0, 2, 1)).tobytes()
             )
 
     def redraw(self, **kwargs):
@@ -536,9 +500,7 @@ class Meshes(Node):
         instanced = 1 if self.instance_transforms is not None else 0
         self.smooth_prog = get_smooth_lit_with_edges_program(vs, instanced)
         self.flat_prog = get_flat_lit_with_edges_program(vs, instanced)
-        self.smooth_face_prog = get_smooth_lit_with_edges_face_color_program(
-            vs, instanced
-        )
+        self.smooth_face_prog = get_smooth_lit_with_edges_face_color_program(vs, instanced)
         self.flat_face_prog = get_flat_lit_with_edges_face_color_program(vs, instanced)
 
         self.depth_only_program = get_depth_only_program(positions_vs, instanced)
@@ -562,19 +524,13 @@ class Meshes(Node):
 
         if self.instance_transforms is not None:
             self.vbo_instance_transforms = ctx.buffer(
-                np.transpose(
-                    self.current_instance_transforms.astype("f4"), (0, 2, 1)
-                ).tobytes()
+                np.transpose(self.current_instance_transforms.astype("f4"), (0, 2, 1)).tobytes()
             )
-            self.vao.buffer(
-                self.vbo_instance_transforms, "16f4/i", "instance_transform"
-            )
+            self.vao.buffer(self.vbo_instance_transforms, "16f4/i", "instance_transform")
 
         self.face_colors_texture = ctx.texture((self.faces.shape[0], 1), 4, dtype="f4")
         if self.face_colors is not None:
-            self.face_colors_texture.write(
-                self.current_face_colors.astype("f4").tobytes()
-            )
+            self.face_colors_texture.write(self.current_face_colors.astype("f4").tobytes())
 
         if self.has_texture:
             img = self.texture_image
@@ -676,9 +632,7 @@ class Meshes(Node):
             "Flat shading [F]##flat_shading{}".format(self.unique_name),
             self.flat_shading,
         )
-        _, self.draw_edges = imgui.checkbox(
-            "Draw edges [E]##draw_edges{}".format(self.unique_name), self.draw_edges
-        )
+        _, self.draw_edges = imgui.checkbox("Draw edges [E]##draw_edges{}".format(self.unique_name), self.draw_edges)
         _, self.draw_outline = imgui.checkbox(
             "Draw outline##draw_outline{}".format(self.unique_name), self.draw_outline
         )
@@ -688,15 +642,9 @@ class Meshes(Node):
                 self._show_normals()
 
     def gui_context_menu(self, imgui):
-        _, self.flat_shading = imgui.menu_item(
-            "Flat shading", "F", selected=self.flat_shading, enabled=True
-        )
-        _, self.draw_edges = imgui.menu_item(
-            "Draw edges", "E", selected=self.draw_edges, enabled=True
-        )
-        _, self.draw_outline = imgui.menu_item(
-            "Draw outline", selected=self.draw_outline
-        )
+        _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
+        _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
+        _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
         imgui.spacing()
         imgui.separator()
@@ -705,9 +653,7 @@ class Meshes(Node):
 
     def gui_io(self, imgui):
         if imgui.button("Export OBJ##export_{}".format(self.unique_name)):
-            mesh = trimesh.Trimesh(
-                vertices=self.current_vertices, faces=self.faces, process=False
-            )
+            mesh = trimesh.Trimesh(vertices=self.current_vertices, faces=self.faces, process=False)
             mesh.export("../export/" + self.name + ".obj")
 
     def key_event(self, key, wnd_keys):
@@ -836,9 +782,7 @@ class VariableTopologyMeshes(Node):
         return cls(vertices, faces, vertex_normals, vertex_colors=vertex_colors)
 
     @classmethod
-    def from_directory(
-        cls, path, preload=False, vertex_scale=1.0, high_quality=False, **kwargs
-    ):
+    def from_directory(cls, path, preload=False, vertex_scale=1.0, high_quality=False, **kwargs):
         """
         Initialize from a directory containing mesh and texture data.
 
@@ -907,9 +851,7 @@ class VariableTopologyMeshes(Node):
             name = os.path.splitext(x)[0]
             return int(regex.search(name).group(0))
 
-        obj_names = filter(
-            lambda x: x.startswith("mesh") and x.endswith(mesh_format), files
-        )
+        obj_names = filter(lambda x: x.startswith("mesh") and x.endswith(mesh_format), files)
         obj_names = sorted(obj_names, key=sort_key)
 
         vertices, faces, vertex_normals, uvs = [], [], [], []
@@ -932,9 +874,7 @@ class VariableTopologyMeshes(Node):
             texture_paths.append(
                 os.path.join(
                     path,
-                    obj_name.replace("mesh", "atlas").replace(
-                        mesh_format, texture_format
-                    ),
+                    obj_name.replace("mesh", "atlas").replace(mesh_format, texture_format),
                 )
             )
 
@@ -1029,15 +969,9 @@ class VariableTopologyMeshes(Node):
         self.current_mesh.render_outline(*args, **kwargs)
 
     def gui_context_menu(self, imgui):
-        _, self.flat_shading = imgui.menu_item(
-            "Flat shading", "F", selected=self.flat_shading, enabled=True
-        )
-        _, self.draw_edges = imgui.menu_item(
-            "Draw edges", "E", selected=self.draw_edges, enabled=True
-        )
-        _, self.draw_outline = imgui.menu_item(
-            "Draw outline", selected=self.draw_outline
-        )
+        _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
+        _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
+        _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
 
         imgui.spacing()
         imgui.separator()
@@ -1065,9 +999,7 @@ class VariableTopologyMeshes(Node):
             format="%.2f",
         )
         if ur:
-            self.rotation = euler2rot_numpy(
-                np.array(euler_angles)[np.newaxis], degrees=True
-            )[0]
+            self.rotation = euler2rot_numpy(np.array(euler_angles)[np.newaxis], degrees=True)[0]
 
         # Scale controls
         us, scale = imgui.drag_float(
@@ -1113,9 +1045,7 @@ class VariableTopologyMeshes(Node):
         _, self.draw_outline = imgui.checkbox("Draw outline", self.draw_outline)
 
         if show_advanced:
-            if imgui.tree_node(
-                "Advanced material##advanced_material{}'".format(self.unique_name)
-            ):
+            if imgui.tree_node("Advanced material##advanced_material{}'".format(self.unique_name)):
                 # Diffuse
                 ud, diffuse = imgui.slider_float(
                     "Diffuse##diffuse{}".format(self.unique_name),

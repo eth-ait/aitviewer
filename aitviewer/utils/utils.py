@@ -105,9 +105,7 @@ def images_to_video(
     command = [
         "ffmpeg",
         "-framerate",
-        str(
-            input_fps
-        ),  # must be this early in the command, otherwise it is not applied.
+        str(input_fps),  # must be this early in the command, otherwise it is not applied.
         "-start_number",
         str(start_frame),
         "-i",
@@ -167,9 +165,7 @@ def resample_positions(positions, fps_in, fps_out):
     return interpolate_positions(positions, ts_in, ts_out)
 
 
-def compute_vertex_and_face_normals_torch(
-    vertices, faces, vertex_faces, normalize=False
-):
+def compute_vertex_and_face_normals_torch(vertices, faces, vertex_faces, normalize=False):
     """
     Compute (unnormalized) vertex normals for the given vertices.
     :param vertices: A tensor of shape (N, V, 3).
@@ -179,22 +175,16 @@ def compute_vertex_and_face_normals_torch(
     :return: The vertex and face normals as tensors of shape (N, V, 3) and (N, F, 3) respectively.
     """
     vs = vertices[:, faces.to(dtype=torch.long)]
-    face_normals = torch.cross(
-        vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], dim=-1
-    )  # (N, F, 3)
+    face_normals = torch.cross(vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], dim=-1)  # (N, F, 3)
 
     ns_all_faces = face_normals[:, vertex_faces]  # (N, V, MAX_VERTEX_DEGREE, 3)
     ns_all_faces[:, vertex_faces == -1] = 0.0
     vertex_degrees = (vertex_faces > -1).sum(dim=-1).to(dtype=ns_all_faces.dtype)
-    vertex_normals = (
-        ns_all_faces.sum(dim=-2) / vertex_degrees[None, :, None]
-    )  # (N, V, 3)
+    vertex_normals = ns_all_faces.sum(dim=-2) / vertex_degrees[None, :, None]  # (N, V, 3)
 
     if normalize:
         face_normals = face_normals / torch.norm(face_normals, dim=-1).unsqueeze(-1)
-        vertex_normals = vertex_normals / torch.norm(vertex_normals, dim=-1).unsqueeze(
-            -1
-        )
+        vertex_normals = vertex_normals / torch.norm(vertex_normals, dim=-1).unsqueeze(-1)
 
     return vertex_normals, face_normals
 
@@ -213,31 +203,21 @@ def compute_vertex_and_face_normals(vertices, faces, vertex_faces, normalize=Fal
     :return: The vertex and face normals as a np arrays of shape (N, V, 3) and (N, F, 3) respectively.
     """
     vs = vertices[:, faces]
-    face_normals = np.cross(
-        vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], axis=-1
-    )  # (N, F, 3)
+    face_normals = np.cross(vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], axis=-1)  # (N, F, 3)
 
     ns_all_faces = face_normals[:, vertex_faces]  # (N, V, MAX_VERTEX_DEGREE, 3)
     ns_all_faces[:, vertex_faces == -1] = 0.0
     vertex_degrees = np.sum(vertex_faces > -1, axis=-1)
-    vertex_normals = (
-        np.sum(ns_all_faces, axis=-2) / vertex_degrees[np.newaxis, :, np.newaxis]
-    )  # (N, V, 3)
+    vertex_normals = np.sum(ns_all_faces, axis=-2) / vertex_degrees[np.newaxis, :, np.newaxis]  # (N, V, 3)
 
     if normalize:
-        face_normals = (
-            face_normals / np.linalg.norm(face_normals, axis=-1)[..., np.newaxis]
-        )
-        vertex_normals = (
-            vertex_normals / np.linalg.norm(vertex_normals, axis=-1)[..., np.newaxis]
-        )
+        face_normals = face_normals / np.linalg.norm(face_normals, axis=-1)[..., np.newaxis]
+        vertex_normals = vertex_normals / np.linalg.norm(vertex_normals, axis=-1)[..., np.newaxis]
 
     return vertex_normals, face_normals
 
 
-def compute_vertex_and_face_normals_sparse(
-    vertices, faces, vertex_faces_sparse, normalize=False
-):
+def compute_vertex_and_face_normals_sparse(vertices, faces, vertex_faces_sparse, normalize=False):
     """
     Compute (unnormalized) vertex normals for the given vertices. This is a rather expensive operation despite it being
     fully optimized with numpy. For a typical SMPL mesh this can take 5-10ms per call. Not normalizing the resulting
@@ -314,12 +294,8 @@ def set_lights_in_program(prog, lights, shadows_enabled, ambient_strength):
     for i, light in enumerate(lights):
         prog[f"dirLights[{i}].direction"].value = tuple(light.direction)
         prog[f"dirLights[{i}].color"].value = light.light_color
-        prog[f"dirLights[{i}].strength"].value = (
-            light.strength if light.enabled else 0.0
-        )
-        prog[f"dirLights[{i}].shadow_enabled"].value = (
-            shadows_enabled and light.shadow_enabled
-        )
+        prog[f"dirLights[{i}].strength"].value = light.strength if light.enabled else 0.0
+        prog[f"dirLights[{i}].shadow_enabled"].value = shadows_enabled and light.shadow_enabled
     prog["ambient_strength"] = ambient_strength
 
 

@@ -156,9 +156,7 @@ def resample_rotations(rotations, fps_in, fps_out):
     :return: A numpy array of shape (F', N, 3) where F is adjusted according to the new fps.
     """
     n_frames = rotations.shape[0]
-    assert (
-        n_frames > 1
-    ), "We need at least two rotations for a resampling to make sense."
+    assert n_frames > 1, "We need at least two rotations for a resampling to make sense."
     duration = n_frames / fps_in
     ts_in = np.arange(0, duration, 1 / fps_in)[:n_frames]
     ts_out = np.arange(0, duration, 1 / fps_out)

@@ -69,9 +69,7 @@ class MultiViewSystem(Node):
             path = os.path.join(camera_images_path, str(id))
             if os.path.isdir(path):
                 n_frames = len(os.listdir(path)) - start_frame
-                assert (
-                    n_frames > 0
-                ), f"Camera {id} has no images after frame {start_frame}"
+                assert n_frames > 0, f"Camera {id} has no images after frame {start_frame}"
                 camera_n_frames.append(n_frames)
 
         n_frames = max(camera_n_frames) if camera_n_frames else 1
@@ -105,11 +103,7 @@ class MultiViewSystem(Node):
         # to compute the distance at which to show the billboards.
         positions = np.array(positions)
         camera_center = np.mean(positions, 0)
-        max_dist = np.max(
-            np.apply_along_axis(
-                lambda x: np.linalg.norm(x - camera_center), 1, positions
-            )
-        )
+        max_dist = np.max(np.apply_along_axis(lambda x: np.linalg.norm(x - camera_center), 1, positions))
         self.billboard_distance = max_dist * 2
         self.camera_positions = positions
 
@@ -132,9 +126,7 @@ class MultiViewSystem(Node):
     def _create_billboard_for_camera(self, camera_index):
         """Helper function to create a billboard for the camera at the given index."""
         # Look for images for the given camera.
-        camera_path = os.path.join(
-            self.camera_images_path, str(self.camera_info["ids"][camera_index])
-        )
+        camera_path = os.path.join(self.camera_images_path, str(self.camera_info["ids"][camera_index]))
         if not os.path.isdir(camera_path):
             print(f"Camera directory not found at {camera_path}")
             return
@@ -228,9 +220,7 @@ class MultiViewSystem(Node):
         # Update all frustums of all active cameras.
         for i in self.active_cameras.keys():
             if enabled:
-                self.cameras[i].show_frustum(
-                    self.cols, self.rows, self.billboard_distance
-                )
+                self.cameras[i].show_frustum(self.cols, self.rows, self.billboard_distance)
             else:
                 self.cameras[i].hide_frustum()
 
@@ -284,9 +274,7 @@ class MultiViewSystem(Node):
 
     def _gui_checkboxes(self, imgui):
         _, self.cameras_enabled = imgui.checkbox("Show cameras", self.cameras_enabled)
-        _, self.billboards_enabled = imgui.checkbox(
-            "Show billboard", self.billboards_enabled
-        )
+        _, self.billboards_enabled = imgui.checkbox("Show billboard", self.billboards_enabled)
         _, self.frustums_enabled = imgui.checkbox("Show frustum", self.frustums_enabled)
 
     def gui(self, imgui):
@@ -296,9 +284,7 @@ class MultiViewSystem(Node):
         active_index = -1
         if len(self.active_cameras) > 0:
             active_index = next(reversed(self.active_cameras.keys()))
-        u_selected, active_index = imgui.combo(
-            "ID", active_index, [str(id) for id in self.camera_info["ids"].tolist()]
-        )
+        u_selected, active_index = imgui.combo("ID", active_index, [str(id) for id in self.camera_info["ids"].tolist()])
         if u_selected:
             self.view_from_camera(active_index)
 

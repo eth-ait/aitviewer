@@ -36,9 +36,7 @@ from aitviewer.utils.decorators import hooked
 class Billboard(Node):
     """A billboard for displaying a sequence of images as an object in the world"""
 
-    def __init__(
-        self, vertices, textures, img_process_fn=None, icon="\u0096", **kwargs
-    ):
+    def __init__(self, vertices, textures, img_process_fn=None, icon="\u0096", **kwargs):
         """Initializer.
         :param vertices:
             A np array of 4 billboard vertices in world space coordinates of shape (4, 3)
@@ -60,9 +58,7 @@ class Billboard(Node):
         center = np.mean(vertices, axis=(0, 1))
         self.vertices = vertices - center
         self.position = center
-        self.img_process_fn = (
-            (lambda img, _: img) if img_process_fn is None else img_process_fn
-        )
+        self.img_process_fn = (lambda img, _: img) if img_process_fn is None else img_process_fn
         self._need_redraw = False
 
         # Tile the uv buffer to match the size of the vertices buffer,
@@ -257,9 +253,7 @@ class Billboard(Node):
     def render_positions(self, prog):
         if self.is_renderable:
             first = 4 * self.current_frame_id if self.vertices.shape[0] > 1 else 0
-            self.positions_vao.render(
-                prog, mode=moderngl.TRIANGLE_STRIP, vertices=4, first=first
-            )
+            self.positions_vao.render(prog, mode=moderngl.TRIANGLE_STRIP, vertices=4, first=first)
 
     @hooked
     def release(self):
@@ -275,11 +269,7 @@ class Billboard(Node):
 
     @property
     def current_vertices(self):
-        return (
-            self.vertices[0]
-            if self.vertices.shape[0] <= 1
-            else self.vertices[self.current_frame_id]
-        )
+        return self.vertices[0] if self.vertices.shape[0] <= 1 else self.vertices[self.current_frame_id]
 
     @property
     def bounds(self):
@@ -297,9 +287,7 @@ class Billboard(Node):
 
     def get_bc_coords_from_points(self, tri_id, points):
         indices = np.array([[0, 1, 2], [1, 2, 3]])
-        return points_to_barycentric(self.current_vertices[indices[[tri_id]]], points)[
-            0
-        ]
+        return points_to_barycentric(self.current_vertices[indices[[tri_id]]], points)[0]
 
     def gui_material(self, imgui, show_advanced=True):
         _, self.texture_alpha = imgui.slider_float(

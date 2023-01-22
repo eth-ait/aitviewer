@@ -95,9 +95,7 @@ class RemoteViewer:
     def send(self, data):
         try:
             if self.connected:
-                asyncio.run_coroutine_threadsafe(
-                    self._async_send(data), self.loop
-                ).result()
+                asyncio.run_coroutine_threadsafe(self._async_send(data), self.loop).result()
         except Exception as e:
             print(f"Send loop exception: {e}")
 

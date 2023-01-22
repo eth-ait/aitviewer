@@ -48,9 +48,7 @@ class Skeletons(Node):
         if not isinstance(joint_connections, np.ndarray):
             joint_connections = np.array(joint_connections)
 
-        super(Skeletons, self).__init__(
-            n_frames=joint_positions.shape[0], color=color, icon=icon, **kwargs
-        )
+        super(Skeletons, self).__init__(n_frames=joint_positions.shape[0], color=color, icon=icon, **kwargs)
 
         self._joint_positions = joint_positions
         self.joint_connections = joint_connections
@@ -62,9 +60,7 @@ class Skeletons(Node):
 
         # Nodes.
         material = Material(color=color)
-        self.spheres = Spheres(
-            joint_positions, radius=radius, material=material, is_selectable=False
-        )
+        self.spheres = Spheres(joint_positions, radius=radius, material=material, is_selectable=False)
         self.lines = Lines(
             lines=self.joint_positions[:, self.skeleton].reshape(len(self), -1, 3),
             mode="lines",
@@ -101,14 +97,10 @@ class Skeletons(Node):
     def redraw(self, **kwargs):
         if kwargs.get("current_frame_only", False):
             self.spheres.current_sphere_positions = self.current_joint_positions
-            self.lines.current_lines = self.current_joint_positions[
-                self.skeleton
-            ].reshape(-1, 3)
+            self.lines.current_lines = self.current_joint_positions[self.skeleton].reshape(-1, 3)
         else:
             self.spheres.sphere_positions = self.joint_positions
-            self.lines.lines = self.joint_positions[:, self.skeleton].reshape(
-                len(self), -1, 3
-            )
+            self.lines.lines = self.joint_positions[:, self.skeleton].reshape(len(self), -1, 3)
         super().redraw(**kwargs)
 
     @property

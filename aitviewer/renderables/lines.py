@@ -252,9 +252,7 @@ class Lines(Node):
         self.r_tip = r_tip if r_tip is not None else r_base
 
         self.vertices, self.faces = self.get_mesh()
-        self.n_lines = (
-            self.lines.shape[1] // 2 if mode == "lines" else self.lines.shape[1] - 1
-        )
+        self.n_lines = self.lines.shape[1] // 2 if mode == "lines" else self.lines.shape[1] - 1
 
         kwargs["material"] = kwargs.get("material", Material(color=color, ambient=0.2))
         super(Lines, self).__init__(n_frames=self.lines.shape[0], **kwargs)

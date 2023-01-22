@@ -66,9 +66,7 @@ if __name__ == "__main__":
     rbs = RigidBodies(joints[:, joint_idxs].cpu().numpy(), oris)
 
     # Display the SMPL ground-truth.
-    smpl_seq = SMPLSequence(
-        poses_body=poses[:, 3:], smpl_layer=smpl_layer, poses_root=poses[:, :3]
-    )
+    smpl_seq = SMPLSequence(poses_body=poses[:, 3:], smpl_layer=smpl_layer, poses_root=poses[:, :3])
 
     # Add everything to the scene and display.
     v = Viewer()

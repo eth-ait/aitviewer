@@ -40,9 +40,7 @@ m.add_frames(vertices)
 m.update_frames(cube.vertices * 0.5, frames=3)
 
 # Update two frames.
-vals = np.append(
-    (cube.vertices * 0.2)[np.newaxis], (cube.vertices * 3)[np.newaxis], axis=0
-)
+vals = np.append((cube.vertices * 0.2)[np.newaxis], (cube.vertices * 3)[np.newaxis], axis=0)
 m.update_frames(vals, frames=[80, 83])
 
 

@@ -52,9 +52,7 @@ class PointClouds(Node):
             assert len(colors) == len(points)
 
         self.points = points
-        super(PointClouds, self).__init__(
-            n_frames=len(self.points), color=color, icon=icon, **kwargs
-        )
+        super(PointClouds, self).__init__(n_frames=len(self.points), color=color, icon=icon, **kwargs)
 
         self.fragmap = pickable
 
@@ -68,9 +66,7 @@ class PointClouds(Node):
         self.vao = VAO("points", mode=moderngl.POINTS)
 
         if z_up:
-            self.rotation = np.matmul(
-                np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation
-            )
+            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
     @property
     def points(self):
@@ -108,9 +104,7 @@ class PointClouds(Node):
         # though to change the alpha, even if a point cloud has per-point colors.
         self.material.color = color
         if self.is_renderable:
-            single_color = (
-                isinstance(self.colors[0], tuple) and len(self.colors[0]) == 4
-            )
+            single_color = isinstance(self.colors[0], tuple) and len(self.colors[0]) == 4
             if single_color:
                 self.colors = tuple(color)
             else:
@@ -193,9 +187,7 @@ class PointClouds(Node):
         self.vao.buffer(self.vbo_points, "3f", ["in_position"])
         self.vao.buffer(self.vbo_colors, "4f", ["in_color"])
 
-        self.positions_vao = VAO(
-            "{}:positions".format(self.unique_name), mode=moderngl.POINTS
-        )
+        self.positions_vao = VAO("{}:positions".format(self.unique_name), mode=moderngl.POINTS)
         self.positions_vao.buffer(self.vbo_points, "3f", ["in_position"])
 
     def render(self, camera, **kwargs):

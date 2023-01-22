@@ -43,39 +43,27 @@ def get_lit_program(vs, smooth_shading, texture, face_color, instanced=0):
 
 
 def get_smooth_lit_with_edges_program(vs, instanced=0):
-    return get_lit_program(
-        vs, smooth_shading=1, texture=0, face_color=0, instanced=instanced
-    )
+    return get_lit_program(vs, smooth_shading=1, texture=0, face_color=0, instanced=instanced)
 
 
 def get_smooth_lit_with_edges_face_color_program(vs, instanced=0):
-    return get_lit_program(
-        vs, smooth_shading=1, texture=0, face_color=1, instanced=instanced
-    )
+    return get_lit_program(vs, smooth_shading=1, texture=0, face_color=1, instanced=instanced)
 
 
 def get_flat_lit_with_edges_face_color_program(vs, instanced=0):
-    return get_lit_program(
-        vs, smooth_shading=0, texture=0, face_color=1, instanced=instanced
-    )
+    return get_lit_program(vs, smooth_shading=0, texture=0, face_color=1, instanced=instanced)
 
 
 def get_flat_lit_with_edges_program(vs, instanced=0):
-    return get_lit_program(
-        vs, smooth_shading=0, texture=0, face_color=0, instanced=instanced
-    )
+    return get_lit_program(vs, smooth_shading=0, texture=0, face_color=0, instanced=instanced)
 
 
 def get_flat_lit_with_edges_program(vs, instanced=0):
-    return get_lit_program(
-        vs, smooth_shading=0, texture=0, face_color=0, instanced=instanced
-    )
+    return get_lit_program(vs, smooth_shading=0, texture=0, face_color=0, instanced=instanced)
 
 
 def get_smooth_lit_texturized_program(vs, instanced=0):
-    return get_lit_program(
-        vs, smooth_shading=1, texture=1, face_color=0, instanced=instanced
-    )
+    return get_lit_program(vs, smooth_shading=1, texture=1, face_color=0, instanced=instanced)
 
 
 def get_sphere_instanced_program():

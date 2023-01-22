@@ -28,9 +28,7 @@ from aitviewer.viewer import Viewer
 if __name__ == "__main__":
     # Load camera and SMPL parameters estimated by ROMP https://github.com/Arthur151/ROMP.
     # For a discussion on camera parameters see https://github.com/Arthur151/ROMP/issues/344
-    results = np.load("resources/romp/romp_output.npz", allow_pickle=True)["results"][
-        ()
-    ]
+    results = np.load("resources/romp/romp_output.npz", allow_pickle=True)["results"][()]
 
     # Load the image that ROMP produced. Note: in order to get perfect alignment, it is important that ROMP was
     # configured to use pyrender to render the results. Otherwise, the image will be slightly different.
@@ -67,9 +65,7 @@ if __name__ == "__main__":
     cam_extrinsics[1:3, :3] *= -1.0
 
     # Create an OpenCV camera.
-    cameras = OpenCVCamera(
-        cam_intrinsics, cam_extrinsics[:3], cols, rows, viewer=viewer
-    )
+    cameras = OpenCVCamera(cam_intrinsics, cam_extrinsics[:3], cols, rows, viewer=viewer)
 
     # Load the reference image and create a Billboard.
     pc = Billboard.from_camera_and_distance(cameras, 4.0, cols, rows, [img_path])

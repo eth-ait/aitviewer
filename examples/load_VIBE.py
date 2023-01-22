@@ -63,9 +63,7 @@ if __name__ == "__main__":
     cols, rows = 1920, 1080
 
     # Create a sequence of weak perspective cameras.
-    cameras = WeakPerspectiveCamera(
-        camera_info[:, :2], camera_info[:, 2:], cols, rows, far=3, viewer=viewer
-    )
+    cameras = WeakPerspectiveCamera(camera_info[:, :2], camera_info[:, 2:], cols, rows, far=3, viewer=viewer)
 
     # Path to the directory containing the video frames.
     images_path = "resources/vibe/frames"
@@ -83,10 +81,7 @@ if __name__ == "__main__":
         cameras.far - 1e-6,
         cols,
         rows,
-        [
-            os.path.join(images_path, f)
-            for f in sorted(os.listdir(images_path), key=sort_key)
-        ],
+        [os.path.join(images_path, f) for f in sorted(os.listdir(images_path), key=sort_key)],
     )
 
     # Add all the objects to the scene.
@@ -105,8 +100,6 @@ if __name__ == "__main__":
     viewer.shadows_enabled = False
 
     if HEADLESS:
-        viewer.save_video(
-            video_dir=os.path.join(C.export_dir, "headless/vibe.mp4"), output_fps=25
-        )
+        viewer.save_video(video_dir=os.path.join(C.export_dir, "headless/vibe.mp4"), output_fps=25)
     else:
         viewer.run()

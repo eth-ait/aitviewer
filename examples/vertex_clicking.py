@@ -39,10 +39,7 @@ class ClickingViewer(Viewer):
         # Create a marker sequence for the entire sequence at once.
         # First get the positions.
         seq = intersection.node
-        positions = (
-            seq.vertices[:, intersection.vert_id : intersection.vert_id + 1]
-            + seq.position[np.newaxis]
-        )
+        positions = seq.vertices[:, intersection.vert_id : intersection.vert_id + 1] + seq.position[np.newaxis]
 
         ms = Spheres(positions, name="{}".format(intersection.vert_id), radius=0.005)
         ms.current_frame_id = seq.current_frame_id

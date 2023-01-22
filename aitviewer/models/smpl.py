@@ -58,9 +58,7 @@ class SMPLLayer(nn.Module, ABC):
         self.num_betas = num_betas
 
         smpl_model_params["use_pca"] = smpl_model_params.get("use_pca", False)
-        smpl_model_params["flat_hand_mean"] = smpl_model_params.get(
-            "flat_hand_mean", True
-        )
+        smpl_model_params["flat_hand_mean"] = smpl_model_params.get("flat_hand_mean", True)
 
         self.bm = smplx.create(
             C.smplx_models,
@@ -109,9 +107,7 @@ class SMPLLayer(nn.Module, ABC):
         if self._vertex_faces is None:
             import trimesh
 
-            mesh = trimesh.Trimesh(
-                vertices.detach().cpu().numpy(), self.faces.cpu().numpy(), process=False
-            )
+            mesh = trimesh.Trimesh(vertices.detach().cpu().numpy(), self.faces.cpu().numpy(), process=False)
             self._vertex_faces = torch.from_numpy(np.copy(mesh.vertex_faces)).to(
                 dtype=torch.long, device=vertices.device
             )
@@ -124,9 +120,7 @@ class SMPLLayer(nn.Module, ABC):
         :param output_vertex_ids: An optional list of integers indexing into the 2nd dimension of `vertices`.
         :return: A tensor of shape (N, V', 3) where V' is either V or len(output_vertex_ids).
         """
-        normals, _ = compute_vertex_and_face_normals_torch(
-            vertices, self.faces, self.vertex_faces(vertices[0])
-        )
+        normals, _ = compute_vertex_and_face_normals_torch(vertices, self.faces, self.vertex_faces(vertices[0]))
         if output_vertex_ids is not None:
             return normals[:, output_vertex_ids]
         else:
@@ -191,22 +185,12 @@ class SMPLLayer(nn.Module, ABC):
         if has_hands:
             if self.bm.use_pca:
                 dof_per_hand = self.bm.num_pca_comps
-                assert (
-                    poses_left_hand is None or poses_left_hand.shape[1] == dof_per_hand
-                )
-                assert (
-                    poses_right_hand is None
-                    or poses_right_hand.shape[1] == dof_per_hand
-                )
+                assert poses_left_hand is None or poses_left_hand.shape[1] == dof_per_hand
+                assert poses_right_hand is None or poses_right_hand.shape[1] == dof_per_hand
             else:
                 dof_per_hand = self.bm.NUM_HAND_JOINTS * 3
-                assert (
-                    poses_left_hand is None or poses_left_hand.shape[1] == dof_per_hand
-                )
-                assert (
-                    poses_right_hand is None
-                    or poses_right_hand.shape[1] == dof_per_hand
-                )
+                assert poses_left_hand is None or poses_left_hand.shape[1] == dof_per_hand
+                assert poses_right_hand is None or poses_right_hand.shape[1] == dof_per_hand
         else:
             dof_per_hand = 0  # Silencing the might not be initialized warning.
 
@@ -214,34 +198,20 @@ class SMPLLayer(nn.Module, ABC):
         device = poses_body.device
 
         if poses_root is None:
-            poses_root = torch.zeros([batch_size, 3]).to(
-                dtype=poses_body.dtype, device=device
-            )
+            poses_root = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
         if trans is None:
-            trans = torch.zeros([batch_size, 3]).to(
-                dtype=poses_body.dtype, device=device
-            )
+            trans = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
 
         if has_hands and poses_left_hand is None:
-            poses_left_hand = torch.zeros([batch_size, dof_per_hand]).to(
-                dtype=poses_body.dtype, device=device
-            )
+            poses_left_hand = torch.zeros([batch_size, dof_per_hand]).to(dtype=poses_body.dtype, device=device)
         if has_hands and poses_right_hand is None:
-            poses_right_hand = torch.zeros([batch_size, dof_per_hand]).to(
-                dtype=poses_body.dtype, device=device
-            )
+            poses_right_hand = torch.zeros([batch_size, dof_per_hand]).to(dtype=poses_body.dtype, device=device)
         if has_face and poses_jaw is None:
-            poses_jaw = torch.zeros([batch_size, 3]).to(
-                dtype=poses_body.dtype, device=device
-            )
+            poses_jaw = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
         if has_face and poses_leye is None:
-            poses_leye = torch.zeros([batch_size, 3]).to(
-                dtype=poses_body.dtype, device=device
-            )
+            poses_leye = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
         if has_face and poses_reye is None:
-            poses_reye = torch.zeros([batch_size, 3]).to(
-                dtype=poses_body.dtype, device=device
-            )
+            poses_reye = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
         if has_face and expression is None:
             expression = torch.zeros([batch_size, self.bm.num_expression_coeffs]).to(
                 dtype=poses_body.dtype, device=device
@@ -258,9 +228,7 @@ class SMPLLayer(nn.Module, ABC):
             first_root_ori = torch.inverse(root_ori[0:1])
             root_ori = torch.matmul(first_root_ori, root_ori)
             poses_root = rot2aa(root_ori)
-            trans = torch.matmul(
-                first_root_ori.unsqueeze(0), trans.unsqueeze(-1)
-            ).squeeze()
+            trans = torch.matmul(first_root_ori.unsqueeze(0), trans.unsqueeze(-1)).squeeze()
             trans = trans - trans[0:1]
 
         output = self.bm(

@@ -116,11 +116,7 @@ class Webcam(Streamable):
 
     def gui(self, imgui):
         if self.enabled:
-            imgui.text(
-                "Clip Info: {}x{} @ {:.2f} fps".format(
-                    self.width, self.height, self.fps
-                )
-            )
+            imgui.text("Clip Info: {}x{} @ {:.2f} fps".format(self.width, self.height, self.fps))
         _, self.transparency = imgui.slider_float(
             "Opacity##opacity_".format(self.name), self.transparency, 0.0, 1.0, "%.2f"
         )

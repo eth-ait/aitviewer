@@ -67,9 +67,7 @@ class Light(Node):
             0.15,
             0,
             is_selectable=False,
-            material=Material(
-                diffuse=0.0, ambient=1.0, color=(*tuple(light_color), 1.0)
-            ),
+            material=Material(diffuse=0.0, ambient=1.0, color=(*tuple(light_color), 1.0)),
         )
         self.add(self.arrow, show_in_hierarchy=False)
 
@@ -108,9 +106,7 @@ class Light(Node):
         self.arrow.color = (*tuple(light_color), 1.0)
 
     def update_rotation(self):
-        self.rotation = look_at(
-            np.array([0, 0, 0]), self.direction, np.array([0.0, 1.0, 0.0])
-        )[:3, :3].T
+        self.rotation = look_at(np.array([0, 0, 0]), self.direction, np.array([0.0, 1.0, 0.0]))[:3, :3].T
 
     def create_shadowmap(self, ctx):
         if self.shadow_map is None:
@@ -121,9 +117,7 @@ class Light(Node):
             self.shadow_map.compare_func = ">"
             self.shadow_map.repeat_x = False
             self.shadow_map.repeat_y = False
-            self.shadow_map_framebuffer = ctx.framebuffer(
-                depth_attachment=self.shadow_map
-            )
+            self.shadow_map_framebuffer = ctx.framebuffer(depth_attachment=self.shadow_map)
 
     def use(self, ctx):
         if not self.shadow_map:
@@ -182,19 +176,11 @@ class Light(Node):
         )
 
         size = self.shadow_map_size
-        view_from_ndc = np.linalg.inv(
-            orthographic_projection(
-                size, size, self.shadow_map_near, self.shadow_map_far
-            )
-        )
-        lines = np.apply_along_axis(
-            lambda x: (view_from_ndc @ np.append(x, 1.0))[:3], 1, lines
-        )
+        view_from_ndc = np.linalg.inv(orthographic_projection(size, size, self.shadow_map_near, self.shadow_map_far))
+        lines = np.apply_along_axis(lambda x: (view_from_ndc @ np.append(x, 1.0))[:3], 1, lines)
 
         if self._debug_lines is None:
-            self._debug_lines = Lines(
-                lines, r_base=0.05, mode="lines", cast_shadow=False, is_selectable=False
-            )
+            self._debug_lines = Lines(lines, r_base=0.05, mode="lines", cast_shadow=False, is_selectable=False)
             self.add(self._debug_lines, show_in_hierarchy=False)
         else:
             self._debug_lines.lines = lines
@@ -218,9 +204,7 @@ class Light(Node):
 
     @property
     def direction(self):
-        return direction_from_spherical_coordinates(
-            self.elevation, self.azimuth, degrees=True
-        )
+        return direction_from_spherical_coordinates(self.elevation, self.azimuth, degrees=True)
 
     def redraw(self, **kwargs):
         if self._debug_lines:
@@ -295,9 +279,7 @@ class Light(Node):
             min_value=0.01,
             max_value=100.0,
         )
-        u_show, self._show_debug_lines = imgui.checkbox(
-            "Show Frustum", self._show_debug_lines
-        )
+        u_show, self._show_debug_lines = imgui.checkbox("Show Frustum", self._show_debug_lines)
 
         if self._show_debug_lines:
             if self._debug_lines:

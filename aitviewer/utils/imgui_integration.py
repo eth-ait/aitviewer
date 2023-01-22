@@ -105,9 +105,7 @@ class ImGuiRenderer(ModernglWindowRenderer):
                         (
                             "Texture {} is not registered. Please add to renderer using "
                             "register_texture(..). "
-                            "Current textures: {}".format(
-                                command.texture_id, list(self._textures)
-                            )
+                            "Current textures: {}".format(command.texture_id, list(self._textures))
                         )
                     )
 
@@ -115,9 +113,7 @@ class ImGuiRenderer(ModernglWindowRenderer):
 
                 x, y, z, w = command.clip_rect
                 self.ctx.scissor = int(x), int(fb_height - w), int(z - x), int(w - y)
-                self._vao.render(
-                    moderngl.TRIANGLES, vertices=command.elem_count, first=idx_pos
-                )
+                self._vao.render(moderngl.TRIANGLES, vertices=command.elem_count, first=idx_pos)
                 idx_pos += command.elem_count
 
         self.ctx.scissor = None

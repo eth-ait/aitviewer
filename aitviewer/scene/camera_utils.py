@@ -30,9 +30,7 @@ def look_at(position, target, up):
     def _normalize(x):
         return x / np.linalg.norm(x)
 
-    forward = _normalize(
-        position - target
-    )  # forward actually points in the other direction than `target` is.
+    forward = _normalize(position - target)  # forward actually points in the other direction than `target` is.
     right = _normalize(np.cross(up, forward))
     camera_up = np.cross(forward, right)
 

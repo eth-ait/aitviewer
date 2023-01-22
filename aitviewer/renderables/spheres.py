@@ -59,12 +59,8 @@ def _create_sphere(radius=1.0, rings=16, sectors=32):
     i = 0
     for r in range(rings - 1):
         for s in range(sectors - 1):
-            faces[i] = np.array(
-                [r * sectors + s, (r + 1) * sectors + (s + 1), r * sectors + (s + 1)]
-            )
-            faces[i + 1] = np.array(
-                [r * sectors + s, (r + 1) * sectors + s, (r + 1) * sectors + (s + 1)]
-            )
+            faces[i] = np.array([r * sectors + s, (r + 1) * sectors + (s + 1), r * sectors + (s + 1)])
+            faces[i + 1] = np.array([r * sectors + s, (r + 1) * sectors + s, (r + 1) * sectors + (s + 1)])
             i += 2
 
     return vertices, faces
@@ -97,9 +93,7 @@ class Spheres(Node):
 
         # Define a default material in case there is None.
         if isinstance(color, tuple) or len(color.shape) == 1:
-            kwargs["material"] = kwargs.get(
-                "material", Material(color=color, ambient=0.2)
-            )
+            kwargs["material"] = kwargs.get("material", Material(color=color, ambient=0.2))
             self.sphere_colors = kwargs["material"].color
         else:
             assert color.shape[1] == 4 and positions.shape[1] == color.shape[0]
@@ -109,9 +103,7 @@ class Spheres(Node):
         self._sphere_positions = positions
         self.radius = radius
 
-        self.vertices, self.faces = _create_sphere(
-            radius=1.0, rings=rings, sectors=sectors
-        )
+        self.vertices, self.faces = _create_sphere(radius=1.0, rings=rings, sectors=sectors)
         self.n_vertices = self.vertices.shape[0]
         self.n_spheres = self.sphere_positions.shape[1]
 
@@ -225,9 +217,7 @@ class Spheres(Node):
         if not self.is_renderable or not self._need_upload:
             return
         self._need_upload = False
-        self.vbo_instance_position.write(
-            self.current_sphere_positions.astype("f4").tobytes()
-        )
+        self.vbo_instance_position.write(self.current_sphere_positions.astype("f4").tobytes())
         if len(self._sphere_colors.shape) > 1:
             self.vbo_instance_color.write(self._sphere_colors.astype("f4").tobytes())
 
@@ -262,9 +252,7 @@ class Spheres(Node):
             self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_spheres)
 
     def gui(self, imgui):
-        _, self.radius = imgui.drag_float(
-            "Radius", self.radius, 0.01, min_value=0.001, max_value=10.0, format="%.3f"
-        )
+        _, self.radius = imgui.drag_float("Radius", self.radius, 0.01, min_value=0.001, max_value=10.0, format="%.3f")
         super().gui(imgui)
 
     @hooked

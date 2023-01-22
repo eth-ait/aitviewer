@@ -58,9 +58,7 @@ class ViewerServer:
             msg = self.queue.get_nowait()
             # Call process_message on the viewer so that subclasses of a viewer can intercept messages.
             # By default this will end up calling self.process_message()
-            self.viewer.process_message(
-                msg["type"], msg["uid"], msg["args"], msg["kwargs"]
-            )
+            self.viewer.process_message(msg["type"], msg["uid"], msg["args"], msg["kwargs"])
 
     def process_message(self, type: Message, remote_uid: int, args, kwargs):
         """
@@ -100,9 +98,7 @@ class ViewerServer:
             layer_kwargs = {k: v for k, v in kwargs.items() if k in layer_arg_names}
             layer = SMPLLayer(**layer_kwargs)
 
-            sequence_kwargs = {
-                k: v for k, v in kwargs.items() if k not in layer_arg_names
-            }
+            sequence_kwargs = {k: v for k, v in kwargs.items() if k not in layer_arg_names}
             n = SMPLSequence(*args, smpl_layer=layer, **sequence_kwargs)
             self.viewer.scene.add(n)
             self.remote_to_local_id[remote_uid] = n.uid
@@ -146,9 +142,7 @@ class ViewerServer:
         :param remote_uid: the remote uid to look up.
         :return: Node corresponding to the remote uid.
         """
-        return self.viewer.scene.get_node_by_uid(
-            self.remote_to_local_id.get(remote_uid, None)
-        )
+        return self.viewer.scene.get_node_by_uid(self.remote_to_local_id.get(remote_uid, None))
 
 
 # If this module is invoke directly it starts an empty viewer

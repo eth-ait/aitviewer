@@ -26,9 +26,7 @@ if __name__ == "__main__":
     # Load 3DPW sequence. This uses the SMPL model. This might return more than one sequence because some 3DPW
     # sequences contain multiple people.
     seqs_3dpw = SMPLSequence.from_3dpw(
-        pkl_data_path=os.path.join(
-            C.datasets.threedpw.ori, "test/downtown_sitOnStairs_00.pkl"
-        ),
+        pkl_data_path=os.path.join(C.datasets.threedpw.ori, "test/downtown_sitOnStairs_00.pkl"),
         name="3DPW Sit on Stairs",
     )
 

@@ -131,9 +131,7 @@ class Arrows(Node):
         return self.origins + (self.tips - self.origins) * (1 - self.p)
 
     def get_line_coords(self, starts, ends):
-        c = np.zeros(
-            (len(self), (starts.shape[1] + ends.shape[1]), 3), dtype=starts.dtype
-        )
+        c = np.zeros((len(self), (starts.shape[1] + ends.shape[1]), 3), dtype=starts.dtype)
         c[:, 0::2] = starts
         c[:, 1::2] = ends
         return c

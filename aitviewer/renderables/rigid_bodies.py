@@ -52,9 +52,7 @@ class RigidBodies(Node):
         """
         self._rb_pos = rb_pos[np.newaxis] if rb_pos.ndim == 2 else rb_pos
         self._rb_ori = rb_ori[np.newaxis] if rb_ori.ndim == 3 else rb_ori
-        super(RigidBodies, self).__init__(
-            n_frames=self.rb_pos.shape[0], color=color, icon=icon, **kwargs
-        )
+        super(RigidBodies, self).__init__(n_frames=self.rb_pos.shape[0], color=color, icon=icon, **kwargs)
 
         self.radius = radius
         self.length = length

@@ -21,9 +21,7 @@ def test_renderables(viewer: Viewer):
     n_lines = grid_xz.shape[1] * grid_xz.shape[2]
 
     xz_coords = np.reshape(grid_xz, (2, -1)).T
-    line_starts = np.concatenate(
-        [xz_coords[:, 0:1], np.zeros((n_lines, 1)), xz_coords[:, 1:2]], axis=-1
-    )
+    line_starts = np.concatenate([xz_coords[:, 0:1], np.zeros((n_lines, 1)), xz_coords[:, 1:2]], axis=-1)
     line_ends = line_starts.copy()
     line_ends[:, 1] = 1.0
     line_strip = np.zeros((2 * n_lines, 3))
@@ -32,14 +30,10 @@ def test_renderables(viewer: Viewer):
     line_renderable = Lines(line_strip, r_base=0.03, mode="lines")
 
     line_dirs = line_ends - line_starts
-    sphere_positions = line_ends + 0.1 * (
-        line_dirs / np.linalg.norm(line_dirs, axis=-1, keepdims=True)
-    )
+    sphere_positions = line_ends + 0.1 * (line_dirs / np.linalg.norm(line_dirs, axis=-1, keepdims=True))
     spheres = Spheres(sphere_positions, radius=0.05, color=(1.0, 0.0, 1.0, 1.0))
 
-    rb_positions = line_ends + 0.4 * (
-        line_dirs / np.linalg.norm(line_dirs, axis=-1, keepdims=True)
-    )
+    rb_positions = line_ends + 0.4 * (line_dirs / np.linalg.norm(line_dirs, axis=-1, keepdims=True))
     angles = np.arange(0.0, 2 * np.pi, step=2 * np.pi / n_lines)[:, None]
     axes = np.zeros((n_lines, 3))
     axes[:, 2] = 1.0
@@ -62,9 +56,7 @@ def test_obj(viewer: Viewer):
         flat_shading=True,
     )
 
-    planet = trimesh.load(
-        os.path.join(RESOURCE_DIR, "planet/planet.obj"), process=False
-    )
+    planet = trimesh.load(os.path.join(RESOURCE_DIR, "planet/planet.obj"), process=False)
     texture_image = os.path.join(RESOURCE_DIR, "planet/mars.png")
     planet_mesh = Meshes(
         planet.vertices,
@@ -159,9 +151,7 @@ def test_smplx(viewer: Viewer):
 def test_amass(viewer: Viewer):
     c = (149 / 255, 85 / 255, 149 / 255, 0.5)
     seq_amass = SMPLSequence.from_amass(
-        npz_data_path=os.path.join(
-            C.datasets.amass, "ACCAD/Female1Running_c3d/C2 - Run to stand_poses.npz"
-        ),
+        npz_data_path=os.path.join(C.datasets.amass, "ACCAD/Female1Running_c3d/C2 - Run to stand_poses.npz"),
         fps_out=60.0,
         name="AMASS Running",
         color=c,
@@ -177,9 +167,7 @@ def test_amass(viewer: Viewer):
 @requires_smpl
 def test_3dpw(viewer: Viewer):
     seqs_3dpw = SMPLSequence.from_3dpw(
-        pkl_data_path=os.path.join(
-            C.datasets.threedpw.ori, "test/downtown_sitOnStairs_00.pkl"
-        ),
+        pkl_data_path=os.path.join(C.datasets.threedpw.ori, "test/downtown_sitOnStairs_00.pkl"),
         name="3DPW Sit on Stairs",
     )
     viewer.scene.camera.position = np.array([-1.0, 1.5, -1.5])

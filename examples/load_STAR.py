@@ -29,9 +29,7 @@ if __name__ == "__main__":
 
     # Load a STAR Sequence from AMASS data. BETAs will not be loaded by default and need to be converted.
     star_seq = STARSequence.from_amass(
-        npz_data_path=os.path.join(
-            C.datasets.amass, "ACCAD/Female1Running_c3d/C2 - Run to stand_poses.npz"
-        ),
+        npz_data_path=os.path.join(C.datasets.amass, "ACCAD/Female1Running_c3d/C2 - Run to stand_poses.npz"),
         fps_out=60.0,
         name="AMASS Running",
         show_joint_angles=False,

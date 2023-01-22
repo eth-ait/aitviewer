@@ -25,16 +25,12 @@ from aitviewer.renderables.smpl import SMPLSequence
 if __name__ == "__main__":
     # Load an AMASS sequence.
     smpl_seq = SMPLSequence.from_amass(
-        npz_data_path=os.path.join(
-            C.datasets.amass, "ACCAD/Female1Running_c3d/C2 - Run to stand_poses.npz"
-        ),
+        npz_data_path=os.path.join(C.datasets.amass, "ACCAD/Female1Running_c3d/C2 - Run to stand_poses.npz"),
         fps_out=60.0,
         name="AMASS Running",
         show_joint_angles=True,
     )
-    smpl_seq.color = smpl_seq.color[:3] + (
-        0.75,
-    )  # Make the sequence a bit transparent.
+    smpl_seq.color = smpl_seq.color[:3] + (0.75,)  # Make the sequence a bit transparent.
 
     # Create the headless renderer and add the sequence.
     v = HeadlessRenderer()

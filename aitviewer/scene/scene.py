@@ -73,14 +73,10 @@ class Scene(Node):
         self.ambient_strength = 2.0
 
         # Scene items
-        self.origin = CoordinateSystem(
-            name="Origin", length=0.1, gui_affine=False, gui_material=False
-        )
+        self.origin = CoordinateSystem(name="Origin", length=0.1, gui_affine=False, gui_material=False)
         self.add(self.origin)
 
-        self.floor = ChessboardPlane(
-            100.0, 200, (0.9, 0.9, 0.9, 1.0), (0.82, 0.82, 0.82, 1.0), name="Floor"
-        )
+        self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0), (0.82, 0.82, 0.82, 1.0), name="Floor")
         self.floor.material.diffuse = 0.1
         self.add(self.floor)
 
@@ -198,9 +194,7 @@ class Scene(Node):
 
     @property
     def current_bounds(self):
-        return compute_union_of_current_bounds(
-            [n for n in self.nodes if n not in self.lights]
-        )
+        return compute_union_of_current_bounds([n for n in self.nodes if n not in self.lights])
 
     def auto_set_floor(self):
         """Finds the minimum lower bound in the y coordinate from all the children bounds and uses that as the floor"""
@@ -273,15 +267,11 @@ class Scene(Node):
                 return n
         return None
 
-    def select(
-        self, obj, selected_node=None, selected_instance=None, selected_tri_id=None
-    ):
+    def select(self, obj, selected_node=None, selected_instance=None, selected_tri_id=None):
         """Set 'obj' as the selected object"""
         self.selected_object = obj
         if isinstance(obj, Node):
-            self.selected_object.on_selection(
-                selected_node, selected_instance, selected_tri_id
-            )
+            self.selected_object.on_selection(selected_node, selected_instance, selected_tri_id)
         # Always keep the last selected object in the property panel
         if obj is not None:
             self.gui_selected_object = obj
@@ -307,9 +297,7 @@ class Scene(Node):
                 imgui.spacing()
                 for i, (gm_key, gm_val) in enumerate(s.gui_modes.items()):
                     if s.selected_mode == gm_key:
-                        imgui.push_style_color(
-                            imgui.COLOR_BUTTON, 0.26, 0.59, 0.98, 1.0
-                        )
+                        imgui.push_style_color(imgui.COLOR_BUTTON, 0.26, 0.59, 0.98, 1.0)
                     mode_clicked = imgui.button(f" {gm_val['icon']}{gm_val['title']} ")
                     if s.selected_mode == gm_key:
                         imgui.pop_style_color()
@@ -352,9 +340,7 @@ class Scene(Node):
     def gui(self, imgui):
         imgui.text(f"FPS: {self.fps:.1f}")
         # Background color
-        uc, color = imgui.color_edit4(
-            "Background", *self.background_color, show_alpha=True
-        )
+        uc, color = imgui.color_edit4("Background", *self.background_color, show_alpha=True)
         if uc:
             self.background_color = color
 
@@ -394,9 +380,7 @@ class Scene(Node):
             name = self.camera.name
         else:
             name = f"Camera: {self.camera.name}"
-        camera_expanded = imgui.tree_node(
-            f"{self.camera.icon} {name}##tree_node_r_camera", flags
-        )
+        camera_expanded = imgui.tree_node(f"{self.camera.icon} {name}##tree_node_r_camera", flags)
         if imgui.is_item_clicked():
             self.select(self.camera)
 
@@ -414,9 +398,7 @@ class Scene(Node):
             flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
             if self.is_selected(light):
                 flags |= imgui.TREE_NODE_SELECTED
-            light_expanded = imgui.tree_node(
-                f"{light.icon} {light.name}##tree_node_r", flags
-            )
+            light_expanded = imgui.tree_node(f"{light.icon} {light.name}##tree_node_r", flags)
             if imgui.is_item_clicked():
                 self.select(light)
 
@@ -448,9 +430,7 @@ class Scene(Node):
                 flags |= imgui.TREE_NODE_SELECTED
             if not any(c.show_in_hierarchy for c in r.nodes):
                 flags |= imgui.TREE_NODE_LEAF
-            r.expanded = imgui.tree_node(
-                "{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name), flags
-            )
+            r.expanded = imgui.tree_node("{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name), flags)
             if imgui.is_item_clicked():
                 self.select(r)
 
@@ -461,9 +441,7 @@ class Scene(Node):
                 # Aligns checkbox to the right side of the window
                 # https://github.com/ocornut/imgui/issues/196
                 imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
-                eu, enabled = imgui.checkbox(
-                    "##enabled_r_{}".format(r.unique_name), r.enabled
-                )
+                eu, enabled = imgui.checkbox("##enabled_r_{}".format(r.unique_name), r.enabled)
                 if eu:
                     r.enabled = enabled
 

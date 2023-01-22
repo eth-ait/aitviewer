@@ -39,18 +39,12 @@ def test_headless(viewer: HeadlessRenderer):
         viewer.save_video(frame_dir=frame_path, video_dir=mp4_path, output_fps=30)
         assert os.path.exists(os.path.join(temp, "video_0.mp4")), "MP4 file not found"
         frames = os.path.join(frame_path, "0000")
-        assert (
-            os.path.exists(frames)
-            and len(os.listdir(frames)) == sphere_positions.shape[0]
-        )
+        assert os.path.exists(frames) and len(os.listdir(frames)) == sphere_positions.shape[0]
 
         viewer.save_video(frame_dir=frame_path, video_dir=gif_path, output_fps=30)
         assert os.path.exists(os.path.join(temp, "video_0.gif")), "GIF file not found"
         frames = os.path.join(frame_path, "0001")
-        assert (
-            os.path.exists(frames)
-            and len(os.listdir(frames)) == sphere_positions.shape[0]
-        )
+        assert os.path.exists(frames) and len(os.listdir(frames)) == sphere_positions.shape[0]
 
         viewer.save_video(video_dir=mp4_path)
         assert os.path.exists(os.path.join(temp, "video_1.mp4")), "MP4 file not found"
@@ -91,9 +85,7 @@ def test_empty(viewer: Viewer):
 
 def add_cube(viewer: Viewer, pos):
     cube = trimesh.load(os.path.join(RESOURCE_DIR, "cube.obj"), process=False)
-    cube_mesh = Meshes(
-        cube.vertices, cube.faces, name="Cube", position=pos, flat_shading=True
-    )
+    cube_mesh = Meshes(cube.vertices, cube.faces, name="Cube", position=pos, flat_shading=True)
     viewer.scene.add(cube_mesh)
 
 
@@ -277,7 +269,5 @@ def test_instancing(viewer: Viewer):
     viewer.scene.camera.position = (10, 5, 7)
     viewer.scene.camera.target = (1.5, -1, -2)
 
-    cube_mesh = Meshes.instanced(
-        cube.vertices, cube.faces, positions=p, rotations=r, scales=s, flat_shading=True
-    )
+    cube_mesh = Meshes.instanced(cube.vertices, cube.faces, positions=p, rotations=r, scales=s, flat_shading=True)
     viewer.scene.add(cube_mesh)

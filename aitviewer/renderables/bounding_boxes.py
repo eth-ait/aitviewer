@@ -42,9 +42,7 @@ class BoundingBoxes(Node):
         else:
             assert len(vertices.shape) == 3
         assert vertices.shape[1] == 8
-        super(BoundingBoxes, self).__init__(
-            n_frames=len(vertices), color=color, **kwargs
-        )
+        super(BoundingBoxes, self).__init__(n_frames=len(vertices), color=color, **kwargs)
 
         self.vertices = vertices
 
@@ -54,9 +52,7 @@ class BoundingBoxes(Node):
             r_base=thickness,
             color=self.color,
         )
-        self.spheres = Spheres(
-            positions=self.vertices, radius=thickness, color=self.color
-        )
+        self.spheres = Spheres(positions=self.vertices, radius=thickness, color=self.color)
         self._add_nodes(self.lines, self.spheres, show_in_hierarchy=False)
 
     @staticmethod

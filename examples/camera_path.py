@@ -25,9 +25,7 @@ from aitviewer.viewer import Viewer
 
 if __name__ == "__main__":
     # Create a neutral SMPL T Pose.
-    smpl_template = SMPLSequence.t_pose(
-        SMPLLayer(model_type="smpl", gender="neutral", device=C.device), name="SMPL"
-    )
+    smpl_template = SMPLSequence.t_pose(SMPLLayer(model_type="smpl", gender="neutral", device=C.device), name="SMPL")
 
     d = 10  # Distance from the object at start and end.
     r = 3  # Radius of the circle around the object.
@@ -52,9 +50,7 @@ if __name__ == "__main__":
     v = Viewer()
 
     # Create a Pihole camera that uses the positions and targets we computed.
-    camera = PinholeCamera(
-        positions, targets, v.window_size[0], v.window_size[1], viewer=v
-    )
+    camera = PinholeCamera(positions, targets, v.window_size[0], v.window_size[1], viewer=v)
 
     # Add the camera and the SMPL sequence to the scene.
     v.scene.add(camera, smpl_template)

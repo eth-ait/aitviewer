@@ -62,9 +62,7 @@ def viewer(refs):
         ref_img = Image.open(ref)
 
         diff = ImageChops.difference(img, ref_img)
-        relative_error = (
-            np.asarray(diff).sum() / np.full(np.asarray(img).shape, 255).sum()
-        )
+        relative_error = np.asarray(diff).sum() / np.full(np.asarray(img).shape, 255).sum()
 
         # If the relative error is higher than this threshold report a failure.
         if relative_error > 1e-5:
@@ -124,9 +122,7 @@ def reference(name=None, count=1):
         # If this references more than one image create a list of paths by appending the frame index.
         if count > 1:
             print_name = f"{name}_[0-{count - 1}]"
-            refs = [
-                os.path.join(REFERENCE_DIR, f"{name}_{i}.png") for i in range(count)
-            ]
+            refs = [os.path.join(REFERENCE_DIR, f"{name}_{i}.png") for i in range(count)]
         else:
             print_name = name
             refs = [os.path.join(REFERENCE_DIR, f"{name}.png")]

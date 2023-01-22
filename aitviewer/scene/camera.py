@@ -51,23 +51,17 @@ class CameraInterface(ABC):
 
     def get_projection_matrix(self):
         if self.projection_matrix is None:
-            raise ValueError(
-                "update_matrices() must be called before to update the projection matrix"
-            )
+            raise ValueError("update_matrices() must be called before to update the projection matrix")
         return self.projection_matrix
 
     def get_view_matrix(self):
         if self.view_matrix is None:
-            raise ValueError(
-                "update_matrices() must be called before to update the view matrix"
-            )
+            raise ValueError("update_matrices() must be called before to update the view matrix")
         return self.view_matrix
 
     def get_view_projection_matrix(self):
         if self.view_projection_matrix is None:
-            raise ValueError(
-                "update_matrices() must be called before to update the view-projection matrix"
-            )
+            raise ValueError("update_matrices() must be called before to update the view-projection matrix")
         return self.view_projection_matrix
 
     @abstractmethod
@@ -303,9 +297,7 @@ class Camera(Node, CameraInterface):
 
         ori = np.eye(3, dtype=np.float)
         ori[:, 2] *= -1
-        self.origin = RigidBodies(
-            np.array([0.0, 0.0, 0.0])[np.newaxis], ori[np.newaxis]
-        )
+        self.origin = RigidBodies(np.array([0.0, 0.0, 0.0])[np.newaxis], ori[np.newaxis])
         self.add(self.origin, show_in_hierarchy=False)
 
         self.current_frame_id = frame_id
@@ -334,9 +326,7 @@ class Camera(Node, CameraInterface):
             # Flip the Z axis since we want to display the orientation with Z forward
             all_oris[i] = self.rotation @ np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])
 
-        path_spheres = RigidBodies(
-            all_points, all_oris, radius=0.01, length=0.1, color=(0.92, 0.68, 0.2, 1.0)
-        )
+        path_spheres = RigidBodies(all_points, all_oris, radius=0.01, length=0.1, color=(0.92, 0.68, 0.2, 1.0))
         # Create lines only if there is more than one frame in the sequence.
         if self.n_frames > 1:
             path_lines = Lines(
@@ -351,9 +341,7 @@ class Camera(Node, CameraInterface):
 
         # We add the the path to the parent node of the camera because we don't want the camera position and rotation
         # to be applied to it.
-        assert (
-            self.parent is not None
-        ), "Camera node must be added to the scene before showing the camera path."
+        assert self.parent is not None, "Camera node must be added to the scene before showing the camera path."
         self.parent.add(path_spheres, show_in_hierarchy=False, enabled=self.enabled)
         if path_lines is not None:
             self.parent.add(path_lines, show_in_hierarchy=False, enabled=self.enabled)
@@ -387,9 +375,7 @@ class Camera(Node, CameraInterface):
 
     def gui_context_menu(self, imgui):
         if self.viewer:
-            if imgui.menu_item(
-                "View from camera", shortcut=None, selected=False, enabled=True
-            )[1]:
+            if imgui.menu_item("View from camera", shortcut=None, selected=False, enabled=True)[1]:
                 self.view_from_camera()
 
         u, show = imgui.checkbox("Show path", self.path is not None)
@@ -437,14 +423,10 @@ class WeakPerspectiveCamera(Camera):
         if len(translation.shape) == 1:
             translation = translation[np.newaxis]
 
-        assert (
-            scale.shape[0] == translation.shape[0]
-        ), "Number of frames in scale and translation must match"
+        assert scale.shape[0] == translation.shape[0], "Number of frames in scale and translation must match"
 
         kwargs["gui_affine"] = False
-        super(WeakPerspectiveCamera, self).__init__(
-            n_frames=scale.shape[0], viewer=viewer, **kwargs
-        )
+        super(WeakPerspectiveCamera, self).__init__(n_frames=scale.shape[0], viewer=viewer, **kwargs)
 
         self.scale_factor = scale
         self.translation = translation
@@ -557,15 +539,11 @@ class OpenCVCamera(Camera):
         assert len(self.K.shape) == 3
 
         assert (
-            self.K.shape[0] == 1
-            or self.Rt.shape[0] == 1
-            or self.K.shape[0] == self.Rt.shape[0]
+            self.K.shape[0] == 1 or self.Rt.shape[0] == 1 or self.K.shape[0] == self.Rt.shape[0]
         ), f"extrinsics and intrinsics array shape mismatch: {self.Rt.shape} and {self.K.shape}"
 
         kwargs["gui_affine"] = False
-        super(OpenCVCamera, self).__init__(
-            viewer=viewer, n_frames=max(self.K.shape[0], self.Rt.shape[0]), **kwargs
-        )
+        super(OpenCVCamera, self).__init__(viewer=viewer, n_frames=max(self.K.shape[0], self.Rt.shape[0]), **kwargs)
         self.position = self.current_position
         self.rotation = self.current_rotation
 
@@ -757,16 +735,12 @@ class PinholeCamera(Camera):
         positions = position if len(position.shape) == 2 else position[np.newaxis]
         targets = target if len(target.shape) == 2 else target[np.newaxis]
         assert (
-            positions.shape[0] == 1
-            or targets.shape[0] == 1
-            or positions.shape[0] == targets.shape[0]
+            positions.shape[0] == 1 or targets.shape[0] == 1 or positions.shape[0] == targets.shape[0]
         ), f"position and target array shape mismatch: {positions.shape} and {targets.shape}"
 
         self._world_up = np.array([0.0, 1.0, 0.0])
         self._targets = targets
-        super(PinholeCamera, self).__init__(
-            position=position, n_frames=targets.shape[0], viewer=viewer, **kwargs
-        )
+        super(PinholeCamera, self).__init__(position=position, n_frames=targets.shape[0], viewer=viewer, **kwargs)
 
         self.cols = cols
         self.rows = rows
@@ -793,11 +767,7 @@ class PinholeCamera(Camera):
 
     @property
     def current_target(self):
-        return (
-            self._targets[0]
-            if self._targets.shape[0] == 1
-            else self._targets[self.current_frame_id]
-        )
+        return self._targets[0] if self._targets.shape[0] == 1 else self._targets[self.current_frame_id]
 
     @property
     def rotation(self):
@@ -805,9 +775,7 @@ class PinholeCamera(Camera):
 
     def update_matrices(self, width, height):
         # Compute projection matrix.
-        P = perspective_projection(
-            np.deg2rad(self.fov), width / height, self.near, self.far
-        )
+        P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
 
         # Compute view matrix.
         V = look_at(self.position, self.current_target, self._world_up)
@@ -999,9 +967,7 @@ class ViewerCamera(CameraInterface):
             xscale = width / height * yscale
             P = orthographic_projection(xscale, yscale, self.near, self.far)
         else:
-            P = perspective_projection(
-                np.deg2rad(self.fov), width / height, self.near, self.far
-            )
+            P = perspective_projection(np.deg2rad(self.fov), width / height, self.near, self.far)
 
         # Compute view matrix.
         V = look_at(self.position, self.target, self.up)
@@ -1034,9 +1000,7 @@ class ViewerCamera(CameraInterface):
         else:
             # Clamp movement size to avoid surpassing the target
             movement_length = speed * norm
-            max_movement_length = max(
-                np.linalg.norm(self.target - self.position) - 0.01, 0.0
-            )
+            max_movement_length = max(np.linalg.norm(self.target - self.position) - 0.01, 0.0)
 
             # Update position
             self.position += fwd * min(movement_length, max_movement_length)
@@ -1065,9 +1029,7 @@ class ViewerCamera(CameraInterface):
         rot = np.eye(4)
 
         # Avoid singularity when z axis of camera is aligned with the up axis of the scene.
-        if not (mouse_dy > 0 and dot > 0 and 1 - dot < 0.001) and not (
-            mouse_dy < 0 and dot < 0 and 1 + dot < 0.001
-        ):
+        if not (mouse_dy > 0 and dot > 0 and 1 - dot < 0.001) and not (mouse_dy < 0 and dot < 0 and 1 + dot < 0.001):
             # We are either hovering exactly below or above the scene's target but we want to move away or we are
             # not hitting the singularity anyway.
             x_axis = -self.right
@@ -1138,19 +1100,12 @@ class ViewerCamera(CameraInterface):
             t = self._animation_t / self._animation_total_time
             # Smootherstep interpolation (this polynomial has 0 first and second derivative at 0 and 1)
             t = t * t * t * (t * (t * 6 - 15) + 10)
-            self.position = (
-                self._animation_start_position * (1 - t)
-                + self._animation_end_position * t
-            )
-            self.target = (
-                self._animation_start_target * (1 - t) + self._animation_end_target * t
-            )
+            self.position = self._animation_start_position * (1 - t) + self._animation_end_position * t
+            self.target = self._animation_start_target * (1 - t) + self._animation_end_target * t
 
     def gui(self, imgui):
         _, self.is_ortho = imgui.checkbox("Orthographic Camera", self.is_ortho)
-        _, self.fov = imgui.slider_float(
-            "Camera FOV##fov", self.fov, 0.1, 180.0, "%.1f"
-        )
+        _, self.fov = imgui.slider_float("Camera FOV##fov", self.fov, 0.1, 180.0, "%.1f")
         _, position = imgui.drag_float3("Position", *self.position)
         _, target = imgui.drag_float3("Target", *self.target)
         self.position = np.array(position)

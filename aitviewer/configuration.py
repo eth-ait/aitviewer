@@ -29,9 +29,7 @@ class Configuration(object):
 
         def __init__(self):
             # Load the default configurations.
-            self._conf = OmegaConf.load(
-                os.path.join(os.path.dirname(__file__), "aitvconfig.yaml")
-            )
+            self._conf = OmegaConf.load(os.path.join(os.path.dirname(__file__), "aitvconfig.yaml"))
 
             # Check if we have a config file in AITVRC env variable.
             if os.environ.get("AITVRC", None) is not None:
@@ -63,19 +61,11 @@ class Configuration(object):
             if hasattr(self._conf, item):
                 # Some attributes of the config are converted to torch objects automatically.
                 if item == "device":
-                    return torch.device(
-                        self._conf.get("device", "cuda:0")
-                        if self._gpu_available
-                        else "cpu"
-                    )
+                    return torch.device(self._conf.get("device", "cuda:0") if self._gpu_available else "cpu")
                 elif item == "f_precision":
-                    return getattr(
-                        torch, "float{}".format(self._conf.get("f_precision", 32))
-                    )
+                    return getattr(torch, "float{}".format(self._conf.get("f_precision", 32)))
                 elif item == "i_precision":
-                    return getattr(
-                        torch, "int{}".format(self._conf.get("i_precision", 64))
-                    )
+                    return getattr(torch, "int{}".format(self._conf.get("i_precision", 64)))
                 else:
                     return getattr(self._conf, item)
             else:
