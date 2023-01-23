@@ -230,6 +230,7 @@ class Billboard(Node):
                 img = self.textures[self.current_frame_id]
                 if not isinstance(img, np.ndarray):
                     img = np.asarray(img)
+                img = img.copy()
 
             img = self.img_process_fn(img, self.current_frame_id)
             self.texture = self.ctx.texture(
