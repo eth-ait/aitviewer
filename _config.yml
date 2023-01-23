@@ -1,7 +1,6 @@
 title: aitviewer
 description: aitviewer - official documentation
-#theme: just-the-docs
-remote_theme: pmarsceill/just-the-docs
+theme: just-the-docs
 
 logo: "/assets/aitviewer_logo.svg"
 
