@@ -9,9 +9,12 @@ cube = trimesh.load("resources/cube.obj")
 # Create a RemoteViewer instance. This represents a connection to a remote viewer and
 # must be passed as the first argument to every Remote* renderable constructor.
 #
-# If no argument is given a new viewer is created locally in a new process.
-# Instead, an address can be passed to connect to a running viewer.
-v = RemoteViewer()
+# The 'create_new_process()' helper method first creates a viewer in a new process and
+# then connects to it locally.
+#
+# You can also use connect to an already running viewer as follows:
+# v = RemoteViewer("localhost")
+v: RemoteViewer = RemoteViewer.create_new_process()
 
 
 # Create a cube with a single frame on the remote viewer.
@@ -59,11 +62,3 @@ v.set_frame(50)
 
 # Uncomment the following line to remove the node completely from the viewer.
 # m.delete()
-
-
-# Wait until the viewer is closed.
-#
-# If the viewer is running locally in a new process this will
-# wait for it to exit and print its output to the console.
-# If the viewer is not running locally this call will return immediately.
-v.wait_close()

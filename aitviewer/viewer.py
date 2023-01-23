@@ -764,6 +764,14 @@ class Viewer(moderngl_window.WindowConfig):
 
                 imgui.end_menu()
 
+            if self.server is not None:
+                if imgui.begin_menu("Server", True):
+                    imgui.text("Connected clients:")
+                    imgui.separator()
+                    for c in self.server.connections:
+                        imgui.text(f"{c[0]}:{c[1]}")
+                    imgui.end_menu()
+
             imgui.end_main_menu_bar()
 
         if clicked_export:

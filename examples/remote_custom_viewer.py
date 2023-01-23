@@ -34,7 +34,7 @@ if len(sys.argv) == 1:
     #
     # This will invoke the script with the following command:
     #   python path/to/script.py server
-    v = RemoteViewer(args=[__file__, "server"])
+    v = RemoteViewer.create_new_process([__file__, "server"])
 
     # Send 3 Meshes to the viewer
     for i in range(3):
@@ -50,13 +50,9 @@ if len(sys.argv) == 1:
         time.sleep(1)
 
     # Send a custom message to the viewer, we specify
-    # the message type and the positional arguments that will
+    # the message type and a keyword argument that will
     # be sent to the viewer's 'process_message()' method.
-    index = 1
-    v.send_message(CUSTOM_MESSAGE, args=[index])
-
-    # Wait for the viewer to close.
-    v.wait_close()
+    v.send_message(CUSTOM_MESSAGE, index=1)
 
 elif sys.argv[1] == "server":
 
@@ -96,9 +92,9 @@ elif sys.argv[1] == "server":
                 self.scene.select(cube)
                 self.center_view_on_selection()
             else:
-                # Extract the first argument from the argument list passed
+                # Extract the 'index' keyword argument from the arguments passed
                 # to 'send_message()' by the client.
-                index = args[0]
+                index = kwargs["index"]
 
                 # We use this to select one of the cubes and center the view on it.
                 self.scene.select(cubes[index])

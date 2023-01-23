@@ -21,8 +21,17 @@ class ViewerServer:
           connections will be bound.
         """
         self.viewer = viewer
+
+        # Dictionary mapping from the remote node uid to the local node uid
         self.remote_to_local_id = {}
+
+        # A queue of messages received by the server. This is used to transfer
+        # received messages from the server thread to the main thread.
         self.queue = queue.Queue()
+
+        # A list of connections that are currently open. Each entry is
+        # the remote address (host, port) tuple.
+        self.connections = []
 
         # Entry point of server thread
         def entry(queue: queue.Queue):
@@ -31,17 +40,25 @@ class ViewerServer:
 
             import websockets
 
+            # Called whenever a new connection is enstablished.
             async def serve(websocket):
                 addr = websocket.remote_address
                 print(f"New connection: {addr[0]}:{addr[1]}")
+                self.connections.append(addr)
                 try:
+                    # Message loop.
+                    # This loop is exited whenever the connection is dropped
+                    # which causes and exception to be raised.
                     async for message in websocket:
                         data = pickle.loads(message)
+                        # Equeue data for the main thread to process.
                         queue.put_nowait(data)
                 except:
                     pass
+                self.connections.remove(addr)
                 print(f"Connection closed: {addr[0]}:{addr[1]}")
 
+            # Async entry point of the main thread.
             async def main():
                 server = await websockets.serve(serve, "0.0.0.0", port)
                 await server.serve_forever()
