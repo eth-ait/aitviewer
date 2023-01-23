@@ -22,3 +22,4 @@ All renderables are natively 4D, meaning they can be animated sequences.
 ## Making a Custom Renderables
 Add GUI Elements
 Add Custom Interaction Modes
+Composition vs Inheritance Approaches
