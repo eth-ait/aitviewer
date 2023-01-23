@@ -70,6 +70,7 @@ GEM
 PLATFORMS
   x64-unknown
   x86_64-darwin-20
+  x86_64-linux
 
 DEPENDENCIES
   jekyll (~> 4.3)
