@@ -19,7 +19,10 @@ All renderables are natively 4D, meaning they can be animated sequences.
 - SMPL Sequence
 - STAR Sequence 
 
+## Instanced Rendering
+
 ## Making a Custom Renderables
 Add GUI Elements
 Add Custom Interaction Modes
 Composition vs Inheritance Approaches
+
