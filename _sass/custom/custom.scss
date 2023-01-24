@@ -1,0 +1,22 @@
+// Print-only styles.
+.site-header {
+	margin-top: 20px;
+}
+
+#main-header {
+	height: 80px;
+}
+table td {
+	text-align: center;
+}
+
+img + em {
+	margin-top: 20px;
+	display: block;
+}
+
+
+h1 + p img {
+	max-width: 70%;
+	margin-top: 20px;
+}
