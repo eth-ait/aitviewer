@@ -6,13 +6,13 @@ parent: Renderables
 ---
 
 # Point Clouds
-![Point Clouds](../assets/images/pcl.png) 
+![Point Clouds](../assets/images/pcl.png)
 
 Point clouds can be useful for display raw data from sensors, or displaying huge amounts of point data (1 million +). A custom color can be assigned to each point.
 
 
 ## Example Usage
-In the[`load_AMASS.py`](https://github.com/eth-ait/aitviewer/blob/main/examples/load_AMASS.py) example, point clouds are used to display the vertices of an SMPL sequence. The sequence of `points` are expected to be of unifom size for each frame (thus, variable length point clouds are not supported at this time).  
+In the [`load_AMASS.py`](https://github.com/eth-ait/aitviewer/blob/main/examples/load_AMASS.py) example, point clouds are used to display the vertices of an SMPL sequence. The sequence of `points` are expected to be of unifom size for each frame (thus, variable length point clouds are not supported at this time).
 
 
 ```python
