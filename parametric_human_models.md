@@ -3,7 +3,7 @@ title: Parametric Human Models
 layout: default
 has_children: true
 nav_order: 4
-has_toc: false
+has_toc: true
 ---
 
 # Parametric Human Models
