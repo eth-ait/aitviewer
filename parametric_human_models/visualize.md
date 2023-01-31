@@ -23,9 +23,9 @@ romp_smpl = SMPLSequence(poses_body=results['body_pose'],
 Then we prepare the camera, taking care that we get the conventions correct:
 ```python
 # When using pyrender with ROMP, an FOV of 60 degrees is used.
+# We mimic this here so that we get the same visualization as ROMP.
 fov = 60
 f = max(cols, rows)/2. * 1./np.tan(np.radians(fov/2))
-input_img = cv2.imread(img_path)
 cam_intrinsics = np.array([[f, 0., cols / 2], [0., f, rows / 2], [0., 0., 1.]])
 
 # The camera extrinsics are assumed to identity rotation and the translation is estimated by ROMP.
