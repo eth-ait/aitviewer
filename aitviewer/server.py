@@ -52,7 +52,7 @@ class ViewerServer:
                     async for message in websocket:
                         data = pickle.loads(message)
                         # Equeue data for the main thread to process.
-                        queue.put_nowait(data)
+                        queue.put_nowait((addr, data))
                 except:
                     pass
                 self.connections.remove(addr)
@@ -72,12 +72,12 @@ class ViewerServer:
     def process_messages(self):
         """Processes all messages received since the last time this method was called."""
         while not self.queue.empty():
-            msg = self.queue.get_nowait()
+            client, msg = self.queue.get_nowait()
             # Call process_message on the viewer so that subclasses of a viewer can intercept messages.
             # By default this will end up calling self.process_message()
-            self.viewer.process_message(msg["type"], msg["uid"], msg["args"], msg["kwargs"])
+            self.viewer.process_message(msg["type"], msg["uid"], msg["args"], msg["kwargs"], client)
 
-    def process_message(self, type: Message, remote_uid: int, args, kwargs):
+    def process_message(self, type: Message, remote_uid: int, args: list, kwargs: dict, client: tuple[str, str]):
         """
         Default processing of messages.
 
@@ -85,30 +85,32 @@ class ViewerServer:
         :param remote_uid: the remote id of the node that this message refers to.
         :param args: positional arguments received with the message.
         :param kwargs: keyword arguments received with the message.
+        :param client: a tuple (ip, port) describing the address of the client
+            that sent this message.
         """
 
-        def add(remote_uid, args, kwargs, type):
+        def add(client, remote_uid, args, kwargs, type):
             n = type(*args, **kwargs)
             self.viewer.scene.add(n)
-            self.remote_to_local_id[remote_uid] = n.uid
+            self.remote_to_local_id[(client, remote_uid)] = n.uid
 
         if type == Message.NODE:
-            add(remote_uid, args, kwargs, Node)
+            add(client, remote_uid, args, kwargs, Node)
 
         elif type == Message.MESHES:
-            add(remote_uid, args, kwargs, Meshes)
+            add(client, remote_uid, args, kwargs, Meshes)
 
         elif type == Message.SPHERES:
-            add(remote_uid, args, kwargs, Spheres)
+            add(client, remote_uid, args, kwargs, Spheres)
 
         elif type == Message.LINES:
-            add(remote_uid, args, kwargs, Lines)
+            add(client, remote_uid, args, kwargs, Lines)
 
         elif type == Message.ARROWS:
-            add(remote_uid, args, kwargs, Arrows)
+            add(client, remote_uid, args, kwargs, Arrows)
 
         elif type == Message.RIGID_BODIES:
-            add(remote_uid, args, kwargs, RigidBodies)
+            add(client, remote_uid, args, kwargs, RigidBodies)
 
         elif type == Message.SMPL:
             layer_arg_names = {"model_type", "gender", "num_betas"}
@@ -118,25 +120,25 @@ class ViewerServer:
             sequence_kwargs = {k: v for k, v in kwargs.items() if k not in layer_arg_names}
             n = SMPLSequence(*args, smpl_layer=layer, **sequence_kwargs)
             self.viewer.scene.add(n)
-            self.remote_to_local_id[remote_uid] = n.uid
+            self.remote_to_local_id[(client, remote_uid)] = n.uid
 
         elif type == Message.DELETE:
-            node: Node = self.get_node_by_remote_uid(remote_uid)
+            node: Node = self.get_node_by_remote_uid(remote_uid, client)
             if node and node.parent:
                 node.parent.remove(node)
 
         elif type == Message.UPDATE_FRAMES:
-            node: Node = self.get_node_by_remote_uid(remote_uid)
+            node: Node = self.get_node_by_remote_uid(remote_uid, client)
             if node:
                 node.update_frames(*args, **kwargs)
 
         elif type == Message.ADD_FRAMES:
-            node: Node = self.get_node_by_remote_uid(remote_uid)
+            node: Node = self.get_node_by_remote_uid(remote_uid, client)
             if node:
                 node.add_frames(*args, **kwargs)
 
         elif type == Message.REMOVE_FRAMES:
-            node: Node = self.get_node_by_remote_uid(remote_uid)
+            node: Node = self.get_node_by_remote_uid(remote_uid, client)
             if node:
                 node.remove_frames(*args, **kwargs)
 
@@ -152,14 +154,16 @@ class ViewerServer:
             if not self.viewer.run_animations:
                 self.viewer.scene.previous_frame()
 
-    def get_node_by_remote_uid(self, remote_uid):
+    def get_node_by_remote_uid(self, remote_uid: int, client: tuple[str, str]):
         """
-        Returns the Node corresponding to the remote uid passed in.
+        Returns the Node corresponding to the remote uid and client passed in.
 
         :param remote_uid: the remote uid to look up.
+        :param client: the client that created the node, this is the value of the 'client'
+            parameter that was passed to process_message() when the message was received.
         :return: Node corresponding to the remote uid.
         """
-        return self.viewer.scene.get_node_by_uid(self.remote_to_local_id.get(remote_uid, None))
+        return self.viewer.scene.get_node_by_uid(self.remote_to_local_id.get((client, remote_uid), None))
 
 
 # If this module is invoke directly it starts an empty viewer
