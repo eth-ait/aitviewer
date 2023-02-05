@@ -21,7 +21,6 @@ CUSTOM_MESSAGE = Message.USER_MESSAGE
 # In practice the custom viewer script could be a different script,
 # potentially already running in an other process or on a remote host.
 if not args.server:
-
     #
     # Client script sending data to the remote viewer.
     #
@@ -61,7 +60,6 @@ if not args.server:
     v.send_message(CUSTOM_MESSAGE, index=1)
 
 else:
-
     #
     # Server script running the custom viewer.
     #
