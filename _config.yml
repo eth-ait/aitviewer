@@ -22,3 +22,8 @@ baseurl: "/aitviewer"
 url: "https://eth-ait.github.io"
 
 include: ["technical_details", "img"]
+
+callouts:
+  warning:
+    title: Warning
+    color: red
