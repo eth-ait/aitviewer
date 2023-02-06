@@ -2,6 +2,11 @@ import argparse
 
 from aitviewer.remote.message import Message
 
+# For simplicity in this example we have the client and server code in the same
+# script and run the client or the server depending on the --server command line flag.
+#
+# In practice the custom viewer could be in a different script,
+# potentially already running in an other process or on a remote host.
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--server", help="run the viewer part of the script, if not given run the client instead", action="store_true"
@@ -11,15 +16,11 @@ args = parser.parse_args()
 # We define a custom message identifier that we will send to our custom viewer.
 #
 # The Message class is just an enumeration of message identifiers with integer type.
-# All values higher than Message.USER_MESSAGE are not used internally by the viewer
+# All values greater than or equal to Message.USER_MESSAGE are not used internally by the viewer
 # and can be safely used to send custom messages.
 CUSTOM_MESSAGE = Message.USER_MESSAGE
 
-# For simplicity in this example we have the client and server code in the same
-# script and run the client or the server depending on command line arguments.
-#
-# In practice the custom viewer script could be a different script,
-# potentially already running in an other process or on a remote host.
+# Run the server or the viewer depending on the command line argument.
 if not args.server:
     #
     # Client script sending data to the remote viewer.
@@ -38,7 +39,7 @@ if not args.server:
     # and a command line argument.
     #
     # This will invoke the script with the following command:
-    #   python path/to/script.py server
+    #   python path/to/script.py --server
     v = RemoteViewer.create_new_process([__file__, "--server"])
 
     # Send 3 Meshes to the viewer
