@@ -343,16 +343,18 @@ class Viewer(moderngl_window.WindowConfig):
         if self.auto_set_camera_target:
             self.scene.auto_set_camera_target()
 
-    def get_node_by_remote_uid(self, remote_uid: int):
+    def get_node_by_remote_uid(self, remote_uid: int, client: tuple[str, str]):
         """
-        Returns the Node corresponding to the remote uid passed in.
+        Returns the Node corresponding to the remote uid and client passed in.
 
         :param remote_uid: the remote uid to look up.
+        :param client: the client that created the node, this is the value of the 'client'
+            parameter that was passed to process_message() when the message was received.
         :return: Node corresponding to the remote uid.
         """
-        return self.server.get_node_by_remote_uid(remote_uid)
+        return self.server.get_node_by_remote_uid(remote_uid, client)
 
-    def process_message(self, type: Message, remote_uid: int, args, kwargs):
+    def process_message(self, type: Message, remote_uid: int, args: list, kwargs: dict, client: tuple[str, str]):
         """
         Default processing of messages received by the viewer.
 
@@ -369,9 +371,11 @@ class Viewer(moderngl_window.WindowConfig):
             Node corresponding to this id.
         :param args: positional arguments received with the message.
         :param kwargs: keyword arguments received with the message.
+        :param client: a tuple (ip, port) describing the address of the client
+            that sent this message.
         """
         try:
-            self.server.process_message(type, remote_uid, args, kwargs)
+            self.server.process_message(type, remote_uid, args, kwargs, client)
         except Exception as e:
             print(f"Exception while processing mesage: type = {type}, remote_uid = {remote_uid}:\n{e}")
 
@@ -645,7 +649,6 @@ class Viewer(moderngl_window.WindowConfig):
 
         if imgui.begin_main_menu_bar():
             if imgui.begin_menu("File", True):
-
                 clicked_quit, selected_quit = imgui.menu_item("Quit", "Cmd+Q", False, True)
                 if clicked_quit:
                     exit(1)

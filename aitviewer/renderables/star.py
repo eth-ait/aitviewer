@@ -44,7 +44,6 @@ class STARSequence(SMPLSequence):
         post_fk_func=None,
         **kwargs,
     ):
-
         super(STARSequence, self).__init__(
             poses_body,
             smpl_layer,
