@@ -53,7 +53,6 @@ if __name__ == "__main__":
     # When using pyrender with ROMP, an FOV of 60 degrees is used.
     fov = 60
     f = max(cols, rows) / 2.0 * 1.0 / np.tan(np.radians(fov / 2))
-    input_img = cv2.imread(img_path)
     cam_intrinsics = np.array([[f, 0.0, cols / 2], [0.0, f, rows / 2], [0.0, 0.0, 1.0]])
 
     # The camera extrinsics are assumed to identity rotation and the translation is estimated by ROMP.
