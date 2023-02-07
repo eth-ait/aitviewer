@@ -1,4 +1,5 @@
 import argparse
+from typing import Tuple
 
 from aitviewer.remote.message import Message
 
@@ -75,7 +76,7 @@ else:
         # This function is called on the viewer every time a new message has to
         # be processed. By overriding this method we can intercept messages before
         # they are sent to the viewer and add custom functionality to them.
-        def process_message(self, type: Message, remote_uid: int, args: list, kwargs: dict, client: tuple[str, str]):
+        def process_message(self, type: Message, remote_uid: int, args: list, kwargs: dict, client: Tuple[str, str]):
             if type != CUSTOM_MESSAGE:
                 # If we didn't receive a custom message we first forward
                 # it to the viewer to make sure it's handled normally.

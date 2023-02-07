@@ -343,7 +343,7 @@ class Viewer(moderngl_window.WindowConfig):
         if self.auto_set_camera_target:
             self.scene.auto_set_camera_target()
 
-    def get_node_by_remote_uid(self, remote_uid: int, client: tuple[str, str]):
+    def get_node_by_remote_uid(self, remote_uid: int, client: Tuple[str, str]):
         """
         Returns the Node corresponding to the remote uid and client passed in.
 
@@ -354,7 +354,7 @@ class Viewer(moderngl_window.WindowConfig):
         """
         return self.server.get_node_by_remote_uid(remote_uid, client)
 
-    def process_message(self, type: Message, remote_uid: int, args: list, kwargs: dict, client: tuple[str, str]):
+    def process_message(self, type: Message, remote_uid: int, args: list, kwargs: dict, client: Tuple[str, str]):
         """
         Default processing of messages received by the viewer.
 

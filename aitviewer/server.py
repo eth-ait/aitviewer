@@ -1,5 +1,6 @@
 import queue
 import threading
+from typing import Tuple
 
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.remote.message import Message
@@ -77,7 +78,7 @@ class ViewerServer:
             # By default this will end up calling self.process_message()
             self.viewer.process_message(msg["type"], msg["uid"], msg["args"], msg["kwargs"], client)
 
-    def process_message(self, type: Message, remote_uid: int, args: list, kwargs: dict, client: tuple[str, str]):
+    def process_message(self, type: Message, remote_uid: int, args: list, kwargs: dict, client: Tuple[str, str]):
         """
         Default processing of messages.
 
@@ -154,7 +155,7 @@ class ViewerServer:
             if not self.viewer.run_animations:
                 self.viewer.scene.previous_frame()
 
-    def get_node_by_remote_uid(self, remote_uid: int, client: tuple[str, str]):
+    def get_node_by_remote_uid(self, remote_uid: int, client: Tuple[str, str]):
         """
         Returns the Node corresponding to the remote uid and client passed in.
 
