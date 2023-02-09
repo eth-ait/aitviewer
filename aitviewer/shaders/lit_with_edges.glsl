@@ -162,7 +162,7 @@
 #if !FACE_COLOR
             g_color = gs_in[i].color;
 #else
-            g_color = texelFetch(face_colors, ivec2(gl_PrimitiveIDIn, 0), 0);
+            g_color = texelFetch(face_colors, ivec2(gl_PrimitiveIDIn % 8192, gl_PrimitiveIDIn / 8192), 0);
 #endif
 
             for(int j = 0; j < NR_DIR_LIGHTS; j++) {
