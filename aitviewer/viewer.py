@@ -1461,14 +1461,16 @@ class Viewer(moderngl_window.WindowConfig):
         else:
             fbo = self.wnd.fbo
 
+        width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
+        height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
         image = Image.frombytes(
             fmt,
-            (
-                self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
-                self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1],
-            ),
+            (width, height),
             fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components),
         )
+        if width != self.wnd.size[0] or height != self.wnd.size[1]:
+            image.resize(self.wnd.size, Image.NEAREST)
+
         return image.transpose(Image.FLIP_TOP_BOTTOM)
 
     def get_current_depth_image(self):
@@ -1489,15 +1491,18 @@ class Viewer(moderngl_window.WindowConfig):
         else:
             fbo = self.wnd.fbo
 
+        width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
+        height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
+
         # Get depth image from depth buffer.
         depth = Image.frombytes(
             "F",
-            (
-                self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
-                self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1],
-            ),
+            (width, height),
             fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype="f4"),
         )
+
+        if width != self.wnd.size[0] or height != self.wnd.size[1]:
+            depth.resize(self.wnd.size, Image.NEAREST)
 
         # Convert from [0, 1] range to [-1, 1] range.
         # This is necessary because our projection matrix computes NDC
@@ -1518,14 +1523,15 @@ class Viewer(moderngl_window.WindowConfig):
         Render and return a color mask as a 'RGB' PIL image. Each object in the mask
         has a uniform color computed as an hash of the Node uid.
         """
+
+        width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
+        height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
+
         # Get object ids as floating point numbers from the first channel of
         # the first attachment of the picking framebuffer.
         id = Image.frombytes(
             "F",
-            (
-                self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
-                self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1],
-            ),
+            (width, height),
             self.offscreen_p.read(
                 viewport=self.wnd.fbo.viewport,
                 alignment=1,
@@ -1534,6 +1540,9 @@ class Viewer(moderngl_window.WindowConfig):
                 dtype="f4",
             ),
         )
+
+        if width != self.wnd.size[0] or height != self.wnd.size[1]:
+            id.resize(self.wnd.size, Image.NEAREST)
 
         # Convert the id to integer values.
         id_int = np.asarray(id).astype(dtype=np.int32)
