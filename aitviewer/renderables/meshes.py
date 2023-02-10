@@ -538,7 +538,6 @@ class Meshes(Node):
         # Compute shape of 2D texture.
         shape = (min(self.faces.shape[0], 8192), (self.faces.shape[0] + 8191) // 8192)
         self.face_colors_texture = ctx.texture(shape, 4, dtype="f4")
-        print(shape)
         if self.face_colors is not None:
             # Write texture left justifying the buffer to fill the last row of the texture.
             self.face_colors_texture.write(
