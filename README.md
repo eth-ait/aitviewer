@@ -1,7 +1,23 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-# [![AITV](aitviewer-logo.svg)](https://github.com/eth-ait/aitviewer)
+# [![aitviewer](aitviewer_logo.svg)](https://github.com/eth-ait/aitviewer)
 A set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS. See the official page at [https://eth-ait.github.io/aitviewer](https://eth-ait.github.io/aitviewer/) for all the details.
+
+## Installation
+Basic Installation:
+```commandline
+pip install aitviewer
+```
+Note that this does not install the GPU-version of PyTorch automatically. If your environment already contains it, you should be good to go, otherwise install it manually.
+
+Or install locally (if you need to extend or modify code)
+```commandline
+git clone git@github.com:eth-ait/aitviewer.git
+cd aitviewer
+pip install -e .
+```
+
+For more advanced installation and for installing SMPL body models, please refer to the [documentation](https://eth-ait.github.io/aitviewer/parametric_human_models/supported_models.html) .
 
 ## Features
 * Native Python interface, easy to use and hack.
@@ -16,28 +32,7 @@ A set of tools to visualize and interact with sequences of 3D data with cross-pl
 * Export screenshots, videos and turntable views (as mp4/gif)
 * High-Performance ModernGL-based rendering pipeline (running at 100fps+ on most laptops).
 
-![AITV SMPL Editing](https://user-images.githubusercontent.com/5639197/188625764-351100e9-992e-430c-b170-69d4f142f5dd.gif)
-
-## Installation
-Basic Installation:
-```commandline
-pip install aitviewer
-```
-
-Or install locally (if you need to extend or modify code)
-```commandline
-git clone git@github.com:eth-ait/aitviewer.git
-cd aitviewer
-pip install -e .
-```
-
-Note that this does not install the GPU-version of PyTorch automatically. If your environment already contains it, you should be good to go, otherwise install it manually.
-
-If you would like to visualize STAR, please install the package manually via
-```commandline
-pip install git+https://github.com/ahmedosman/STAR.git
-```
-and download the respective body models from the official website.
+![aitviewer SMPL Editing](https://user-images.githubusercontent.com/5639197/188625764-351100e9-992e-430c-b170-69d4f142f5dd.gif)
 
 
 
@@ -80,4 +75,4 @@ This software was developed by [Manuel Kaufmann](mailto:manuel.kaufmann@inf.ethz
 For questions please create an issue.
 We welcome and encourage module and feature contributions from the community.
 
-![AITV Sample](aitviewer_collab.png)
+![aitviewer Sample](aitviewer_collab.png)
