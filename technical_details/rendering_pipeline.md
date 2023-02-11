@@ -16,7 +16,7 @@ The main loop of the viewer is composed of the following steps:
 The rendering of the scene can be further broken down into these render passes:
 1. Render objects to the picking map, this is a framebuffer which contains world space position, object id, triangle id and instance id of each pixel.
 2. Render objects to shadow maps, there is one shadow map per light with shadows enabled.
-3. Render objects to the framebuffer (potentially rendering a depth prepass, see [Rendering of Transparent Objects]({{ site.baseurl }}{% link technical_details/rendering_of_transparent_objects.md %})).
+3. Render objects to the framebuffer (potentially rendering a depth prepass, see [Rendering of Transparent Objects]({% link technical_details/rendering_of_transparent_objects.md %})).
 4. Render objects to the outline buffer and then use it to render outlines to the framebuffer.
 
 ## Render passes

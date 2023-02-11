@@ -38,7 +38,7 @@ The usual structure of this method is to bind a shader program, set the required
 
 - `render_positions()`: this is another rendering method that renderables need to implement.
 This method is called when the object should be drawn
-with only vertex positions bound, this is used for drawing to shadow maps, drawing to the buffer used for picking objects and drawing the depth prepass for transparent objects (see [Rendering Pipeline]({{ site.baseurl }}{% link technical_details/rendering_pipeline.md %}) for more information about render passes).
+with only vertex positions bound, this is used for drawing to shadow maps, drawing to the buffer used for picking objects and drawing the depth prepass for transparent objects (see [Rendering Pipeline]({% link technical_details/rendering_pipeline.md %}) for more information about render passes).
 
 - `release()` this method is invoked to release all rendering resources allocated by the node. It should always be implemented if the node allocates any OpenGL resource to avoid memory leaks.
 
@@ -55,7 +55,7 @@ This bounding box is used for centering the camera to the object and to automati
 - `on_selection()`: this method is called whenever the object is selected, this can happen when the object is clicked or when the `scene.select()` method is called on the object. When the object is clicked additional information about the click is passed in, otherwise all parameters are `None`. The additional information can be used to handle selection of specific parts of the object, when it's not provided the whole object should be considered selected.
 - `gui()` and `gui_*()`: those methods are responsible for drawing custom GUI that is specific for this node. There are many `gui_*()` methods, each method is responsible for drawing in a different section of the UI or in special windows such as the context menu that appears when right clicking on an object.
 - `key_event()`: this method is called on a node that is selected whenever a key is pressed. Renderables can override this method to implement custom actions.
-- `is_transparent()`: this method returns `True` if the object should be considered transparent when rendering. This changes the order in which the object is drawn and performs a depth prepass when rendering this object to avoid artifacts due to self overlap (see [Rendering of transparent objects]({{ site.baseurl }}{% link technical_details/rendering_of_transparent_objects.md %}) for more information about how transparency is handled by the renderer).
+- `is_transparent()`: this method returns `True` if the object should be considered transparent when rendering. This changes the order in which the object is drawn and performs a depth prepass when rendering this object to avoid artifacts due to self overlap (see [Rendering of transparent objects]({% link technical_details/rendering_of_transparent_objects.md %}) for more information about how transparency is handled by the renderer).
 
 
 ## Scene
