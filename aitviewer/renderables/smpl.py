@@ -252,36 +252,28 @@ class SMPLSequence(Node):
         )
 
     @classmethod
-    def from_3dpw(cls, pkl_data_path, smplx_neutral=False, **kwargs):
+    def from_3dpw(cls, pkl_data_path, **kwargs):
         """Load a 3DPW sequence which might contain multiple people."""
         with open(pkl_data_path, "rb") as p:
             body_data = pkl.load(p, encoding="latin1")
         num_people = len(body_data["poses"])
-
-        if smplx_neutral:
-            smpl_layer = SMPLLayer(model_type="smplx", gender="neutral", num_betas=10, flat_hand_mean=True)
-
-        poses_key = "poses_smplx" if smplx_neutral else "poses"
-        trans_key = "trans_smplx" if smplx_neutral else "trans"
-        betas_key = "betas_smplx" if smplx_neutral else "betas"
 
         name = kwargs.get("name", "3DPW")
 
         seqs = []
         for i in range(num_people):
             gender = body_data["genders"][i]
-            if not smplx_neutral:
-                smpl_layer = SMPLLayer(
-                    model_type="smpl",
-                    gender="female" if gender == "f" else "male",
-                    device=C.device,
-                    num_betas=10,
-                )
+            smpl_layer = SMPLLayer(
+                model_type="smpl",
+                gender="female" if gender == "f" else "male",
+                device=C.device,
+                num_betas=10,
+            )
 
             # Extract the 30 Hz data that is already aligned with the image data.
-            poses = body_data[poses_key][i]
-            trans = body_data[trans_key][i]
-            betas = body_data[betas_key][i]
+            poses = body_data["poses"][i]
+            trans = body_data["trans"][i]
+            betas = body_data["betas"][i]
 
             if len(betas.shape) == 1:
                 betas = betas[np.newaxis]
@@ -301,7 +293,14 @@ class SMPLSequence(Node):
             )
             seqs.append(seq)
 
-        return seqs
+        # Load camera poses.
+        camera_data = {
+            "intrinsics": body_data["cam_intrinsics"],
+            "extrinsics": body_data["cam_poses"],
+            "campose_valid": body_data["campose_valid"],
+        }
+
+        return seqs, camera_data
 
     @classmethod
     def t_pose(cls, smpl_layer=None, betas=None, frames=1, **kwargs):
