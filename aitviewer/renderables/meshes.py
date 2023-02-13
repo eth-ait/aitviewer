@@ -475,7 +475,14 @@ class Meshes(Node):
             self.vbo_colors.write(self.current_vertex_colors.astype("f4").tobytes())
         else:
             # Write face colors.
-            self.face_colors_texture.write(self.current_face_colors.astype("f4").tobytes())
+
+            # Compute shape of 2D texture.
+            shape = (min(self.faces.shape[0], 8192), (self.faces.shape[0] + 8191) // 8192)
+
+            # Write texture left justifying the buffer to fill the last row of the texture.
+            self.face_colors_texture.write(
+                self.current_face_colors.astype("f4").tobytes().ljust(shape[0] * shape[1] * 16)
+            )
 
         # Write uvs.
         if self.has_texture:
@@ -528,9 +535,14 @@ class Meshes(Node):
             )
             self.vao.buffer(self.vbo_instance_transforms, "16f4/i", "instance_transform")
 
-        self.face_colors_texture = ctx.texture((self.faces.shape[0], 1), 4, dtype="f4")
+        # Compute shape of 2D texture.
+        shape = (min(self.faces.shape[0], 8192), (self.faces.shape[0] + 8191) // 8192)
+        self.face_colors_texture = ctx.texture(shape, 4, dtype="f4")
         if self.face_colors is not None:
-            self.face_colors_texture.write(self.current_face_colors.astype("f4").tobytes())
+            # Write texture left justifying the buffer to fill the last row of the texture.
+            self.face_colors_texture.write(
+                self.current_face_colors.astype("f4").tobytes().ljust(shape[0] * shape[1] * 16)
+            )
 
         if self.has_texture:
             img = self.texture_image

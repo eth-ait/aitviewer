@@ -72,8 +72,8 @@ def video_to_gif(path_mp4, path_gif, remove=False):
         "-i",
         path_mp4,
         "-y",
-        "-filter_complex",
-        f"[0:v] split [a][b];[a] palettegen=stats_mode=single [p];[b][p] paletteuse=new=1:dither=none",
+        "-vf",
+        "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
         path_gif,
     ]
 
