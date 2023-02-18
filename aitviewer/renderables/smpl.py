@@ -591,14 +591,38 @@ class SMPLSequence(Node):
             imgui.text(f"{j} - {name}")
 
         if e:
-            aa = self._edit_pose[j * 3 : (j + 1) * 3]
-            euler = aa2euler_numpy(aa.cpu().numpy(), degrees=True)
-            u, euler = imgui.drag_float3(f"##joint{j}", *euler, 0.1, format="%.2f")
+            # Euler angles sliders.
+            aa = self._edit_pose[j * 3 : (j + 1) * 3].cpu().numpy()
+            euler = aa2euler_numpy(aa, degrees=True)
+            u, euler = imgui.drag_float3(f"Euler XYZ##joint{j}", *euler, 0.1, format="%.3f")
             if u:
                 aa = euler2aa_numpy(np.array(euler), degrees=True)
                 self._edit_pose[j * 3 : (j + 1) * 3] = torch.from_numpy(aa)
                 self._edit_pose_dirty = True
                 self.redraw(current_frame_only=True)
+
+            # Sliders for rotation around a specific axis.
+            base = Rotation.from_rotvec(aa)
+            u, delta = imgui.drag_float3(f"Axis##deltajoint{j}", 0, 0, 0, 0.003, format="")
+            if u:
+                for i in range(3):
+                    if delta[i] == 0:
+                        continue
+
+                    # Get the world coordinates of the current axis from the
+                    # respective column of the rotation matrix.
+                    axis = Rotation.as_matrix(base)[:, i]
+
+                    # Create a rotation of 'delta[i]' radians around the axis.
+                    rot = Rotation.from_rotvec(axis * delta[i])
+
+                    # Rotate the current joint and convert back to axis angle.
+                    aa = Rotation.as_rotvec(rot * base)
+
+                    self._edit_pose[j * 3 : (j + 1) * 3] = torch.from_numpy(aa)
+                    self._edit_pose_dirty = True
+                    self.redraw(current_frame_only=True)
+
             if tree:
                 for c in tree.get(j, []):
                     self._gui_joint(imgui, c, tree)
