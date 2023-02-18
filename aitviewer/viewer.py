@@ -322,11 +322,12 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_animation = True
         self.export_animation_range = [0, -1]
         self.export_duration = 10
-        self.export_as_gif = False
+        self.export_format = "mp4"
         self.export_rotate_camera = False
         self.export_seconds_per_rotation = 10
         self.export_fps = self.playback_fps
         self.export_scale_factor = 1.0
+        self.export_transparent = False
 
         # Screenshot settings
         self.screenshot_transparent = False
@@ -880,16 +881,35 @@ class Viewer(moderngl_window.WindowConfig):
 
             # Output settings.
             imgui.text("Output")
+
             imgui.spacing()
             imgui.text("Format:")
             imgui.same_line()
-            if imgui.radio_button("MP4", not self.export_as_gif):
-                self.export_as_gif = False
+            if imgui.radio_button("MP4", self.export_format == "mp4"):
+                self.export_format = "mp4"
             imgui.same_line(spacing=15)
-            if imgui.radio_button("GIF", self.export_as_gif):
-                self.export_as_gif = True
+            if imgui.radio_button("WEBM", self.export_format == "webm"):
+                self.export_format = "webm"
+            imgui.same_line(spacing=15)
+            if imgui.radio_button("GIF", self.export_format == "gif"):
+                self.export_format = "gif"
 
-            if self.export_as_gif:
+            imgui.spacing()
+            if self.export_format != "webm":
+                imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
+                self.export_transparent = False
+
+            _, self.export_transparent = imgui.checkbox("Transparent background", self.export_transparent)
+            if self.export_format != "webm":
+                imgui.pop_style_var()
+                self.export_transparent = False
+
+            if imgui.is_item_hovered():
+                imgui.begin_tooltip()
+                imgui.text("Available only for WEBM format")
+                imgui.end_tooltip()
+
+            if self.export_format == "gif":
                 max_output_fps = 30.0
             else:
                 max_output_fps = 120.0
@@ -973,7 +993,7 @@ class Viewer(moderngl_window.WindowConfig):
                     os.path.join(
                         C.export_dir,
                         "videos",
-                        self.window.title + (".gif" if self.export_as_gif else ".mp4"),
+                        f"{self.window.title}.{self.export_format}",
                     ),
                     animation=self.export_animation,
                     animation_range=self.export_animation_range,
@@ -983,6 +1003,7 @@ class Viewer(moderngl_window.WindowConfig):
                     rotate_camera=not self.export_animation or self.export_rotate_camera,
                     seconds_per_rotation=self.export_seconds_per_rotation,
                     scale_factor=self.export_scale_factor,
+                    transparent=self.export_transparent,
                 )
 
             imgui.end_popup()
@@ -1619,6 +1640,7 @@ class Viewer(moderngl_window.WindowConfig):
         rotate_camera=False,
         seconds_per_rotation=10.0,
         scale_factor=None,
+        transparent=False,
     ):
         # Load this module to reduce load time.
         import skvideo.io
@@ -1691,29 +1713,39 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Initialize video writer.
         if output_path is not None:
-            path_mp4, path_gif, is_gif = get_video_paths(output_path)
+            path_video, path_gif, is_gif = get_video_paths(output_path)
+            pix_fmt = "yuva420p" if transparent else "yuv420p"
+            outputdict = {
+                "-pix_fmt": pix_fmt,
+                "-vf": "pad=ceil(iw/2)*2:ceil(ih/2)*2",  # Avoid error when image res is not divisible by 2.
+                "-r": str(output_fps),
+            }
+
+            if path_video.endswith("mp4"):
+                # MP4 specific options
+                outputdict.update(
+                    {
+                        "-c:v": "libx264",
+                        "-preset": "slow",
+                        "-profile:v": "high",
+                        "-level:v": "4.0",
+                    }
+                )
+
             writer = skvideo.io.FFmpegWriter(
-                path_mp4,
+                path_video,
                 inputdict={
-                    "-framerate": str(output_fps),  # must be this early in the command, otherwise it is not applied.
+                    "-framerate": str(output_fps),
                 },
-                outputdict={
-                    "-c:v": "libx264",
-                    "-preset": "slow",
-                    "-profile:v": "high",
-                    "-level:v": "4.0",
-                    "-pix_fmt": "yuv420p",
-                    "-vf": "pad=ceil(iw/2)*2:ceil(ih/2)*2",  # Avoid error when image res is not divisible by 2.
-                    "-r": str(output_fps),
-                },
+                outputdict=outputdict,
             )
 
         for i in tqdm(range(frames), desc="Rendering frames"):
             if rotate_camera:
                 self.scene.camera.rotate_azimuth(az_delta)
 
-            self.render(time, time + dt, export=True)
-            img = self.get_current_frame_as_image()
+            self.render(time, time + dt, export=True, transparent_background=transparent)
+            img = self.get_current_frame_as_image(alpha=transparent)
 
             # Scale image by the scale factor.
             if scale_factor is not None and scale_factor != 1.0:
@@ -1740,7 +1772,7 @@ class Viewer(moderngl_window.WindowConfig):
             writer.close()
             if is_gif:
                 # Convert to gif.
-                video_to_gif(path_mp4, path_gif, remove=True)
+                video_to_gif(path_video, path_gif, remove=True)
 
                 print(f"GIF saved to {os.path.abspath(path_gif)}")
             else:

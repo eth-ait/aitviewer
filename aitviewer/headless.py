@@ -37,20 +37,19 @@ class HeadlessRenderer(Viewer):
         """Same as self.save_video, kept for backward compatibility."""
         return self.save_video(frame_dir, video_dir, output_fps)
 
-    def save_video(self, frame_dir=None, video_dir=None, output_fps=60):
+    def save_video(self, frame_dir=None, video_dir=None, output_fps=60, transparent=False):
         """
         Convenience method to run the headless rendering.
         :param frame_dir: Where to store the individual frames or None if you don't care.
         :param video_dir: If set will automatically generate a video from the images found in `frame_dir`. Must
           be specified if `frame_dir` is None.
         :param output_fps: Fps of the output video, if None uses 60fps as default
+        :param transparent: Save video with a transparent background, this is only supported by ".webm" format
+            and ignored otherwise.
         """
         self._init_scene()
         self.export_video(
-            output_path=video_dir,
-            frame_dir=frame_dir,
-            animation=True,
-            output_fps=output_fps,
+            output_path=video_dir, frame_dir=frame_dir, animation=True, output_fps=output_fps, transparent=transparent
         )
 
     def save_frame(self, file_path, scale_factor: float = None):
