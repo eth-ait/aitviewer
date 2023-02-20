@@ -7,7 +7,11 @@ parent: Viewer Frontend
 The viewer loads default configuration parameters from [`aitvconfig.yaml`](aitviewer/aitvconfig.yaml). There are three ways how to override these parameters:
   - Create a file named `aitvconfig.yaml` and have the environment variable `AITVRC` point to it. Alternatively, you can point `AITVRC` to the directory containing `aitvconfig.yaml`.
   - Create a file named `aitvconfig.yaml` in your current working directory, i.e. from where you launch your python program.
-  - Pass a `config` parameter to the `Viewer` constructor.
+  - Calling `C.update_conf()` directly from a python script with a dictionary of option value pairs. This function should likely be called before creating any object to ensure that the new values are used.
+    ```python
+    from aitviewer.configuration import CONFIG as C
+    C.update_conf({"run_animations": True})
+    ```
 
 Note that the configuration files are loaded in this order, i.e. the config file in your working directory overrides all previous parameters.
 
