@@ -20,7 +20,7 @@ import struct
 from array import array
 from collections import namedtuple
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple
 
 import imgui
 import moderngl
@@ -28,7 +28,6 @@ import moderngl_window
 import numpy as np
 from moderngl_window import activate_context, geometry, get_local_window_cls
 from moderngl_window.opengl.vao import VAO
-from omegaconf.dictconfig import DictConfig
 from PIL import Image
 from tqdm import tqdm
 
@@ -81,13 +80,12 @@ class Viewer(moderngl_window.WindowConfig):
     size_mult = 1.0
     samples = 4
     gl_version = (4, 0)
-    window_type = C.window_type
+    window_type = None
 
     def __init__(
         self,
         title="aitviewer",
         size: Tuple[int, int] = None,
-        config: Union[DictConfig, dict] = None,
         samples: int = None,
         **kwargs,
     ):
@@ -97,13 +95,8 @@ class Viewer(moderngl_window.WindowConfig):
         :param size: Window size as (width, height) tuple, if None uses the size from the configuration file
         :param kwargs: kwargs.
         """
-
-        # Update config with user parameter.
-        if config is not None:
-            C.update_conf(config)
-
         # Window Setup (Following `moderngl_window.run_window_config`).
-        if self.window_type != "headless":
+        if self.window_type is None:
             self.window_type = C.window_type
 
         # HACK: We use our own version of the PyQt5 windows to override

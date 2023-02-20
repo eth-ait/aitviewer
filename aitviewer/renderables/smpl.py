@@ -57,8 +57,8 @@ class SMPLSequence(Node):
         trans=None,
         poses_left_hand=None,
         poses_right_hand=None,
-        device=C.device,
-        dtype=C.f_precision,
+        device=None,
+        dtype=None,
         include_root=True,
         normalize_root=False,
         is_rigged=True,
@@ -101,6 +101,11 @@ class SMPLSequence(Node):
             icon = "\u0092"
         elif smpl_layer.model_type == "flame":
             icon = "\u0091"
+
+        if device is None:
+            device = C.device
+        if dtype is None:
+            dtype = C.f_precision
 
         super(SMPLSequence, self).__init__(n_frames=poses_body.shape[0], icon=icon, gui_material=False, **kwargs)
 

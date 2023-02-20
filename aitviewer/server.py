@@ -170,8 +170,10 @@ class ViewerServer:
 # If this module is invoke directly it starts an empty viewer
 # with the server functionality enabled.
 if __name__ == "__main__":
+    from aitviewer.configuration import CONFIG as C
     from aitviewer.viewer import Viewer
 
-    v = Viewer(config={"server_enabled": True})
+    C.update_conf({"server_enabled": True})
+    v = Viewer()
     v.scene.floor.enabled = False
     v.run()

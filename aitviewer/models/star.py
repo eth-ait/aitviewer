@@ -34,7 +34,7 @@ from aitviewer.utils.so3 import rot2aa_torch as rot2aa
 class STARLayer(STAR):
     """Wraps the publicly available STAR model to match SMPLX model interface"""
 
-    def __init__(self, gender="male", num_betas=300, device=C.device, dtype=C.f_precision):
+    def __init__(self, gender="male", num_betas=300, device=None, dtype=None):
         """
         Initializer.
         :param gender: Which gender to load.
@@ -43,16 +43,15 @@ class STARLayer(STAR):
         :param device: CPU or GPU.
         :param dtype: The pytorch floating point data type.
         """
-
         # Configure STAR model before initializing
-        cfg.data_type = dtype
+        cfg.data_type = dtype if dtype is not None else C.f_precision
         cfg.path_male_star = os.path.join(C.star_models, "male/model.npz")
         cfg.path_female_star = os.path.join(C.star_models, "female/model.npz")
         cfg.path_neutral_star = os.path.join(C.star_models, "neutral/model.npz")
 
         super(STARLayer, self).__init__(gender=gender, num_betas=num_betas)
 
-        self.device = device
+        self.device = device if device is not None else C.device
         self.model_type = "star"
         self._parents = None
         self._children = None

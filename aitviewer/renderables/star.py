@@ -35,7 +35,7 @@ class STARSequence(SMPLSequence):
         poses_root,
         betas=None,
         trans=None,
-        device=C.device,
+        device=None,
         include_root=True,
         normalize_root=False,
         is_rigged=True,

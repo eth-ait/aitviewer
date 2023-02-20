@@ -36,8 +36,8 @@ class SMPLLayer(nn.Module, ABC):
         model_type="smpl",
         gender="neutral",
         num_betas=10,
-        device=C.device,
-        dtype=C.f_precision,
+        device=None,
+        dtype=None,
         **smpl_model_params,
     ):
         """
@@ -67,6 +67,11 @@ class SMPLLayer(nn.Module, ABC):
             gender=gender,
             **smpl_model_params,
         )
+
+        if device is None:
+            device = C.device
+        if dtype is None:
+            dtype = C.f_precision
         self.bm.to(device=device, dtype=dtype)
 
         self.model_type = model_type
