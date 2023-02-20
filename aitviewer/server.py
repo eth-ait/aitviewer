@@ -61,7 +61,7 @@ class ViewerServer:
 
             # Async entry point of the main thread.
             async def main():
-                server = await websockets.serve(serve, "0.0.0.0", port)
+                server = await websockets.serve(serve, "0.0.0.0", port, max_size=None)
                 await server.serve_forever()
 
             asyncio.run(main())

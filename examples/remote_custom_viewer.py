@@ -61,6 +61,8 @@ if not args.server:
     # be sent to the viewer's 'process_message()' method.
     v.send_message(CUSTOM_MESSAGE, index=1)
 
+    v.close_connection()
+
 else:
     #
     # Server script running the custom viewer.
