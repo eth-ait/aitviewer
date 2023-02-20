@@ -1490,7 +1490,7 @@ class Viewer(moderngl_window.WindowConfig):
             fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components),
         )
         if width != self.wnd.size[0] or height != self.wnd.size[1]:
-            image.resize(self.wnd.size, Image.NEAREST)
+            image = image.resize(self.wnd.size, Image.NEAREST)
 
         return image.transpose(Image.FLIP_TOP_BOTTOM)
 
@@ -1523,7 +1523,7 @@ class Viewer(moderngl_window.WindowConfig):
         )
 
         if width != self.wnd.size[0] or height != self.wnd.size[1]:
-            depth.resize(self.wnd.size, Image.NEAREST)
+            depth = depth.resize(self.wnd.size, Image.NEAREST)
 
         # Convert from [0, 1] range to [-1, 1] range.
         # This is necessary because our projection matrix computes NDC
@@ -1563,7 +1563,7 @@ class Viewer(moderngl_window.WindowConfig):
         )
 
         if width != self.wnd.size[0] or height != self.wnd.size[1]:
-            id.resize(self.wnd.size, Image.NEAREST)
+            id = id.resize(self.wnd.size, Image.NEAREST)
 
         # Convert the id to integer values.
         id_int = np.asarray(id).astype(dtype=np.int32)
