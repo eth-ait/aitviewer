@@ -155,6 +155,7 @@ class SMPLSequence(Node):
         self._edit_joint = None
         self._edit_pose = None
         self._edit_pose_dirty = False
+        self._edit_local_axes = True
 
         # Nodes
         self.vertices, self.joints, self.faces, self.skeleton = self.fk()
@@ -599,34 +600,52 @@ class SMPLSequence(Node):
             # Euler angles sliders.
             aa = self._edit_pose[j * 3 : (j + 1) * 3].cpu().numpy()
             euler = aa2euler_numpy(aa, degrees=True)
-            u, euler = imgui.drag_float3(f"Euler XYZ##joint{j}", *euler, 0.1, format="%.3f")
-            if u:
+
+            _, self._edit_local_axes = imgui.checkbox("Local axes", self._edit_local_axes)
+
+            # If we are editing local axes generate an empty slider on top
+            # of the euler angle sliders to capture the input of the slider
+            # without modifying the euler angle values.
+            if self._edit_local_axes:
+                # Get the current draw position.
+                pos = imgui.get_cursor_position()
+
+                # Make the next widget transparent.
+                imgui.push_style_var(imgui.STYLE_ALPHA, 0.0)
+                u, new_euler = imgui.drag_float3(f"", 0, 0, 0, 0.003, format="")
+                imgui.pop_style_var()
+
+                if u:
+                    base = Rotation.from_rotvec(aa)
+                    for i in range(3):
+                        delta = new_euler[i]
+                        if delta == 0:
+                            continue
+
+                        # Get the world coordinates of the current axis from the
+                        # respective column of the rotation matrix.
+                        axis = Rotation.as_matrix(base)[:, i]
+
+                        # Create a rotation of 'delta[i]' radians around the axis.
+                        rot = Rotation.from_rotvec(axis * delta)
+
+                        # Rotate the current joint and convert back to axis angle.
+                        aa = Rotation.as_rotvec(rot * base)
+
+                        self._edit_pose[j * 3 : (j + 1) * 3] = torch.from_numpy(aa)
+                        self._edit_pose_dirty = True
+                        self.redraw(current_frame_only=True)
+
+                # Reset the draw position so that the next slider is drawn on top of this.
+                imgui.set_cursor_pos(pos)
+
+            name = "Local XYZ" if self._edit_local_axes else "Euler XYZ"
+            u, euler = imgui.drag_float3(f"{name}##joint{j}", *euler, 0.1, format="%.3f")
+            if not self._edit_local_axes and u:
                 aa = euler2aa_numpy(np.array(euler), degrees=True)
                 self._edit_pose[j * 3 : (j + 1) * 3] = torch.from_numpy(aa)
                 self._edit_pose_dirty = True
                 self.redraw(current_frame_only=True)
-
-            # Sliders for rotation around a specific axis.
-            base = Rotation.from_rotvec(aa)
-            u, delta = imgui.drag_float3(f"Axis##deltajoint{j}", 0, 0, 0, 0.003, format="")
-            if u:
-                for i in range(3):
-                    if delta[i] == 0:
-                        continue
-
-                    # Get the world coordinates of the current axis from the
-                    # respective column of the rotation matrix.
-                    axis = Rotation.as_matrix(base)[:, i]
-
-                    # Create a rotation of 'delta[i]' radians around the axis.
-                    rot = Rotation.from_rotvec(axis * delta[i])
-
-                    # Rotate the current joint and convert back to axis angle.
-                    aa = Rotation.as_rotvec(rot * base)
-
-                    self._edit_pose[j * 3 : (j + 1) * 3] = torch.from_numpy(aa)
-                    self._edit_pose_dirty = True
-                    self.redraw(current_frame_only=True)
 
             if tree:
                 for c in tree.get(j, []):
