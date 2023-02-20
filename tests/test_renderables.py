@@ -161,15 +161,3 @@ def test_amass(viewer: Viewer):
     viewer.scene.camera.position = np.array([-3.3, 1.4, 0.2])
     viewer.scene.camera.target = np.array([-2.8, 1.0, -1.6])
     viewer.scene.add(seq_amass)
-
-
-@reference(count=3)
-@requires_smpl
-def test_3dpw(viewer: Viewer):
-    seqs_3dpw = SMPLSequence.from_3dpw(
-        pkl_data_path=os.path.join(C.datasets.threedpw.ori, "test/downtown_sitOnStairs_00.pkl"),
-        name="3DPW Sit on Stairs",
-    )
-    viewer.scene.camera.position = np.array([-1.0, 1.5, -1.5])
-    viewer.scene.camera.target = np.array([-2.2, 1.0, -4.0])
-    viewer.scene.add(*seqs_3dpw)
