@@ -63,7 +63,7 @@ See the example [`remote_custom_viewer.py`](https://github.com/eth-ait/aitviewer
 
 ## Server Setup
 
-The server functionality of the viewer is disabled by default, but can be enabled by setting the configuration property `server_enabled: True` (see [Configuration]({% link configuration.md %}) for details on configuring the viewer) or by launching an empty viewer with the command `pip -m aitviewer.server`. Communication happens with WebSockets over the TCP port specified in the configuration property `server_port` which is number 8417 by default.
+The server functionality of the viewer is disabled by default, but can be enabled by setting the configuration property `server_enabled: True` (see [Configuration]({% link frontend.md %}) for details on configuring the viewer) or by launching an empty viewer with the command `pip -m aitviewer.server`. Communication happens with WebSockets over the TCP port specified in the configuration property `server_port` which is number 8417 by default.
 
 {: .warning }
 > The communication between clients and servers happens over WebSockets without any form of authentication or encryption, additionally no measure is taken by the server to avoid damages from malicious clients. Therefore, it is highly recommended to run the viewer with the server enabled only on hosts that are not exposed to an untrusted network.
