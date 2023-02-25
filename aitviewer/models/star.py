@@ -104,7 +104,8 @@ class STARLayer(STAR):
         """
         poses, betas, trans = self.preprocess(poses_body, betas, poses_root, trans, normalize_root)
 
-        v = super().forward(pose=poses, betas=betas, trans=trans)
+        # STAR repo currently hardcodes floats.
+        v = super().forward(pose=poses.float(), betas=betas.float(), trans=trans.float())
         J = v.J_transformed
         return v, J
 
