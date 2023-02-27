@@ -22,8 +22,8 @@ A renderable typically consists of some geometry (such as a Mesh), but it can al
 
 _Base Renderables_ such as `Spheres`, `Lines`, and `Meshes` implement their own custom shaders and do not rely on any other renderables to 'do their work'. In contrast, _Composite Renderables_ such as `Rigid Bodies` and `SMPL/STAR Sequences` use _Base Renderables_ as children to do their rendering work. _Base Renderables_ support instanced rendering, allowing for higher performance when displaying tens or hundreds of thousands of identical geometries in different affine configurations. 
 
-## Making a Custom Renderables
+<!-- ## Making a Custom Renderables
 Add GUI Elements
 Add Custom Interaction Modes
-Composition vs Inheritance Approaches
+Composition vs Inheritance Approaches -->
 
