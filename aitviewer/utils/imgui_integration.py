@@ -15,10 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from moderngl_window.integrations.imgui import ModernglWindowRenderer
-import moderngl
 import ctypes
+
 import imgui
+import moderngl
+from moderngl_window.integrations.imgui import ModernglWindowRenderer
+
 
 class ImGuiRenderer(ModernglWindowRenderer):
     def __init__(self, window, window_type):
@@ -26,9 +28,10 @@ class ImGuiRenderer(ModernglWindowRenderer):
         super().__init__(window)
 
     def key_event(self, key, action, modifiers):
-        if self.window_type == 'pyqt5':
+        if self.window_type == "pyqt5":
             # HACK: we remap Qt.Key_Enter (numpad enter key) to the normal enter key.
             from PyQt5.QtCore import Qt
+
             if key == Qt.Key_Enter:
                 key = self.wnd.keys.ENTER
 
@@ -72,13 +75,15 @@ class ImGuiRenderer(ModernglWindowRenderer):
 
         self.ctx.enable_only(moderngl.BLEND)
         self.ctx.blend_equation = moderngl.FUNC_ADD
-        
+
         # HACK: we set the blend func for the alpha channel to one here because
         # on some linux platforms the alpha channel is used by the window manager
         # for blending with the desktop and we want to keep the window opaque.
         self.ctx.blend_func = (
-            moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA,
-            moderngl.ONE, moderngl.ONE
+            moderngl.SRC_ALPHA,
+            moderngl.ONE_MINUS_SRC_ALPHA,
+            moderngl.ONE,
+            moderngl.ONE,
         )
 
         self._font_texture.use()
@@ -100,9 +105,7 @@ class ImGuiRenderer(ModernglWindowRenderer):
                         (
                             "Texture {} is not registered. Please add to renderer using "
                             "register_texture(..). "
-                            "Current textures: {}".format(
-                                command.texture_id, list(self._textures)
-                            )
+                            "Current textures: {}".format(command.texture_id, list(self._textures))
                         )
                     )
 
@@ -110,9 +113,7 @@ class ImGuiRenderer(ModernglWindowRenderer):
 
                 x, y, z, w = command.clip_rect
                 self.ctx.scissor = int(x), int(fb_height - w), int(z - x), int(w - y)
-                self._vao.render(
-                    moderngl.TRIANGLES, vertices=command.elem_count, first=idx_pos
-                )
+                self._vao.render(moderngl.TRIANGLES, vertices=command.elem_count, first=idx_pos)
                 idx_pos += command.elem_count
 
         self.ctx.scissor = None

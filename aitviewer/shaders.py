@@ -14,10 +14,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+import functools
+
 from moderngl_window import resources
 from moderngl_window.meta import ProgramDescription
 
-import functools
 
 def _load(name, defines={}):
     return resources.programs.load(ProgramDescription(path=name, defines=defines))
@@ -26,15 +27,19 @@ def _load(name, defines={}):
 @functools.lru_cache()
 def get_lit_program(vs, smooth_shading, texture, face_color, instanced=0):
     defines = {
-        'SMOOTH_SHADING': smooth_shading,
-        'TEXTURE': texture,
-        'FACE_COLOR': face_color,
-        'INSTANCED': instanced,
+        "SMOOTH_SHADING": smooth_shading,
+        "TEXTURE": texture,
+        "FACE_COLOR": face_color,
+        "INSTANCED": instanced,
     }
-    return resources.programs.load(ProgramDescription(vertex_shader=vs,
-                                                      geometry_shader="lit_with_edges.glsl",
-                                                      fragment_shader="lit_with_edges.glsl",
-                                                      defines=defines))
+    return resources.programs.load(
+        ProgramDescription(
+            vertex_shader=vs,
+            geometry_shader="lit_with_edges.glsl",
+            fragment_shader="lit_with_edges.glsl",
+            defines=defines,
+        )
+    )
 
 
 def get_smooth_lit_with_edges_program(vs, instanced=0):
@@ -71,57 +76,63 @@ def get_lines_instanced_program():
 
 @functools.lru_cache()
 def get_outline_program(vs_path, instanced=0):
-    defines = {
-        'INSTANCED': instanced
-    }
-    return resources.programs.load(ProgramDescription(vertex_shader=vs_path,
-                                                      fragment_shader="outline/outline_prepare.fs.glsl",
-                                                      defines=defines))
+    defines = {"INSTANCED": instanced}
+    return resources.programs.load(
+        ProgramDescription(
+            vertex_shader=vs_path,
+            fragment_shader="outline/outline_prepare.fs.glsl",
+            defines=defines,
+        )
+    )
 
 
 @functools.lru_cache()
 def get_fragmap_program(vs_path, instanced=0):
-    defines = {
-        'INSTANCED': instanced
-    }
-    return resources.programs.load(ProgramDescription(vertex_shader=vs_path,
-                                                      fragment_shader="fragment_picking/frag_map.fs.glsl",
-                                                      defines=defines))
+    defines = {"INSTANCED": instanced}
+    return resources.programs.load(
+        ProgramDescription(
+            vertex_shader=vs_path,
+            fragment_shader="fragment_picking/frag_map.fs.glsl",
+            defines=defines,
+        )
+    )
 
 
 @functools.lru_cache()
 def get_depth_only_program(vs_path, instanced=0):
-    defines = {
-        'INSTANCED': instanced
-    }
-    return resources.programs.load(ProgramDescription(vertex_shader=vs_path,
-                                                      fragment_shader="shadow_mapping/depth_only.fs.glsl",
-                                                      defines=defines))
+    defines = {"INSTANCED": instanced}
+    return resources.programs.load(
+        ProgramDescription(
+            vertex_shader=vs_path,
+            fragment_shader="shadow_mapping/depth_only.fs.glsl",
+            defines=defines,
+        )
+    )
 
 
 @functools.lru_cache()
 def get_simple_unlit_program():
-    return _load('simple_unlit.glsl')
+    return _load("simple_unlit.glsl")
 
 
 @functools.lru_cache()
 def get_cylinder_program():
-    return _load('cylinder.glsl')
+    return _load("cylinder.glsl")
 
 
 @functools.lru_cache()
 def get_screen_texture_program():
-    return _load('screen_texture.glsl')
+    return _load("screen_texture.glsl")
 
 
 @functools.lru_cache()
 def get_chessboard_program():
-    return _load('chessboard.glsl')
+    return _load("chessboard.glsl")
 
 
 def clear_shader_cache():
     """Clear all cached shaders."""
-    funcs =  [
+    funcs = [
         get_lit_program,
         get_outline_program,
         get_fragmap_program,
@@ -133,4 +144,3 @@ def clear_shader_cache():
     ]
     for f in funcs:
         f.cache_clear()
-

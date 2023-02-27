@@ -28,25 +28,37 @@ class STARSequence(SMPLSequence):
     Represents a temporal sequence of SMPL poses using the STAR model.
     """
 
-    def __init__(self,
-                 poses_body,
-                 smpl_layer,
-                 poses_root,
-                 betas=None,
-                 trans=None,
-                 device=C.device,
-                 include_root=True,
-                 normalize_root=False,
-                 is_rigged=True,
-                 show_joint_angles=False,
-                 z_up=False,
-                 post_fk_func=None,
-                 **kwargs):
-
-        super(STARSequence, self).__init__(poses_body, smpl_layer, poses_root, betas, trans, device=device,
-                                           include_root=include_root, normalize_root=normalize_root,
-                                           is_rigged=is_rigged, show_joint_angles=show_joint_angles, z_up=z_up,
-                                           post_fk_func=post_fk_func, **kwargs)
+    def __init__(
+        self,
+        poses_body,
+        smpl_layer,
+        poses_root,
+        betas=None,
+        trans=None,
+        device=None,
+        include_root=True,
+        normalize_root=False,
+        is_rigged=True,
+        show_joint_angles=False,
+        z_up=False,
+        post_fk_func=None,
+        **kwargs,
+    ):
+        super(STARSequence, self).__init__(
+            poses_body,
+            smpl_layer,
+            poses_root,
+            betas,
+            trans,
+            device=device,
+            include_root=include_root,
+            normalize_root=normalize_root,
+            is_rigged=is_rigged,
+            show_joint_angles=show_joint_angles,
+            z_up=z_up,
+            post_fk_func=post_fk_func,
+            **kwargs,
+        )
 
     def fk(self, current_frame_only=False):
         """Get joints and/or vertices from the poses."""
@@ -78,16 +90,17 @@ class STARSequence(SMPLSequence):
             trans = self.trans
             betas = self.betas
 
-        verts, joints = self.smpl_layer(poses_root=poses_root,
-                                        poses_body=poses_body,
-                                        betas=betas,
-                                        trans=trans,
-                                        normalize_root=self._normalize_root
-                                        )
+        verts, joints = self.smpl_layer(
+            poses_root=poses_root,
+            poses_body=poses_body,
+            betas=betas,
+            trans=trans,
+            normalize_root=self._normalize_root,
+        )
 
-        skeleton = self.smpl_layer.skeletons()['body'].T
+        skeleton = self.smpl_layer.skeletons()["body"].T
         faces = self.smpl_layer.faces
-        joints = joints[:, :skeleton.shape[0]]
+        joints = joints[:, : skeleton.shape[0]]
 
         if current_frame_only:
             return c2c(verts)[0], c2c(joints)[0], c2c(faces), c2c(skeleton)
@@ -95,31 +108,44 @@ class STARSequence(SMPLSequence):
             return c2c(verts), c2c(joints), c2c(faces), c2c(skeleton)
 
     @classmethod
-    def from_amass(cls,
-                   npz_data_path,
-                   start_frame=None,
-                   end_frame=None,
-                   sub_frames=None,
-                   log=True,
-                   fps_out=None,
-                   load_betas=False,
-                   z_up=True,
-                   **kwargs):
+    def from_amass(
+        cls,
+        npz_data_path,
+        start_frame=None,
+        end_frame=None,
+        sub_frames=None,
+        log=True,
+        fps_out=None,
+        load_betas=False,
+        z_up=True,
+        **kwargs,
+    ):
         """Load a sequence downloaded from the AMASS website."""
 
         # User SMPL sequence loader and re-parse data
-        seq = super().from_amass(npz_data_path, start_frame=start_frame, end_frame=end_frame, log=log, fps_out=fps_out,
-                                 **kwargs)
+        seq = super().from_amass(
+            npz_data_path,
+            start_frame=start_frame,
+            end_frame=end_frame,
+            log=log,
+            fps_out=fps_out,
+            **kwargs,
+        )
 
         # STAR has no hands, but includes wrists
-        poses_body = torch.cat((seq.poses_body, seq.poses_left_hand[:, :3], seq.poses_right_hand[:, :3]), dim=-1)
+        poses_body = torch.cat(
+            (seq.poses_body, seq.poses_left_hand[:, :3], seq.poses_right_hand[:, :3]),
+            dim=-1,
+        )
         poses_root = seq.poses_root
         trans = seq.trans
         betas = None
 
         if load_betas:
-            print("WARNING: Loading betas from AMASS into STAR requires an optimization procedure. " +
-                  "See https://github.com/ahmedosman/STAR/tree/master/convertors")
+            print(
+                "WARNING: Loading betas from AMASS into STAR requires an optimization procedure. "
+                + "See https://github.com/ahmedosman/STAR/tree/master/convertors"
+            )
             betas = seq.betas
 
         if sub_frames is not None:
@@ -127,20 +153,22 @@ class STARSequence(SMPLSequence):
             poses_body = poses_body[sub_frames]
             trans = trans[sub_frames]
 
-        return cls(poses_body=poses_body,
-                   smpl_layer=STARLayer(device=C.device),
-                   poses_root=poses_root,
-                   betas=betas,
-                   trans=trans,
-                   include_root=seq._include_root,
-                   is_rigged=seq._is_rigged,
-                   z_up=z_up,
-                   color=seq.color,
-                   **kwargs)
+        return cls(
+            poses_body=poses_body,
+            smpl_layer=STARLayer(device=C.device),
+            poses_root=poses_root,
+            betas=betas,
+            trans=trans,
+            include_root=seq._include_root,
+            is_rigged=seq._is_rigged,
+            z_up=z_up,
+            color=seq.color,
+            **kwargs,
+        )
 
     @classmethod
     def from_3dpw(cls):
-        raise ValueError('STAR does not support loading from 3DPW.')
+        raise ValueError("STAR does not support loading from 3DPW.")
 
     @classmethod
     def t_pose(cls, model=None, betas=None, frames=1, **kwargs):
@@ -151,4 +179,10 @@ class STARSequence(SMPLSequence):
 
         poses_body = np.zeros([frames, model.n_joints_body * 3])
         poses_root = np.zeros([frames, 3])
-        return cls(poses_body=poses_body, smpl_layer=model, poses_root=poses_root, betas=betas, **kwargs)
+        return cls(
+            poses_body=poses_body,
+            smpl_layer=model,
+            poses_root=poses_root,
+            betas=betas,
+            **kwargs,
+        )

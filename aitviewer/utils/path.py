@@ -1,4 +1,3 @@
-
 """
 Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
@@ -75,7 +74,7 @@ def lock_to_node(node: Node, relative_position, smooth_sigma=None):
     node.current_frame_id = old_current_frame_id
 
     if smooth_sigma is not None and smooth_sigma > 0:
-        positions = scipy.ndimage.gaussian_filter1d(positions, smooth_sigma, axis=0, mode='nearest')
-        targets = scipy.ndimage.gaussian_filter1d(targets, smooth_sigma, axis=0, mode='nearest')
+        positions = scipy.ndimage.gaussian_filter1d(positions, smooth_sigma, axis=0, mode="nearest")
+        targets = scipy.ndimage.gaussian_filter1d(targets, smooth_sigma, axis=0, mode="nearest")
 
     return positions, targets

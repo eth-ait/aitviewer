@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import roma
 import torch
-
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import RotationSpline
 
@@ -52,7 +51,7 @@ def rot2aa_numpy(rotation_matrices):
     ori_shape = rotation_matrices.shape[:-2]
     rots = np.reshape(rotation_matrices, (-1, 3, 3))
     aas = R.as_rotvec(R.from_matrix(rots))
-    rotation_vectors = np.reshape(aas, ori_shape + (3, ))
+    rotation_vectors = np.reshape(aas, ori_shape + (3,))
     return rotation_vectors
 
 
@@ -80,8 +79,8 @@ def euler2aa_numpy(euler_angles, degrees=False):
     assert isinstance(euler_angles, np.ndarray)
     ori_shape = euler_angles.shape[:-1]
     rots = np.reshape(euler_angles, (-1, 3))
-    aas = R.as_rotvec(R.from_euler('XYZ', rots, degrees=degrees))
-    rotation_vectors = np.reshape(aas, ori_shape + (3, ))
+    aas = R.as_rotvec(R.from_euler("XYZ", rots, degrees=degrees))
+    rotation_vectors = np.reshape(aas, ori_shape + (3,))
     return rotation_vectors
 
 
@@ -95,8 +94,8 @@ def aa2euler_numpy(rotation_vectors, degrees=False):
     assert isinstance(rotation_vectors, np.ndarray)
     ori_shape = rotation_vectors.shape[:-1]
     aas = np.reshape(rotation_vectors, (-1, 3))
-    rots = R.as_euler(R.from_rotvec(aas), 'XYZ', degrees=degrees)
-    euler_angles = np.reshape(rots, ori_shape + (3, ))
+    rots = R.as_euler(R.from_rotvec(aas), "XYZ", degrees=degrees)
+    euler_angles = np.reshape(rots, ori_shape + (3,))
     return euler_angles
 
 
@@ -110,7 +109,7 @@ def euler2rot_numpy(euler_angles, degrees=False):
     assert isinstance(euler_angles, np.ndarray)
     ori_shape = euler_angles.shape[:-1]
     rots = np.reshape(euler_angles, (-1, 3))
-    rots = R.as_matrix(R.from_euler('XYZ', rots, degrees=degrees))
+    rots = R.as_matrix(R.from_euler("XYZ", rots, degrees=degrees))
     rotation_matrices = np.reshape(rots, ori_shape + (3, 3))
     return rotation_matrices
 
@@ -125,8 +124,8 @@ def rot2euler_numpy(rotation_matrices, degrees=False):
     assert isinstance(rotation_matrices, np.ndarray)
     ori_shape = rotation_matrices.shape[:-2]
     rots = np.reshape(rotation_matrices, (-1, 3, 3))
-    rots = R.as_euler(R.from_matrix(rots), 'XYZ', degrees=degrees)
-    euler_angles = np.reshape(rots, ori_shape + (3, ))
+    rots = R.as_euler(R.from_matrix(rots), "XYZ", degrees=degrees)
+    euler_angles = np.reshape(rots, ori_shape + (3,))
     return euler_angles
 
 

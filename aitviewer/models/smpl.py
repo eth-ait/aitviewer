@@ -14,25 +14,32 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from abc import ABC
 import collections
+from abc import ABC
+
 import numpy as np
 import smplx
 import torch
 import torch.nn as nn
-import trimesh
 
-from aitviewer.utils.utils import compute_vertex_and_face_normals_torch
 from aitviewer.configuration import CONFIG as C
 from aitviewer.utils.so3 import aa2rot_torch as aa2rot
 from aitviewer.utils.so3 import rot2aa_torch as rot2aa
+from aitviewer.utils.utils import compute_vertex_and_face_normals_torch
 
 
 class SMPLLayer(nn.Module, ABC):
     """A wrapper for the various SMPL body models."""
 
-    def __init__(self, model_type='smpl', gender='neutral', num_betas=10, device=C.device, dtype=C.f_precision,
-                 **smpl_model_params):
+    def __init__(
+        self,
+        model_type="smpl",
+        gender="neutral",
+        num_betas=10,
+        device=None,
+        dtype=None,
+        **smpl_model_params,
+    ):
         """
         Initializer.
         :param model_type: Which type of SMPL model to load, currently SMPL, SMPL-H and SMPL-X are supported.
@@ -42,19 +49,29 @@ class SMPLLayer(nn.Module, ABC):
         :param dtype: The pytorch floating point data type.
         :param smpl_model_params: Other keyword arguments that can be passed to smplx.create.
         """
-        assert model_type in ['smpl', 'smplh', 'smplx', 'mano', 'flame']
-        assert gender in ['male', 'female', 'neutral']
-        if model_type == 'smplh' and gender == 'neutral':
-            gender = 'female'  # SMPL-H has no neutral gender.
+        assert model_type in ["smpl", "smplh", "smplx", "mano", "flame"]
+        assert gender in ["male", "female", "neutral"]
+        if model_type == "smplh" and gender == "neutral":
+            gender = "female"  # SMPL-H has no neutral gender.
 
         super(SMPLLayer, self).__init__()
         self.num_betas = num_betas
 
-        smpl_model_params['use_pca'] = smpl_model_params.get('use_pca', False)
-        smpl_model_params['flat_hand_mean'] = smpl_model_params.get('flat_hand_mean', True)
+        smpl_model_params["use_pca"] = smpl_model_params.get("use_pca", False)
+        smpl_model_params["flat_hand_mean"] = smpl_model_params.get("flat_hand_mean", True)
 
-        self.bm = smplx.create(C.smplx_models, model_type=model_type,
-                               num_betas=self.num_betas, gender=gender, **smpl_model_params)
+        self.bm = smplx.create(
+            C.smplx_models,
+            model_type=model_type,
+            num_betas=self.num_betas,
+            gender=gender,
+            **smpl_model_params,
+        )
+
+        if device is None:
+            device = C.device
+        if dtype is None:
+            dtype = C.f_precision
         self.bm.to(device=device, dtype=dtype)
 
         self.model_type = model_type
@@ -93,8 +110,12 @@ class SMPLLayer(nn.Module, ABC):
         """Return a matrix that returns a list of faces each vertex is contributing to. `vertices` should have
         have shape (V, 3)."""
         if self._vertex_faces is None:
+            import trimesh
+
             mesh = trimesh.Trimesh(vertices.detach().cpu().numpy(), self.faces.cpu().numpy(), process=False)
-            self._vertex_faces = torch.from_numpy(np.copy(mesh.vertex_faces)).to(dtype=torch.long, device=vertices.device)
+            self._vertex_faces = torch.from_numpy(np.copy(mesh.vertex_faces)).to(
+                dtype=torch.long, device=vertices.device
+            )
         return self._vertex_faces
 
     def vertex_normals(self, vertices, output_vertex_ids=None):
@@ -104,9 +125,7 @@ class SMPLLayer(nn.Module, ABC):
         :param output_vertex_ids: An optional list of integers indexing into the 2nd dimension of `vertices`.
         :return: A tensor of shape (N, V', 3) where V' is either V or len(output_vertex_ids).
         """
-        normals, _ = compute_vertex_and_face_normals_torch(vertices,
-                                                           self.faces,
-                                                           self.vertex_faces(vertices[0]))
+        normals, _ = compute_vertex_and_face_normals_torch(vertices, self.faces, self.vertex_faces(vertices[0]))
         if output_vertex_ids is not None:
             return normals[:, output_vertex_ids]
         else:
@@ -115,13 +134,32 @@ class SMPLLayer(nn.Module, ABC):
     def skeletons(self):
         """Return how the joints are connected in the kinematic chain where skeleton[0, i] is the parent of
         joint skeleton[1, i]."""
-        parents = torch.stack([self.bm.parents, torch.arange(0, len(self.bm.parents), device=self.bm.parents.device)])
-        return {'all': parents, 'body': parents[:, :self.bm.NUM_BODY_JOINTS + 1],
-                'hands': parents[:, self.bm.NUM_BODY_JOINTS + 1:]}
+        parents = torch.stack(
+            [
+                self.bm.parents,
+                torch.arange(0, len(self.bm.parents), device=self.bm.parents.device),
+            ]
+        )
+        return {
+            "all": parents,
+            "body": parents[:, : self.bm.NUM_BODY_JOINTS + 1],
+            "hands": parents[:, self.bm.NUM_BODY_JOINTS + 1 :],
+        }
 
-    def fk(self, poses_body, betas, poses_root=None, trans=None,
-           normalize_root=False, poses_left_hand=None, poses_right_hand=None,
-           poses_jaw=None, poses_leye=None, poses_reye=None, expression=None):
+    def fk(
+        self,
+        poses_body,
+        betas,
+        poses_root=None,
+        trans=None,
+        normalize_root=False,
+        poses_left_hand=None,
+        poses_right_hand=None,
+        poses_jaw=None,
+        poses_leye=None,
+        poses_reye=None,
+        expression=None,
+    ):
         """
         Convert body pose data (joint angles and shape parameters) to positional data (joint and mesh vertex positions).
         :param poses_body: A tensor of shape (N, N_JOINTS*3), i.e. joint angles in angle-axis format. This contains all
@@ -145,17 +183,17 @@ class SMPLLayer(nn.Module, ABC):
           facial expressions.
         :return: The resulting vertices and joints.
         """
-        assert poses_body.shape[1] == self.bm.NUM_BODY_JOINTS*3
+        assert poses_body.shape[1] == self.bm.NUM_BODY_JOINTS * 3
 
-        has_hands = hasattr(self.bm, 'NUM_HAND_JOINTS')
-        has_face = hasattr(self.bm, 'NUM_FACE_JOINTS')
+        has_hands = hasattr(self.bm, "NUM_HAND_JOINTS")
+        has_face = hasattr(self.bm, "NUM_FACE_JOINTS")
         if has_hands:
             if self.bm.use_pca:
                 dof_per_hand = self.bm.num_pca_comps
                 assert poses_left_hand is None or poses_left_hand.shape[1] == dof_per_hand
                 assert poses_right_hand is None or poses_right_hand.shape[1] == dof_per_hand
             else:
-                dof_per_hand = self.bm.NUM_HAND_JOINTS*3
+                dof_per_hand = self.bm.NUM_HAND_JOINTS * 3
                 assert poses_left_hand is None or poses_left_hand.shape[1] == dof_per_hand
                 assert poses_right_hand is None or poses_right_hand.shape[1] == dof_per_hand
         else:
@@ -170,11 +208,9 @@ class SMPLLayer(nn.Module, ABC):
             trans = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
 
         if has_hands and poses_left_hand is None:
-            poses_left_hand = torch.zeros([batch_size, dof_per_hand]).to(dtype=poses_body.dtype,
-                                                                         device=device)
+            poses_left_hand = torch.zeros([batch_size, dof_per_hand]).to(dtype=poses_body.dtype, device=device)
         if has_hands and poses_right_hand is None:
-            poses_right_hand = torch.zeros([batch_size, dof_per_hand]).to(dtype=poses_body.dtype,
-                                                                          device=device)
+            poses_right_hand = torch.zeros([batch_size, dof_per_hand]).to(dtype=poses_body.dtype, device=device)
         if has_face and poses_jaw is None:
             poses_jaw = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
         if has_face and poses_leye is None:
@@ -182,13 +218,14 @@ class SMPLLayer(nn.Module, ABC):
         if has_face and poses_reye is None:
             poses_reye = torch.zeros([batch_size, 3]).to(dtype=poses_body.dtype, device=device)
         if has_face and expression is None:
-            expression = torch.zeros([batch_size, self.bm.num_expression_coeffs]).to(dtype=poses_body.dtype,
-                                                                                     device=device)
+            expression = torch.zeros([batch_size, self.bm.num_expression_coeffs]).to(
+                dtype=poses_body.dtype, device=device
+            )
 
         # Batch shapes if they don't match batch dimension.
         if len(betas.shape) == 1 or betas.shape[0] == 1:
             betas = betas.repeat(poses_body.shape[0], 1)
-        betas = betas[:, :self.num_betas]
+        betas = betas[:, : self.num_betas]
 
         if normalize_root:
             # Make everything relative to the first root orientation.
@@ -199,9 +236,18 @@ class SMPLLayer(nn.Module, ABC):
             trans = torch.matmul(first_root_ori.unsqueeze(0), trans.unsqueeze(-1)).squeeze()
             trans = trans - trans[0:1]
 
-        output = self.bm(body_pose=poses_body, betas=betas, global_orient=poses_root, transl=trans,
-                         left_hand_pose=poses_left_hand, right_hand_pose=poses_right_hand,
-                         jaw_pose=poses_jaw, leye_pose=poses_leye, reye_pose=poses_reye, expression=expression)
+        output = self.bm(
+            body_pose=poses_body,
+            betas=betas,
+            global_orient=poses_root,
+            transl=trans,
+            left_hand_pose=poses_left_hand,
+            right_hand_pose=poses_right_hand,
+            jaw_pose=poses_jaw,
+            leye_pose=poses_leye,
+            reye_pose=poses_reye,
+            expression=expression,
+        )
 
         return output.vertices, output.joints
 

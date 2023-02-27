@@ -1,7 +1,8 @@
-import os
 import importlib
-import utils
+import os
 import sys
+
+import utils
 
 if __name__ == "__main__":
     # Ensure that the directory that we will render reference images to exists.
@@ -26,7 +27,7 @@ if __name__ == "__main__":
 
     # Iterate through all registered functions and create an image for each.
     for func, refs in utils.ref_funcs.items():
-        print(f'{func.__name__}')
+        print(f"{func.__name__}")
 
         # Reset the viewer.
         utils.initialize_viewer(viewer)

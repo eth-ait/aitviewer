@@ -17,14 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import joblib
 import numpy as np
 
-from aitviewer.viewer import Viewer
-from aitviewer.renderables.smpl import SMPLSequence
-from aitviewer.models.smpl import SMPLLayer
 from aitviewer.configuration import CONFIG as C
+from aitviewer.models.smpl import SMPLLayer
+from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.utils.so3 import aa2rot_numpy
+from aitviewer.viewer import Viewer
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # In this example we show a way to play sequences of data that has missing frames.
     # Here we assume that we have data only for the frames that exist but we also know the indices
     # of missing frames and we want to avoid padding our data with invalid frames.
@@ -32,9 +31,9 @@ if __name__ == '__main__':
     # everywhere else. Thus the number of ones in the mask must match the number of frames in the data.
 
     # Load SMPL data from the output of the VIBE demo from https://github.com/mkocabas/VIBE
-    data = joblib.load(open("resources/vibe/vibe_output.pkl", 'rb'))
-    poses = data[1]['pose']
-    betas = data[1]['betas']
+    data = joblib.load(open("resources/vibe/vibe_output.pkl", "rb"))
+    poses = data[1]["pose"]
+    betas = data[1]["betas"]
 
     # Number of total frames, including frames that are missing.
     N = poses.shape[0]
@@ -53,14 +52,16 @@ if __name__ == '__main__':
     enabled_frames[25:125] = 0
 
     # Instantiate an SMPL sequence using the parameters and the enabled_frames mask.
-    smpl_layer = SMPLLayer(model_type='smpl', gender='neutral', device=C.device)
-    smpl_seq = SMPLSequence(poses_body=p[:, 3:24 * 3],
-                            poses_root=p[:, 0:3],
-                            betas=b,
-                            smpl_layer=smpl_layer,
-                            position=(1, 0, 0),
-                            rotation=aa2rot_numpy(np.array([1, 0, 0]) * np.pi),
-                            enabled_frames=enabled_frames)
+    smpl_layer = SMPLLayer(model_type="smpl", gender="neutral", device=C.device)
+    smpl_seq = SMPLSequence(
+        poses_body=p[:, 3 : 24 * 3],
+        poses_root=p[:, 0:3],
+        betas=b,
+        smpl_layer=smpl_layer,
+        position=(1, 0, 0),
+        rotation=aa2rot_numpy(np.array([1, 0, 0]) * np.pi),
+        enabled_frames=enabled_frames,
+    )
 
     # We do the same for a second sequence but removing a different range of frames.
     # Notice how the two sequences remain in sync, since the sequence is only advanced
@@ -69,14 +70,16 @@ if __name__ == '__main__':
     b2 = np.concatenate((betas[:175], betas[275:]))
     enabled_frames2 = np.ones(N, dtype=np.bool8)
     enabled_frames2[175:275] = 0
-    smpl_layer2 = SMPLLayer(model_type='smpl', gender='neutral', device=C.device)
-    smpl_seq2 = SMPLSequence(poses_body=p2[:, 3:24 * 3],
-                             poses_root=p2[:, 0:3],
-                             betas=b2,
-                             smpl_layer=smpl_layer2,
-                             position=(-1, 0, 0),
-                             rotation=aa2rot_numpy(np.array([1, 0, 0]) * np.pi),
-                             enabled_frames=enabled_frames2)
+    smpl_layer2 = SMPLLayer(model_type="smpl", gender="neutral", device=C.device)
+    smpl_seq2 = SMPLSequence(
+        poses_body=p2[:, 3 : 24 * 3],
+        poses_root=p2[:, 0:3],
+        betas=b2,
+        smpl_layer=smpl_layer2,
+        position=(-1, 0, 0),
+        rotation=aa2rot_numpy(np.array([1, 0, 0]) * np.pi),
+        enabled_frames=enabled_frames2,
+    )
 
     # Run the viewer
     viewer = Viewer(size=(1600, 900))

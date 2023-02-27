@@ -17,14 +17,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import moderngl
 import numpy as np
 
+from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.coordinate_system import CoordinateSystem
+from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.plane import ChessboardPlane
 from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.light import Light
 from aitviewer.scene.node import Node
-from aitviewer.renderables.lines import Lines
-from aitviewer.configuration import CONFIG as C
-from aitviewer.utils.utils import compute_union_of_bounds, compute_union_of_current_bounds
+from aitviewer.utils.utils import (
+    compute_union_of_bounds,
+    compute_union_of_current_bounds,
+)
 
 
 class Scene(Node):
@@ -50,8 +53,21 @@ class Scene(Node):
         # If you update the number of lights, make sure to change the respective `define` statement in
         # directional_lights.glsl as well!
         # Influence of diffuse lighting is controlled globally for now, but should eventually be a material property.
-        self.lights.append(Light.facing_origin(light_color=(1.0, 1.0, 1.0), name='Back Light', position=(0.0, 10.0, -15.0), shadow_enabled=False))
-        self.lights.append(Light.facing_origin(light_color=(1.0, 1.0, 1.0), name='Front Light', position=(0.0, 10.0, 15.0)))
+        self.lights.append(
+            Light.facing_origin(
+                light_color=(1.0, 1.0, 1.0),
+                name="Back Light",
+                position=(0.0, 10.0, -15.0),
+                shadow_enabled=False,
+            )
+        )
+        self.lights.append(
+            Light.facing_origin(
+                light_color=(1.0, 1.0, 1.0),
+                name="Front Light",
+                position=(0.0, 10.0, 15.0),
+            )
+        )
         self.add(*self.lights)
 
         self.ambient_strength = 2.0
@@ -60,16 +76,28 @@ class Scene(Node):
         self.origin = CoordinateSystem(name="Origin", length=0.1, gui_affine=False, gui_material=False)
         self.add(self.origin)
 
-        self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0),  (0.82, 0.82, 0.82, 1.0), name="Floor")
+        self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0), (0.82, 0.82, 0.82, 1.0), name="Floor")
         self.floor.material.diffuse = 0.1
         self.add(self.floor)
 
         # Camera cursor rendered at the camera target when moving the camera
-        self.camera_target = Lines(np.array([
-            [-1, 0, 0], [1, 0, 0],
-            [0, -1, 0], [0, 1, 0],
-            [0, 0, -1], [0, 0, 1],
-        ]) * 0.05, r_base=0.002, color=(0.2, 0.2, 0.2, 1), mode='lines', cast_shadow=False)
+        self.camera_target = Lines(
+            np.array(
+                [
+                    [-1, 0, 0],
+                    [1, 0, 0],
+                    [0, -1, 0],
+                    [0, 1, 0],
+                    [0, 0, -1],
+                    [0, 0, 1],
+                ]
+            )
+            * 0.05,
+            r_base=0.002,
+            color=(0.2, 0.2, 0.2, 1),
+            mode="lines",
+            cast_shadow=False,
+        )
         self.add(self.camera_target, show_in_hierarchy=False, enabled=False)
 
         self.custom_font = None
@@ -110,15 +138,19 @@ class Scene(Node):
                 # Otherwise append to transparent list
                 transparent.append(r)
 
-        fbo = kwargs['fbo']
+        fbo = kwargs["fbo"]
 
         # Draw back to front by sorting transparent objects based on distance to camera.
         # As an approximation we only sort using the origin of the object
         # which may be incorrect for large objects or objects significantly
         # offset from their origin, but works in many cases.
-        for r in sorted(transparent, key=lambda x: np.linalg.norm(x.position - self.camera.position), reverse=True):
+        for r in sorted(
+            transparent,
+            key=lambda x: np.linalg.norm(x.position - self.camera.position),
+            reverse=True,
+        ):
             # Render to depth buffer only
-            self.ctx.depth_func = '<'
+            self.ctx.depth_func = "<"
 
             fbo.color_mask = (False, False, False, False)
             self.safe_render_depth_prepass(r, **kwargs)
@@ -134,11 +166,11 @@ class Scene(Node):
             # Render normally with less equal depth comparison function,
             # drawing only the pixels closer to the camera to avoid
             # order dependent blending artifacts
-            self.ctx.depth_func = '<='
+            self.ctx.depth_func = "<="
             self.safe_render(r, **kwargs)
 
         # Restore the default depth comparison function
-        self.ctx.depth_func = '<'
+        self.ctx.depth_func = "<"
 
     def safe_render_depth_prepass(self, r, **kwargs):
         if not r.is_renderable:
@@ -221,7 +253,7 @@ class Scene(Node):
         return nodes
 
     def get_node_by_name(self, name):
-        assert name != ''
+        assert name != ""
         ns = self.collect_nodes()
         for n in ns:
             if n.name == name:
@@ -260,7 +292,7 @@ class Scene(Node):
             imgui.pop_font()
 
             # Modes
-            if hasattr(s, 'gui_modes') and len(s.gui_modes) > 1:
+            if hasattr(s, "gui_modes") and len(s.gui_modes) > 1:
                 imgui.push_font(self.custom_font)
                 imgui.spacing()
                 for i, (gm_key, gm_val) in enumerate(s.gui_modes.items()):
@@ -271,24 +303,26 @@ class Scene(Node):
                         imgui.pop_style_color()
                     if mode_clicked:
                         s.selected_mode = gm_key
-                    if i != len(s.gui_modes)-1:
+                    if i != len(s.gui_modes) - 1:
                         imgui.same_line()
                 imgui.pop_font()
 
                 # Mode specific GUI
                 imgui.spacing()
-                if 'fn' in s.gui_modes[s.selected_mode]:
-                    s.gui_modes[s.selected_mode]['fn'](imgui)
+                if "fn" in s.gui_modes[s.selected_mode]:
+                    s.gui_modes[s.selected_mode]["fn"](imgui)
 
             # Custom GUI (i.e. Camera specific params)
             s.gui(imgui)
             imgui.unindent()
 
             # General GUI elements
-            if hasattr(s, 'gui_controls'):
-                imgui.spacing(); imgui.spacing(); imgui.spacing()
+            if hasattr(s, "gui_controls"):
+                imgui.spacing()
+                imgui.spacing()
+                imgui.spacing()
                 for i, (gc_key, gc_val) in enumerate(s.gui_controls.items()):
-                    if not gc_val['is_visible']:
+                    if not gc_val["is_visible"]:
                         continue
                     imgui.begin_group()
                     imgui.push_font(self.custom_font)
@@ -297,9 +331,11 @@ class Scene(Node):
                     imgui.end_group()
                     imgui.same_line(spacing=8)
                     imgui.begin_group()
-                    gc_val['fn'](imgui)
+                    gc_val["fn"](imgui)
                     imgui.end_group()
-                    imgui.spacing(); imgui.spacing(); imgui.spacing()
+                    imgui.spacing()
+                    imgui.spacing()
+                    imgui.spacing()
 
     def gui(self, imgui):
         imgui.text(f"FPS: {self.fps:.1f}")
@@ -308,7 +344,14 @@ class Scene(Node):
         if uc:
             self.background_color = color
 
-        _, self.ambient_strength = imgui.drag_float('Ambient strength', self.ambient_strength, 0.01, min_value=0.0, max_value=10.0, format='%.2f')
+        _, self.ambient_strength = imgui.drag_float(
+            "Ambient strength",
+            self.ambient_strength,
+            0.01,
+            min_value=0.0,
+            max_value=10.0,
+            format="%.2f",
+        )
 
     def gui_editor(self, imgui):
         """GUI to control scene settings."""
@@ -398,7 +441,7 @@ class Scene(Node):
                 # Aligns checkbox to the right side of the window
                 # https://github.com/ocornut/imgui/issues/196
                 imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
-                eu, enabled = imgui.checkbox('##enabled_r_{}'.format(r.unique_name), r.enabled)
+                eu, enabled = imgui.checkbox("##enabled_r_{}".format(r.unique_name), r.enabled)
                 if eu:
                     r.enabled = enabled
 

@@ -16,12 +16,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import collections
 import os
+
 import torch
 import torch.nn.functional as F
 
 try:
-    from star.pytorch.star import STAR
     from star.config import cfg
+    from star.pytorch.star import STAR
 except Exception as e:
     raise ImportError(f"Cannot import STAR. Please run `pip install git+https://github.com/ahmedosman/STAR.git`\n{e}")
 
@@ -33,7 +34,7 @@ from aitviewer.utils.so3 import rot2aa_torch as rot2aa
 class STARLayer(STAR):
     """Wraps the publicly available STAR model to match SMPLX model interface"""
 
-    def __init__(self, gender='male', num_betas=300, device=C.device, dtype=C.f_precision):
+    def __init__(self, gender="male", num_betas=300, device=None, dtype=None):
         """
         Initializer.
         :param gender: Which gender to load.
@@ -42,17 +43,16 @@ class STARLayer(STAR):
         :param device: CPU or GPU.
         :param dtype: The pytorch floating point data type.
         """
-
         # Configure STAR model before initializing
-        cfg.data_type = dtype
+        cfg.data_type = dtype if dtype is not None else C.f_precision
         cfg.path_male_star = os.path.join(C.star_models, "male/model.npz")
         cfg.path_female_star = os.path.join(C.star_models, "female/model.npz")
         cfg.path_neutral_star = os.path.join(C.star_models, "neutral/model.npz")
 
         super(STARLayer, self).__init__(gender=gender, num_betas=num_betas)
 
-        self.device = device
-        self.model_type = 'star'
+        self.device = device if device is not None else C.device
+        self.model_type = "star"
         self._parents = None
         self._children = None
 
@@ -79,7 +79,10 @@ class STARLayer(STAR):
         joint skeleton[1, i]."""
         kintree_table = self.kintree_table
         kintree_table[:, 0] = -1
-        return {'all': kintree_table, 'body': kintree_table[:, :self.n_joints_body + 1]}
+        return {
+            "all": kintree_table,
+            "body": kintree_table[:, : self.n_joints_body + 1],
+        }
 
     @property
     def n_joints_body(self):
@@ -101,7 +104,8 @@ class STARLayer(STAR):
         """
         poses, betas, trans = self.preprocess(poses_body, betas, poses_root, trans, normalize_root)
 
-        v = super().forward(pose=poses, betas=betas, trans=trans)
+        # STAR repo currently hardcodes floats.
+        v = super().forward(pose=poses.float(), betas=betas.float(), trans=trans.float())
         J = v.J_transformed
         return v, J
 
@@ -138,6 +142,6 @@ class STARLayer(STAR):
             betas = torch.nn.functional.pad(betas, [0, self.num_betas - betas.shape[1]])
 
         # Upper bound betas
-        betas = betas[:, :self.num_betas]
+        betas = betas[:, : self.num_betas]
 
         return poses, betas, trans

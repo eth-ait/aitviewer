@@ -20,8 +20,8 @@ from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.renderables.spheres import Spheres
-from aitviewer.viewer import Viewer
 from aitviewer.utils.decorators import hooked
+from aitviewer.viewer import Viewer
 
 
 class ClickingViewer(Viewer):
@@ -29,7 +29,8 @@ class ClickingViewer(Viewer):
     This viewer just allows to place spheres onto vertices that we clicked on with the mouse.
     This only works if the viewer is in "inspection" mode (Click I).
     """
-    title = 'Clicking Viewer'
+
+    title = "Clicking Viewer"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -38,14 +39,14 @@ class ClickingViewer(Viewer):
         # Create a marker sequence for the entire sequence at once.
         # First get the positions.
         seq = intersection.node
-        positions = seq.vertices[:, intersection.vert_id:intersection.vert_id+1] + seq.position[np.newaxis]
+        positions = seq.vertices[:, intersection.vert_id : intersection.vert_id + 1] + seq.position[np.newaxis]
 
-        ms = Spheres(positions, name='{}'.format(intersection.vert_id), radius=0.005)
+        ms = Spheres(positions, name="{}".format(intersection.vert_id), radius=0.005)
         ms.current_frame_id = seq.current_frame_id
         self.scene.add(ms)
 
     def mouse_press_event(self, x: int, y: int, button: int):
-        if not self.imgui_user_interacting and self.selected_mode == 'inspect':
+        if not self.imgui_user_interacting and self.selected_mode == "inspect":
             result = self.mesh_mouse_intersection(x, y)
             if result is not None:
                 self.interact_with_sequence(result, button)
@@ -63,7 +64,7 @@ class ClickingViewer(Viewer):
             self.add_virtual_marker(intersection)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # This example shows how we can implement clicking vertices on a mesh.
     # To implement this, we subclass the viewer. This is also a helpful
     # example to show how you can use the viewer in your own project.
@@ -78,7 +79,7 @@ if __name__ == '__main__':
 
     # Create a neutral SMPL T Pose.
     # This also works with `smplh` or `smplx` model type (but there's no neutral model for SMPL-H).
-    smpl_layer = SMPLLayer(model_type='smpl', gender='neutral', device=C.device)
+    smpl_layer = SMPLLayer(model_type="smpl", gender="neutral", device=C.device)
     poses = np.zeros([1, smpl_layer.bm.NUM_BODY_JOINTS * 3])
     smpl_seq = SMPLSequence(poses, smpl_layer)
 

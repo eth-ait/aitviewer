@@ -15,41 +15,42 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import copy
+import os
+import struct
+from array import array
+from collections import namedtuple
+from pathlib import Path
+from typing import Tuple
+
 import imgui
 import moderngl
 import moderngl_window
 import numpy as np
-import os
-import skvideo.io
-import struct
-import trimesh
+from moderngl_window import activate_context, geometry, get_local_window_cls
+from moderngl_window.opengl.vao import VAO
+from PIL import Image
+from tqdm import tqdm
 
-from array import array
 from aitviewer.configuration import CONFIG as C
+from aitviewer.remote.message import Message
 from aitviewer.renderables.billboard import Billboard
 from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.renderables.point_clouds import PointClouds
 from aitviewer.scene.camera import PinholeCamera, ViewerCamera
-from aitviewer.scene.scene import Scene
 from aitviewer.scene.node import Node
+from aitviewer.scene.scene import Scene
+from aitviewer.server import ViewerServer
 from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
-from aitviewer.utils import PerfTimer, path
+from aitviewer.utils import path
 from aitviewer.utils.imgui_integration import ImGuiRenderer
+from aitviewer.utils.perf_timer import PerfTimer
 from aitviewer.utils.utils import get_video_paths, video_to_gif
-from collections import namedtuple
-from moderngl_window import activate_context
-from moderngl_window import geometry
-from moderngl_window import get_local_window_cls
-from moderngl_window.opengl.vao import VAO
-from omegaconf.dictconfig import DictConfig
-from pathlib import Path
-from PIL import Image
-from tqdm import tqdm
-from typing import Tuple, Union
 
-
-MeshMouseIntersection = namedtuple('MeshMouseIntersection', 'node instance_id tri_id vert_id point_world point_local bc_coords')
+MeshMouseIntersection = namedtuple(
+    "MeshMouseIntersection",
+    "node instance_id tri_id vert_id point_world point_local bc_coords",
+)
 
 SHORTCUTS = {
     "SPACE": "Start/stop playing animation.",
@@ -75,32 +76,34 @@ SHORTCUTS = {
 
 
 class Viewer(moderngl_window.WindowConfig):
-    resource_dir = Path(__file__).parent / 'shaders'
+    resource_dir = Path(__file__).parent / "shaders"
     size_mult = 1.0
     samples = 4
     gl_version = (4, 0)
-    window_type = C.window_type
+    window_type = None
 
-    def __init__(self, title="AITViewer", size: Tuple[int, int]=None, config: Union[DictConfig, dict]=None, samples: int=None, **kwargs):
+    def __init__(
+        self,
+        title="aitviewer",
+        size: Tuple[int, int] = None,
+        samples: int = None,
+        **kwargs,
+    ):
         """
         Initializer.
         :param title: Window title
         :param size: Window size as (width, height) tuple, if None uses the size from the configuration file
         :param kwargs: kwargs.
         """
-
-        # Update config with user parameter.
-        if config is not None:
-            C.update_conf(config)
-
         # Window Setup (Following `moderngl_window.run_window_config`).
-        if self.window_type != 'headless':
+        if self.window_type is None:
             self.window_type = C.window_type
 
         # HACK: We use our own version of the PyQt5 windows to override
         # part of the initialization that crashes on Python >= 3.10.
-        if self.window_type == 'pyqt5':
+        if self.window_type == "pyqt5":
             from aitviewer.utils.pyqt5_window import PyQt5Window
+
             base_window_cls = PyQt5Window
         else:
             base_window_cls = get_local_window_cls(self.window_type)
@@ -142,45 +145,45 @@ class Viewer(moderngl_window.WindowConfig):
         self.imgui_user_interacting = False
 
         # Shaders for rendering the shadow map
-        self.raw_depth_prog = self.load_program('shadow_mapping/raw_depth.glsl')
+        self.raw_depth_prog = self.load_program("shadow_mapping/raw_depth.glsl")
 
         # Shaders for mesh mouse intersection
-        self.frag_pick_prog = self.load_program('fragment_picking/frag_pick.glsl')
-        self.frag_pick_prog['position_texture'].value = 0  # Read from texture channel 0
-        self.frag_pick_prog['obj_info_texture'].value = 1  # Read from texture channel 0
-        self.picker_output = self.ctx.buffer(reserve=6*4)  # 3 floats, 3 ints
+        self.frag_pick_prog = self.load_program("fragment_picking/frag_pick.glsl")
+        self.frag_pick_prog["position_texture"].value = 0  # Read from texture channel 0
+        self.frag_pick_prog["obj_info_texture"].value = 1  # Read from texture channel 0
+        self.picker_output = self.ctx.buffer(reserve=6 * 4)  # 3 floats, 3 ints
         self.picker_vao = VAO(mode=moderngl.POINTS)
 
         # Shaders for drawing outlines
-        self.outline_draw_prog = self.load_program('outline/outline_draw.glsl')
+        self.outline_draw_prog = self.load_program("outline/outline_draw.glsl")
         self.outline_quad = geometry.quad_2d(size=(2.0, 2.0), pos=(0.0, 0.0))
 
         # Create framebuffers
         self.create_framebuffers()
 
         # Custom UI Font
-        self.font_dir = Path(__file__).parent / 'resources' / 'fonts'
+        self.font_dir = Path(__file__).parent / "resources" / "fonts"
         self.fonts = imgui.get_io().fonts
-        self.custom_font = self.fonts.add_font_from_file_ttf(os.path.join(self.font_dir, 'Custom.ttf'), 15)
+        self.custom_font = self.fonts.add_font_from_file_ttf(os.path.join(self.font_dir, "Custom.ttf"), 15)
         self.imgui.refresh_font_texture()
 
         self.modes = {
-            'view': {'title': ' View', 'shortcut': 'V'},
-            'inspect': {'title': ' Inspect', 'shortcut': 'I'},
+            "view": {"title": " View", "shortcut": "V"},
+            "inspect": {"title": " Inspect", "shortcut": "I"},
         }
 
         self.gui_controls = {
-            'menu': self.gui_menu,
-            'scene': self.gui_scene,
-            'playback': self.gui_playback,
-            'inspect': self.gui_inspect,
-            'shortcuts': self.gui_shortcuts,
-            'exit': self.gui_exit,
-            'go_to_frame': self.gui_go_to_frame
+            "menu": self.gui_menu,
+            "scene": self.gui_scene,
+            "playback": self.gui_playback,
+            "inspect": self.gui_inspect,
+            "shortcuts": self.gui_shortcuts,
+            "exit": self.gui_exit,
+            "go_to_frame": self.gui_go_to_frame,
         }
 
         # Debug
-        self.vis_prog =  self.load_program('visualize.glsl')
+        self.vis_prog = self.load_program("visualize.glsl")
         self.vis_quad = geometry.quad_2d(size=(0.9, 0.9), pos=(0.5, 0.5))
 
         # Initialize viewer
@@ -208,19 +211,21 @@ class Viewer(moderngl_window.WindowConfig):
         self._mode_inspect_key = self.wnd.keys.I
         self._mode_view_key = self.wnd.keys.V
         self._go_to_frame_key = self.wnd.keys.G
-        self._shortcut_names = {self.wnd.keys.SPACE: "Space",
-                                self.wnd.keys.C: "C",
-                                self.wnd.keys.D: "D",
-                                self.wnd.keys.I: "I",
-                                self.wnd.keys.L: "L",
-                                self.wnd.keys.K: "K",
-                                self.wnd.keys.O: "O",
-                                self.wnd.keys.P: "P",
-                                self.wnd.keys.S: "S",
-                                self.wnd.keys.T: "T",
-                                self.wnd.keys.X: "X",
-                                self.wnd.keys.G: "G",
-                                self.wnd.keys.Z: "Z"}
+        self._shortcut_names = {
+            self.wnd.keys.SPACE: "Space",
+            self.wnd.keys.C: "C",
+            self.wnd.keys.D: "D",
+            self.wnd.keys.I: "I",
+            self.wnd.keys.L: "L",
+            self.wnd.keys.K: "K",
+            self.wnd.keys.O: "O",
+            self.wnd.keys.P: "P",
+            self.wnd.keys.S: "S",
+            self.wnd.keys.T: "T",
+            self.wnd.keys.X: "X",
+            self.wnd.keys.G: "G",
+            self.wnd.keys.Z: "Z",
+        }
 
         # Disable exit on escape key
         self.window.exit_key = None
@@ -235,6 +240,10 @@ class Viewer(moderngl_window.WindowConfig):
         self._go_to_frame_string = ""
         self._show_shortcuts_window = False
 
+        self.server = None
+        if C.server_enabled:
+            self.server = ViewerServer(self, C.server_port)
+
     # noinspection PyAttributeOutsideInit
     def create_framebuffers(self):
         """
@@ -243,24 +252,21 @@ class Viewer(moderngl_window.WindowConfig):
         """
         # Mesh mouse intersection
         self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
-        self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
-        self.offscreen_p_tri_id = self.ctx.texture(self.wnd.buffer_size, 4, dtype='f4')
+        self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype="f4")
+        self.offscreen_p_tri_id = self.ctx.texture(self.wnd.buffer_size, 4, dtype="f4")
         self.offscreen_p = self.ctx.framebuffer(
-            color_attachments=[
-                self.offscreen_p_viewpos,
-                self.offscreen_p_tri_id
-            ],
-            depth_attachment=self.offscreen_p_depth
+            color_attachments=[self.offscreen_p_viewpos, self.offscreen_p_tri_id],
+            depth_attachment=self.offscreen_p_depth,
         )
         self.offscreen_p_tri_id.filter = (moderngl.NEAREST, moderngl.NEAREST)
 
         # Outline rendering
-        self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype='f4')
+        self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype="f4")
         self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
 
         # If in headlesss mode we create a framebuffer without multisampling that we can use
         # to resolve the default framebuffer before reading.
-        if self.window_type == 'headless':
+        if self.window_type == "headless":
             self.headless_fbo_color = self.ctx.texture(self.wnd.buffer_size, 4)
             self.headless_fbo_depth = self.ctx.depth_texture(self.wnd.buffer_size)
             self.headless_fbo = self.ctx.framebuffer(self.headless_fbo_color, self.headless_fbo_depth)
@@ -309,18 +315,19 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_animation = True
         self.export_animation_range = [0, -1]
         self.export_duration = 10
-        self.export_as_gif = False
+        self.export_format = "mp4"
         self.export_rotate_camera = False
         self.export_seconds_per_rotation = 10
         self.export_fps = self.playback_fps
         self.export_scale_factor = 1.0
+        self.export_transparent = False
 
         # Screenshot settings
         self.screenshot_transparent = False
         self.screenshot_name = None
 
         # Set the mode once the viewer has been completely initialized
-        self.selected_mode = 'view'
+        self.selected_mode = "view"
 
     def _init_scene(self):
         self.scene.make_renderable(self.ctx)
@@ -329,6 +336,42 @@ class Viewer(moderngl_window.WindowConfig):
             self.scene.backface_culling = self.backface_culling
         if self.auto_set_camera_target:
             self.scene.auto_set_camera_target()
+
+    def get_node_by_remote_uid(self, remote_uid: int, client: Tuple[str, str]):
+        """
+        Returns the Node corresponding to the remote uid and client passed in.
+
+        :param remote_uid: the remote uid to look up.
+        :param client: the client that created the node, this is the value of the 'client'
+            parameter that was passed to process_message() when the message was received.
+        :return: Node corresponding to the remote uid.
+        """
+        return self.server.get_node_by_remote_uid(remote_uid, client)
+
+    def process_message(self, type: Message, remote_uid: int, args: list, kwargs: dict, client: Tuple[str, str]):
+        """
+        Default processing of messages received by the viewer.
+
+        This method is called every time a new message has to be processed.
+        It can be overriden to intercept messages before they are sent to
+        the viewer and to add custom functionality.
+
+        :param type: an integer id that represents the type of the message.
+        :param remote_uid: the remote id of the node that this message refers to.
+            This is an id generated by the client to reference nodes that
+            it created. The viewer keeps track of the mapping from remote_uid
+            to the local uid of the node.
+            Use 'viewer.get_node_by_remote_uid(remote_uid)' to get the
+            Node corresponding to this id.
+        :param args: positional arguments received with the message.
+        :param kwargs: keyword arguments received with the message.
+        :param client: a tuple (ip, port) describing the address of the client
+            that sent this message.
+        """
+        try:
+            self.server.process_message(type, remote_uid, args, kwargs, client)
+        except Exception as e:
+            print(f"Exception while processing mesage: type = {type}, remote_uid = {remote_uid}:\n{e}")
 
     def run(self, *args, log=True):
         """
@@ -344,6 +387,9 @@ class Viewer(moderngl_window.WindowConfig):
         self._last_frame_rendered_at = self.timer.time
 
         while not self.window.is_closing:
+            if self.server is not None:
+                self.server.process_messages()
+
             current_time, delta = self.timer.next_frame()
 
             self.window.clear()
@@ -378,6 +424,7 @@ class Viewer(moderngl_window.WindowConfig):
         # Disable some renderables for exporting.
         renderables_to_enable = []
         if export:
+
             def disable_for_export(r):
                 if r.enabled:
                     r.enabled = False
@@ -394,7 +441,10 @@ class Viewer(moderngl_window.WindowConfig):
         self.render_shadowmap()
         self.render_prepare(transparent_background)
         self.render_scene()
-        self.render_outline([n for n in self.scene.collect_nodes() if n.draw_outline], self.outline_color)
+        self.render_outline(
+            [n for n in self.scene.collect_nodes() if n.draw_outline],
+            self.outline_color,
+        )
 
         # Re-enable renderables that were disabled for exporting.
         if export:
@@ -412,7 +462,7 @@ class Viewer(moderngl_window.WindowConfig):
             if self.visualize:
                 self.ctx.enable_only(moderngl.NOTHING)
                 self.offscreen_p_tri_id.use(location=0)
-                self.vis_prog['hash_color'] = True
+                self.vis_prog["hash_color"] = True
                 self.vis_quad.render(self.vis_prog)
 
             # FPS accounting.
@@ -463,18 +513,20 @@ class Viewer(moderngl_window.WindowConfig):
         self.wnd.fbo.depth_mask = False
         self.ctx.enable_only(moderngl.NOTHING)
         self.outline_texture.use(0)
-        self.outline_draw_prog['outline'] = 0
-        self.outline_draw_prog['outline_color'] = color
+        self.outline_draw_prog["outline"] = 0
+        self.outline_draw_prog["outline_color"] = color
         self.outline_quad.render(self.outline_draw_prog)
         self.wnd.fbo.depth_mask = True
 
     def render_scene(self):
         """Render the current scene to the framebuffer without time accounting and GUI elements."""
-        self.scene.render(window_size=self.window.size,
-                          lights=self.scene.lights,
-                          shadows_enabled=self.shadows_enabled,
-                          ambient_strength=self.scene.ambient_strength,
-                          fbo=self.wnd.fbo)
+        self.scene.render(
+            window_size=self.window.size,
+            lights=self.scene.lights,
+            shadows_enabled=self.shadows_enabled,
+            ambient_strength=self.scene.ambient_strength,
+            fbo=self.wnd.fbo,
+        )
 
     def render_prepare(self, transparent_background=True):
         """Prepare the framebuffer."""
@@ -483,16 +535,18 @@ class Viewer(moderngl_window.WindowConfig):
         if transparent_background:
             self.ctx.clear(0, 0, 0, 0)
         else:
-            if self.scene.light_mode == 'dark':
+            if self.scene.light_mode == "dark":
                 self.ctx.clear(0.1, 0.1, 0.1, 1.0)
             else:
                 self.ctx.clear(*self.scene.background_color)
 
         self.ctx.enable_only(moderngl.DEPTH_TEST | moderngl.BLEND | moderngl.CULL_FACE)
-        self.ctx.cull_face = 'back'
+        self.ctx.cull_face = "back"
         self.ctx.blend_func = (
-            moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA,
-            moderngl.ONE, moderngl.ONE
+            moderngl.SRC_ALPHA,
+            moderngl.ONE_MINUS_SRC_ALPHA,
+            moderngl.ONE,
+            moderngl.ONE,
         )
 
     def prevent_background_interactions(self):
@@ -538,9 +592,11 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.new_frame()
 
         # Create a context menu when right clicking on the background.
-        if (not any([imgui.is_window_hovered(), imgui.is_any_item_hovered()])
+        if (
+            not any([imgui.is_window_hovered(), imgui.is_any_item_hovered()])
             and imgui.is_mouse_released(button=1)
-            and not self._mouse_moved):
+            and not self._mouse_moved
+        ):
             # Select the object under the cursor
             if self.select_object(*imgui.get_io().mouse_pos) or not isinstance(self.scene.selected_object, Node):
                 imgui.open_popup("Context Menu")
@@ -558,7 +614,8 @@ class Viewer(moderngl_window.WindowConfig):
 
         if self._render_gui:
             # Render user controls.
-            for gc in self.gui_controls.values(): gc()
+            for gc in self.gui_controls.values():
+                gc()
         else:
             # If gui is disabled only render the go to frame window.
             self.gui_go_to_frame()
@@ -586,17 +643,18 @@ class Viewer(moderngl_window.WindowConfig):
 
         if imgui.begin_main_menu_bar():
             if imgui.begin_menu("File", True):
-
-                clicked_quit, selected_quit = imgui.menu_item(
-                    "Quit", 'Cmd+Q', False, True)
+                clicked_quit, selected_quit = imgui.menu_item("Quit", "Cmd+Q", False, True)
                 if clicked_quit:
                     exit(1)
 
-                clicked_export, selected_export = imgui.menu_item(
-                    "Save as video..", None, False, True)
+                clicked_export, selected_export = imgui.menu_item("Save as video..", None, False, True)
 
                 clicked_screenshot, selected_screenshot = imgui.menu_item(
-                    "Screenshot", self._shortcut_names[self._screenshot_key], False, True)
+                    "Screenshot",
+                    self._shortcut_names[self._screenshot_key],
+                    False,
+                    True,
+                )
 
                 imgui.end_menu()
 
@@ -606,8 +664,11 @@ class Viewer(moderngl_window.WindowConfig):
                     if default:
                         self.scene.light_mode = "default"
 
-                    _, dark = imgui.menu_item("Dark", self._shortcut_names[self._dark_mode_key],
-                                              self.scene.light_mode == "dark")
+                    _, dark = imgui.menu_item(
+                        "Dark",
+                        self._shortcut_names[self._dark_mode_key],
+                        self.scene.light_mode == "dark",
+                    )
                     if dark:
                         self.scene.light_mode = "dark"
 
@@ -616,41 +677,60 @@ class Viewer(moderngl_window.WindowConfig):
                         self.scene.light_mode = "diffuse"
                     imgui.end_menu()
 
-                _, self.shadows_enabled = imgui.menu_item("Render Shadows", self._shortcut_names[self._shadow_key],
-                                                          self.shadows_enabled, True)
+                _, self.shadows_enabled = imgui.menu_item(
+                    "Render Shadows",
+                    self._shortcut_names[self._shadow_key],
+                    self.shadows_enabled,
+                    True,
+                )
 
-                _, self.lock_selection = imgui.menu_item("Lock selection", self._shortcut_names[self._lock_selection_key],
-                                                         self.lock_selection, True)
+                _, self.lock_selection = imgui.menu_item(
+                    "Lock selection",
+                    self._shortcut_names[self._lock_selection_key],
+                    self.lock_selection,
+                    True,
+                )
                 _, self._render_gui = imgui.menu_item("Render GUI", None, self._render_gui, True)
                 imgui.end_menu()
 
             if imgui.begin_menu("Camera", True):
-                _, self.scene.camera_target.enabled = imgui.menu_item("Show Camera Target", self._shortcut_names[self._show_camera_target_key],
-                                                                       self.scene.camera_target.enabled , True)
+                _, self.scene.camera_target.enabled = imgui.menu_item(
+                    "Show Camera Target",
+                    self._shortcut_names[self._show_camera_target_key],
+                    self.scene.camera_target.enabled,
+                    True,
+                )
 
-                clicked, _ = imgui.menu_item("Center view on selection", self._shortcut_names[self._center_view_on_selection_key],
-                                             False, isinstance(self.scene.selected_object, Node))
+                clicked, _ = imgui.menu_item(
+                    "Center view on selection",
+                    self._shortcut_names[self._center_view_on_selection_key],
+                    False,
+                    isinstance(self.scene.selected_object, Node),
+                )
                 if clicked:
                     self.center_view_on_selection()
 
                 is_ortho = False if self._using_temp_camera else self.scene.camera.is_ortho
-                _, is_ortho = imgui.menu_item("Orthographic Camera",
-                                                                self._shortcut_names[self._orthographic_camera_key],
-                                                is_ortho, True)
+                _, is_ortho = imgui.menu_item(
+                    "Orthographic Camera",
+                    self._shortcut_names[self._orthographic_camera_key],
+                    is_ortho,
+                    True,
+                )
                 if is_ortho and self._using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.is_ortho = is_ortho
 
-                clicked_save_cam, selected_save_cam = imgui.menu_item("Save Camera",
-                                                                self._shortcut_names[self._save_cam_key],
-                                                                False, True)
+                clicked_save_cam, selected_save_cam = imgui.menu_item(
+                    "Save Camera", self._shortcut_names[self._save_cam_key], False, True
+                )
                 if clicked_save_cam:
                     self.reset_camera()
                     self.scene.camera.save_cam()
 
-                clicked_load_cam, selected_load_cam = imgui.menu_item("Load Camera",
-                                                                self._shortcut_names[self._load_cam_key],
-                                                                False, True)
+                clicked_load_cam, selected_load_cam = imgui.menu_item(
+                    "Load Camera", self._shortcut_names[self._load_cam_key], False, True
+                )
                 if clicked_load_cam:
                     self.reset_camera()
                     self.scene.camera.load_cam()
@@ -659,21 +739,35 @@ class Viewer(moderngl_window.WindowConfig):
 
             if imgui.begin_menu("Mode", True):
                 for id, mode in self.modes.items():
-                    mode_clicked, _ = imgui.menu_item(mode['title'], mode['shortcut'], id == self.selected_mode, True)
+                    mode_clicked, _ = imgui.menu_item(mode["title"], mode["shortcut"], id == self.selected_mode, True)
                     if mode_clicked:
                         self.selected_mode = id
 
                 imgui.end_menu()
 
             if imgui.begin_menu("Help", True):
-                clicked, self._show_shortcuts_window = imgui.menu_item("Keyboard shortcuts", None, self._show_shortcuts_window)
+                clicked, self._show_shortcuts_window = imgui.menu_item(
+                    "Keyboard shortcuts", None, self._show_shortcuts_window
+                )
                 imgui.end_menu()
 
             if imgui.begin_menu("Debug", True):
-                _, self.visualize = imgui.menu_item("Visualize debug texture", self._shortcut_names[self._visualize_key],
-                                                    self.visualize, True)
+                _, self.visualize = imgui.menu_item(
+                    "Visualize debug texture",
+                    self._shortcut_names[self._visualize_key],
+                    self.visualize,
+                    True,
+                )
 
                 imgui.end_menu()
+
+            if self.server is not None:
+                if imgui.begin_menu("Server", True):
+                    imgui.text("Connected clients:")
+                    imgui.separator()
+                    for c in self.server.connections:
+                        imgui.text(f"{c[0]}:{c[1]}")
+                    imgui.end_menu()
 
             imgui.end_main_menu_bar()
 
@@ -689,7 +783,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.gui_screenshot()
 
     def gui_export(self):
-        imgui.set_next_window_size(570,0)
+        imgui.set_next_window_size(570, 0)
         if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
             if self.scene.n_frames == 1:
                 imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
@@ -707,7 +801,12 @@ class Viewer(moderngl_window.WindowConfig):
                 self.export_animation = False
 
             if self.export_animation:
-                _, animation_range = imgui.drag_int2('Animation range', *self.export_animation_range, min_value=0, max_value=self.scene.n_frames - 1)
+                _, animation_range = imgui.drag_int2(
+                    "Animation range",
+                    *self.export_animation_range,
+                    min_value=0,
+                    max_value=self.scene.n_frames - 1,
+                )
                 if animation_range[0] != self.export_animation_range[0]:
                     self.export_animation_range[0] = animation_range[0]
                     self.export_animation_range[1] = max(animation_range[0], animation_range[1])
@@ -715,15 +814,32 @@ class Viewer(moderngl_window.WindowConfig):
                     self.export_animation_range[1] = animation_range[1]
                     self.export_animation_range[0] = min(animation_range[0], animation_range[1])
 
-                _, self.playback_fps = imgui.drag_float('Playback fps', self.playback_fps, 0.1,
-                                                         min_value=1.0, max_value=120.0, format='%.1f')
+                _, self.playback_fps = imgui.drag_float(
+                    "Playback fps",
+                    self.playback_fps,
+                    0.1,
+                    min_value=1.0,
+                    max_value=120.0,
+                    format="%.1f",
+                )
                 imgui.same_line(spacing=10)
                 speedup = self.playback_fps / self.scene.fps
-                imgui.text(f'({speedup:.2f}x speed)')
+                imgui.text(f"({speedup:.2f}x speed)")
             else:
-                _, self.scene.current_frame_id = imgui.slider_int('Frame', self.scene.current_frame_id,
-                                                                   min_value=0, max_value=self.scene.n_frames - 1)
-                _, self.export_duration = imgui.drag_float('Duration (s)', self.export_duration, min_value=0.1, max_value=10000.0, change_speed=0.05, format='%.1f')
+                _, self.scene.current_frame_id = imgui.slider_int(
+                    "Frame",
+                    self.scene.current_frame_id,
+                    min_value=0,
+                    max_value=self.scene.n_frames - 1,
+                )
+                _, self.export_duration = imgui.drag_float(
+                    "Duration (s)",
+                    self.export_duration,
+                    min_value=0.1,
+                    max_value=10000.0,
+                    change_speed=0.05,
+                    format="%.1f",
+                )
                 duration = self.export_duration
 
             if self.export_animation:
@@ -735,11 +851,20 @@ class Viewer(moderngl_window.WindowConfig):
                     imgui.pop_style_var(1)
 
             if not self.export_animation or self.export_rotate_camera:
-                _, self.export_seconds_per_rotation = imgui.drag_float('Rotation time (s)', self.export_seconds_per_rotation, min_value=0.1, max_value=10000.0, change_speed=0.01, format='%.2f')
+                _, self.export_seconds_per_rotation = imgui.drag_float(
+                    "Rotation time (s)",
+                    self.export_seconds_per_rotation,
+                    min_value=0.1,
+                    max_value=10000.0,
+                    change_speed=0.01,
+                    format="%.2f",
+                )
                 imgui.same_line()
                 if imgui.button("Once"):
                     if self.export_animation:
-                        self.export_seconds_per_rotation = (self.export_animation_range[1] - self.export_animation_range[0] + 1) / self.playback_fps
+                        self.export_seconds_per_rotation = (
+                            self.export_animation_range[1] - self.export_animation_range[0] + 1
+                        ) / self.playback_fps
                     else:
                         self.export_seconds_per_rotation = self.export_duration
 
@@ -749,22 +874,47 @@ class Viewer(moderngl_window.WindowConfig):
 
             # Output settings.
             imgui.text("Output")
+
             imgui.spacing()
             imgui.text("Format:")
             imgui.same_line()
-            if imgui.radio_button("MP4", not self.export_as_gif):
-                self.export_as_gif = False
+            if imgui.radio_button("MP4", self.export_format == "mp4"):
+                self.export_format = "mp4"
             imgui.same_line(spacing=15)
-            if imgui.radio_button("GIF", self.export_as_gif):
-                self.export_as_gif = True
+            if imgui.radio_button("WEBM", self.export_format == "webm"):
+                self.export_format = "webm"
+            imgui.same_line(spacing=15)
+            if imgui.radio_button("GIF", self.export_format == "gif"):
+                self.export_format = "gif"
 
-            if self.export_as_gif:
+            imgui.spacing()
+            if self.export_format != "webm":
+                imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
+                self.export_transparent = False
+
+            _, self.export_transparent = imgui.checkbox("Transparent background", self.export_transparent)
+            if self.export_format != "webm":
+                imgui.pop_style_var()
+                self.export_transparent = False
+
+            if imgui.is_item_hovered():
+                imgui.begin_tooltip()
+                imgui.text("Available only for WEBM format")
+                imgui.end_tooltip()
+
+            if self.export_format == "gif":
                 max_output_fps = 30.0
             else:
                 max_output_fps = 120.0
             self.export_fps = min(self.export_fps, max_output_fps)
-            _, self.export_fps = imgui.drag_float('fps', self.export_fps, 0.1,
-                                                  min_value=1.0, max_value=max_output_fps, format='%.1f')
+            _, self.export_fps = imgui.drag_float(
+                "fps",
+                self.export_fps,
+                0.1,
+                min_value=1.0,
+                max_value=max_output_fps,
+                format="%.1f",
+            )
             imgui.same_line(position=440)
             if imgui.button("1x##fps", width=35):
                 self.export_fps = self.playback_fps
@@ -777,10 +927,17 @@ class Viewer(moderngl_window.WindowConfig):
 
             imgui.spacing()
             imgui.spacing()
-            imgui.text(f"Resolution: [{int(self.window_size[0] * self.export_scale_factor)}x{int(self.window_size[1] * self.export_scale_factor)}]")
-            _, self.export_scale_factor = imgui.drag_float('Scale', self.export_scale_factor,
-                                                               min_value=0.01, max_value=1.0,
-                                                               change_speed=0.005, format='%.2f')
+            imgui.text(
+                f"Resolution: [{int(self.window_size[0] * self.export_scale_factor)}x{int(self.window_size[1] * self.export_scale_factor)}]"
+            )
+            _, self.export_scale_factor = imgui.drag_float(
+                "Scale",
+                self.export_scale_factor,
+                min_value=0.01,
+                max_value=1.0,
+                change_speed=0.005,
+                format="%.2f",
+            )
 
             imgui.same_line(position=440)
             if imgui.button("1x##scale", width=35):
@@ -793,7 +950,7 @@ class Viewer(moderngl_window.WindowConfig):
                 self.export_scale_factor = 0.25
 
             if self.export_animation:
-                duration =  (animation_range[1] - animation_range[0] + 1) / self.playback_fps
+                duration = (animation_range[1] - animation_range[0] + 1) / self.playback_fps
                 # Compute exact number of frames if playback fps is an exact multiple of export fps.
                 if np.fmod(self.playback_fps, self.export_fps) < 0.1:
                     playback_count = int(np.round(self.playback_fps / self.export_fps))
@@ -812,7 +969,7 @@ class Viewer(moderngl_window.WindowConfig):
 
             # Style the cancel with a grey color
             imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
-            imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
+            imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.6, 0.6, 0.6, 1.0)
             imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
 
             if imgui.button("Cancel", width=button_width):
@@ -826,7 +983,11 @@ class Viewer(moderngl_window.WindowConfig):
             if imgui.button("Export", button_width):
                 imgui.close_current_popup()
                 self.export_video(
-                    os.path.join(C.export_dir, 'videos', self.window.title + ('.gif' if self.export_as_gif else '.mp4')),
+                    os.path.join(
+                        C.export_dir,
+                        "videos",
+                        f"{self.window.title}.{self.export_format}",
+                    ),
                     animation=self.export_animation,
                     animation_range=self.export_animation_range,
                     duration=self.export_duration,
@@ -834,7 +995,8 @@ class Viewer(moderngl_window.WindowConfig):
                     output_fps=self.export_fps,
                     rotate_camera=not self.export_animation or self.export_rotate_camera,
                     seconds_per_rotation=self.export_seconds_per_rotation,
-                    scale_factor=self.export_scale_factor
+                    scale_factor=self.export_scale_factor,
+                    transparent=self.export_transparent,
                 )
 
             imgui.end_popup()
@@ -845,8 +1007,10 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.set_next_window_size(self.window_size[0] * 0.4, self.window_size[1] * 0.15, imgui.FIRST_USE_EVER)
         expanded, _ = imgui.begin("Playback", None)
         if expanded:
-            u, run_animations = imgui.checkbox("Run animations [{}]".format(self._shortcut_names[self._pause_key]),
-                                                    self.run_animations)
+            u, run_animations = imgui.checkbox(
+                "Run animations [{}]".format(self._shortcut_names[self._pause_key]),
+                self.run_animations,
+            )
             if u:
                 self.toggle_animation(run_animations)
 
@@ -856,22 +1020,36 @@ class Viewer(moderngl_window.WindowConfig):
             ms_avg = frametime_avg * 1000.0
             ms_last = self._past_frametimes[-1] * 1000.0
 
-            imgui.plot_lines("Internal {:.1f} fps @ {:.2f} ms/frame [{:.2f}ms]".format(fps_avg, ms_avg, ms_last),
-                            array('f', (1.0 / self._past_frametimes).tolist()),
-                            scale_min=0, scale_max=100.0, graph_size=(100, 20))
+            imgui.plot_lines(
+                "Internal {:.1f} fps @ {:.2f} ms/frame [{:.2f}ms]".format(fps_avg, ms_avg, ms_last),
+                array("f", (1.0 / self._past_frametimes).tolist()),
+                scale_min=0,
+                scale_max=100.0,
+                graph_size=(100, 20),
+            )
 
-            _, self.playback_fps = imgui.drag_float(f'Playback fps', self.playback_fps, 0.1,
-                                                    min_value=1.0, max_value=120.0, format='%.1f')
+            _, self.playback_fps = imgui.drag_float(
+                f"Playback fps",
+                self.playback_fps,
+                0.1,
+                min_value=1.0,
+                max_value=120.0,
+                format="%.1f",
+            )
             imgui.same_line(spacing=10)
             speedup = self.playback_fps / self.scene.fps
-            imgui.text(f'({speedup:.2f}x speed)')
+            imgui.text(f"({speedup:.2f}x speed)")
 
             # Sequence Control
             # For simplicity, we allow the global sequence slider to only go as far as the shortest known sequence.
             n_frames = self.scene.n_frames
 
-            _, self.scene.current_frame_id = imgui.slider_int('Frame##r_global_seq_control', self.scene.current_frame_id,
-                                                            min_value=0, max_value=n_frames - 1)
+            _, self.scene.current_frame_id = imgui.slider_int(
+                "Frame##r_global_seq_control",
+                self.scene.current_frame_id,
+                min_value=0,
+                max_value=n_frames - 1,
+            )
             self.prevent_background_interactions()
         imgui.end()
 
@@ -887,7 +1065,7 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_inspect(self):
         """GUI to control playback settings."""
-        if self.selected_mode == 'inspect':
+        if self.selected_mode == "inspect":
             imgui.set_next_window_position(self.window_size[0] * 0.6, 50, imgui.FIRST_USE_EVER)
             imgui.set_next_window_size(self.window_size[0] * 0.35, 140, imgui.FIRST_USE_EVER)
             expanded, _ = imgui.begin("Inspect", None)
@@ -904,14 +1082,24 @@ class Viewer(moderngl_window.WindowConfig):
             imgui.open_popup("Go to frame##go-to-frame-popup")
             self._go_to_frame_string = str(self.scene.current_frame_id)
 
-        imgui.set_next_window_size(300,0)
-        if imgui.begin_popup_modal("Go to frame##go-to-frame-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_TITLE_BAR)[0]:
+        imgui.set_next_window_size(300, 0)
+        if imgui.begin_popup_modal(
+            "Go to frame##go-to-frame-popup",
+            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_TITLE_BAR,
+        )[0]:
             if self._go_to_frame_popup_open:
                 imgui.set_keyboard_focus_here()
-                u, self._go_to_frame_string = imgui.input_text("Go to frame", self._go_to_frame_string, 64, imgui.INPUT_TEXT_CHARS_DECIMAL | imgui.INPUT_TEXT_ENTER_RETURNS_TRUE | imgui.INPUT_TEXT_AUTO_SELECT_ALL)
+                u, self._go_to_frame_string = imgui.input_text(
+                    "Go to frame",
+                    self._go_to_frame_string,
+                    64,
+                    imgui.INPUT_TEXT_CHARS_DECIMAL
+                    | imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+                    | imgui.INPUT_TEXT_AUTO_SELECT_ALL,
+                )
                 if u:
                     try:
-                        frame_id =  int(self._go_to_frame_string)
+                        frame_id = int(self._go_to_frame_string)
                     except:
                         frame_id = -1
                         pass
@@ -932,25 +1120,33 @@ class Viewer(moderngl_window.WindowConfig):
             self.toggle_animation(False)
             imgui.open_popup("Screenshot##screenshot-popup")
 
-        imgui.set_next_window_size(250,0)
-        if imgui.begin_popup_modal("Screenshot##screenshot-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
+        imgui.set_next_window_size(250, 0)
+        if imgui.begin_popup_modal(
+            "Screenshot##screenshot-popup",
+            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE,
+        )[0]:
             if self._screenshot_popup_open:
                 _, self.screenshot_transparent = imgui.checkbox("Transparent background", self.screenshot_transparent)
                 if self.screenshot_name is None:
-                    self.screenshot_name = 'frame_{:0>6}.png'.format(self.scene.current_frame_id)
+                    self.screenshot_name = "frame_{:0>6}.png".format(self.scene.current_frame_id)
 
                 # HACK: we need to set the focus twice when the modal is first opened for it to take effect
                 if self._screenshot_focus_count > 0:
                     self._screenshot_focus_count -= 1
                     imgui.set_keyboard_focus_here()
-                _, self.screenshot_name = imgui.input_text("File name", self.screenshot_name, 64, imgui.INPUT_TEXT_AUTO_SELECT_ALL)
+                _, self.screenshot_name = imgui.input_text(
+                    "File name",
+                    self.screenshot_name,
+                    64,
+                    imgui.INPUT_TEXT_AUTO_SELECT_ALL,
+                )
                 imgui.spacing()
 
                 button_width = (imgui.get_content_region_available()[0] - imgui.get_style().item_spacing[0]) * 0.5
 
                 # Style the cancel with a grey color
                 imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
-                imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.6, 0.6, 0.6, 1.0)
                 imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
 
                 if imgui.button("cancel", width=button_width):
@@ -986,7 +1182,7 @@ class Viewer(moderngl_window.WindowConfig):
 
                 # Style the cancel with a grey color
                 imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
-                imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,  0.6, 0.6, 0.6, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.6, 0.6, 0.6, 1.0)
                 imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
 
                 if imgui.button("cancel", width=button_width):
@@ -1011,16 +1207,16 @@ class Viewer(moderngl_window.WindowConfig):
         pos = int(x * self.wnd.pixel_ratio), int(self.wnd.buffer_height - (y * self.wnd.pixel_ratio))
 
         # Fragment picker uses already encoded position/object/triangle in the frag_pos program textures
-        self.frag_pick_prog['texel_pos'].value = pos
+        self.frag_pick_prog["texel_pos"].value = pos
         self.offscreen_p_viewpos.use(location=0)
         self.offscreen_p_tri_id.use(location=1)
         self.picker_vao.transform(self.frag_pick_prog, self.picker_output, vertices=1)
-        x, y, z, obj_id, tri_id, instance_id = struct.unpack('3f3i', self.picker_output.read())
+        x, y, z, obj_id, tri_id, instance_id = struct.unpack("3f3i", self.picker_output.read())
 
         if obj_id >= 0 and tri_id >= 0:
             node = self.scene.get_node_by_uid(obj_id)
             # Camera space to world space
-            point_world = np.array(np.linalg.inv(self.scene.camera.get_view_matrix()) @ np.array((x, y, z, 1.0)))[:-1]
+            point_world = np.array((x, y, z))
             point_local = (np.linalg.inv(node.model_matrix) @ np.append(point_world, 1.0))[:-1]
             if isinstance(node, Meshes) or isinstance(node, Billboard) or isinstance(node, VariableTopologyMeshes):
                 vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
@@ -1076,6 +1272,8 @@ class Viewer(moderngl_window.WindowConfig):
         for path in paths:
             base, ext = os.path.splitext(path)
             if ext == ".obj" or ext == ".ply":
+                import trimesh
+
                 obj = trimesh.load(path)
                 obj_mesh = Meshes(obj.vertices, obj.faces, name=os.path.basename(base))
                 self.scene.add(obj_mesh)
@@ -1135,7 +1333,7 @@ class Viewer(moderngl_window.WindowConfig):
                 self.shadows_enabled = not self.shadows_enabled
 
             elif key == self._show_camera_target_key:
-                self.scene.camera_target.enabled  = not self.scene.camera_target.enabled
+                self.scene.camera_target.enabled = not self.scene.camera_target.enabled
 
             elif key == self._orthographic_camera_key:
                 if self._using_temp_camera:
@@ -1146,10 +1344,10 @@ class Viewer(moderngl_window.WindowConfig):
                 self.center_view_on_selection()
 
             elif key == self._mode_view_key:
-                self.selected_mode = 'view'
+                self.selected_mode = "view"
 
             elif key == self._mode_inspect_key:
-                self.selected_mode = 'inspect'
+                self.selected_mode = "inspect"
 
             elif key == self._dark_mode_key:
                 self.scene.light_mode = "dark" if self.scene.light_mode != "dark" else "default"
@@ -1182,7 +1380,7 @@ class Viewer(moderngl_window.WindowConfig):
     def mouse_position_event(self, x, y, dx, dy):
         self.imgui.mouse_position_event(x, y, dx, dy)
 
-        if self.selected_mode == 'inspect':
+        if self.selected_mode == "inspect":
             self.mmi = self.mesh_mouse_intersection(x, y)
 
     def mouse_press_event(self, x: int, y: int, button: int):
@@ -1223,7 +1421,7 @@ class Viewer(moderngl_window.WindowConfig):
     def mouse_drag_event(self, x: int, y: int, dx: int, dy: int):
         self.imgui.mouse_drag_event(x, y, dx, dy)
 
-        if not self.imgui_user_interacting :
+        if not self.imgui_user_interacting:
             if self._pan_camera:
                 if self._using_temp_camera:
                     self.reset_camera()
@@ -1234,7 +1432,10 @@ class Viewer(moderngl_window.WindowConfig):
                     self.reset_camera()
                 self.scene.camera.rotate_azimuth_elevation(dx, dy)
 
-            if not self._mouse_moved and np.linalg.norm(np.array([x, y]) - self._mouse_down_position) > self._move_threshold:
+            if (
+                not self._mouse_moved
+                and np.linalg.norm(np.array([x, y]) - self._mouse_down_position) > self._move_threshold
+            ):
                 self._mouse_moved = True
 
     def mouse_scroll_event(self, x_offset: float, y_offset: float):
@@ -1260,24 +1461,30 @@ class Viewer(moderngl_window.WindowConfig):
     def get_current_frame_as_image(self, alpha=False):
         """Return the FBO content as a PIL image."""
         if alpha:
-            fmt = 'RGBA'
+            fmt = "RGBA"
             components = 4
         else:
-            fmt = 'RGB'
+            fmt = "RGB"
             components = 3
 
         # If in headless mode we first resolve the multisampled framebuffer into
         # a non multisampled one and read from that instead.
-        if self.window_type == 'headless':
+        if self.window_type == "headless":
             self.ctx.copy_framebuffer(self.headless_fbo, self.wnd.fbo)
             fbo = self.headless_fbo
         else:
             fbo = self.wnd.fbo
 
-        image = Image.frombytes(fmt,
-                                (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
-                                 self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
-                                fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components))
+        width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
+        height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
+        image = Image.frombytes(
+            fmt,
+            (width, height),
+            fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components),
+        )
+        if width != self.wnd.size[0] or height != self.wnd.size[1]:
+            image = image.resize(self.wnd.size, Image.NEAREST)
+
         return image.transpose(Image.FLIP_TOP_BOTTOM)
 
     def get_current_depth_image(self):
@@ -1292,17 +1499,24 @@ class Viewer(moderngl_window.WindowConfig):
 
         # If in headless mode we first resolve the multisampled framebuffer into
         # a non multisampled one and read from that instead.
-        if self.window_type == 'headless':
+        if self.window_type == "headless":
             self.ctx.copy_framebuffer(self.headless_fbo, self.wnd.fbo)
             fbo = self.headless_fbo
         else:
             fbo = self.wnd.fbo
 
+        width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
+        height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
+
         # Get depth image from depth buffer.
-        depth = Image.frombytes('F',
-                                (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
-                                 self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
-                                fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype='f4'))
+        depth = Image.frombytes(
+            "F",
+            (width, height),
+            fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype="f4"),
+        )
+
+        if width != self.wnd.size[0] or height != self.wnd.size[1]:
+            depth = depth.resize(self.wnd.size, Image.NEAREST)
 
         # Convert from [0, 1] range to [-1, 1] range.
         # This is necessary because our projection matrix computes NDC
@@ -1316,19 +1530,33 @@ class Viewer(moderngl_window.WindowConfig):
         # Linearize depth values. This converts from [-1, 1] range to the
         # view space Z coordinate value, with positive z in front of the camera.
         z = b / (a + depth)
-        return Image.fromarray(z, mode='F').transpose(Image.FLIP_TOP_BOTTOM)
+        return Image.fromarray(z, mode="F").transpose(Image.FLIP_TOP_BOTTOM)
 
     def get_current_mask_image(self):
         """
         Render and return a color mask as a 'RGB' PIL image. Each object in the mask
         has a uniform color computed as an hash of the Node uid.
         """
+
+        width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
+        height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
+
         # Get object ids as floating point numbers from the first channel of
         # the first attachment of the picking framebuffer.
-        id = Image.frombytes('F',
-                             (self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0],
-                              self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]),
-                             self.offscreen_p.read(viewport=self.wnd.fbo.viewport, alignment=1, components=1, attachment=1, dtype='f4'))
+        id = Image.frombytes(
+            "F",
+            (width, height),
+            self.offscreen_p.read(
+                viewport=self.wnd.fbo.viewport,
+                alignment=1,
+                components=1,
+                attachment=1,
+                dtype="f4",
+            ),
+        )
+
+        if width != self.wnd.size[0] or height != self.wnd.size[1]:
+            id = id.resize(self.wnd.size, Image.NEAREST)
 
         # Convert the id to integer values.
         id_int = np.asarray(id).astype(dtype=np.int32)
@@ -1336,15 +1564,16 @@ class Viewer(moderngl_window.WindowConfig):
         # Hash the ids.
         def hash(h):
             h ^= h >> 16
-            h *= 0x85ebca6b
+            h *= 0x85EBCA6B
             h ^= h >> 13
-            h *= 0xc2b2ae35
+            h *= 0xC2B2AE35
             h ^= h >> 16
             return h
+
         hashed = hash(id_int.copy())
 
         # Convert the hashed ids to an RGBA image and then throw away the alpha channel.
-        img = Image.frombytes('RGBA', id.size, hashed.tobytes()).convert('RGB')
+        img = Image.frombytes("RGBA", id.size, hashed.tobytes()).convert("RGB")
         return img.transpose(Image.FLIP_TOP_BOTTOM)
 
     def on_close(self):
@@ -1363,14 +1592,14 @@ class Viewer(moderngl_window.WindowConfig):
     def take_screenshot(self, file_name=None, transparent_background=False):
         """Save the current frame to an image in the screenshots directory inside the export directory"""
         if file_name is None:
-            file_name = 'frame_{:0>6}.png'.format(self.scene.current_frame_id)
+            file_name = "frame_{:0>6}.png".format(self.scene.current_frame_id)
         if not file_name.endswith(".png"):
             file_name += ".png"
-        file_path = os.path.join(C.export_dir, 'screenshots', file_name)
+        file_path = os.path.join(C.export_dir, "screenshots", file_name)
         self.export_frame(file_path, transparent_background=transparent_background)
         print(f"Screenshot saved to {file_path}")
 
-    def export_frame(self, file_path, scale_factor:float=None, transparent_background=False):
+    def export_frame(self, file_path, scale_factor: float = None, transparent_background=False):
         """Save the current frame to an image.
         :param file_path: the path where the image is saved.
         :param scale_factor: a scale factor used to scale the image. If None no scale factor is used and
@@ -1404,7 +1633,11 @@ class Viewer(moderngl_window.WindowConfig):
         rotate_camera=False,
         seconds_per_rotation=10.0,
         scale_factor=None,
-        ):
+        transparent=False,
+    ):
+        # Load this module to reduce load time.
+        import skvideo.io
+
         if rotate_camera and not isinstance(self.scene.camera, ViewerCamera):
             print("Cannot export a video with camera rotation while using a camera that is not a ViewerCamera")
             return
@@ -1473,28 +1706,39 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Initialize video writer.
         if output_path is not None:
-            path_mp4, path_gif, is_gif = get_video_paths(output_path)
-            writer = skvideo.io.FFmpegWriter(
-                path_mp4,
-                inputdict = {
-                    '-framerate': str(output_fps),  # must be this early in the command, otherwise it is not applied.
-                },
-                outputdict = {
-                    '-c:v': 'libx264',
-                    '-preset': 'slow',
-                    '-profile:v': 'high',
-                    '-level:v': '4.0',
-                    '-pix_fmt': 'yuv420p',
-                    '-vf': 'pad=ceil(iw/2)*2:ceil(ih/2)*2',  # Avoid error when image res is not divisible by 2.
-                    '-r': str(output_fps),
-                })
+            path_video, path_gif, is_gif = get_video_paths(output_path)
+            pix_fmt = "yuva420p" if transparent else "yuv420p"
+            outputdict = {
+                "-pix_fmt": pix_fmt,
+                "-vf": "pad=ceil(iw/2)*2:ceil(ih/2)*2",  # Avoid error when image res is not divisible by 2.
+                "-r": str(output_fps),
+            }
 
-        for i in tqdm(range(frames), desc='Rendering frames'):
+            if path_video.endswith("mp4"):
+                # MP4 specific options
+                outputdict.update(
+                    {
+                        "-c:v": "libx264",
+                        "-preset": "slow",
+                        "-profile:v": "high",
+                        "-level:v": "4.0",
+                    }
+                )
+
+            writer = skvideo.io.FFmpegWriter(
+                path_video,
+                inputdict={
+                    "-framerate": str(output_fps),
+                },
+                outputdict=outputdict,
+            )
+
+        for i in tqdm(range(frames), desc="Rendering frames"):
             if rotate_camera:
                 self.scene.camera.rotate_azimuth(az_delta)
 
-            self.render(time, time + dt, export=True)
-            img = self.get_current_frame_as_image()
+            self.render(time, time + dt, export=True, transparent_background=transparent)
+            img = self.get_current_frame_as_image(alpha=transparent)
 
             # Scale image by the scale factor.
             if scale_factor is not None and scale_factor != 1.0:
@@ -1504,7 +1748,7 @@ class Viewer(moderngl_window.WindowConfig):
 
             # Store the image to disk if a directory for frames was given.
             if frame_dir is not None:
-                img_name = os.path.join(frame_dir, 'frame_{:0>6}.png'.format(i))
+                img_name = os.path.join(frame_dir, "frame_{:0>6}.png".format(i))
                 img.save(img_name)
 
             # Write the frame to the video writer.
@@ -1521,7 +1765,7 @@ class Viewer(moderngl_window.WindowConfig):
             writer.close()
             if is_gif:
                 # Convert to gif.
-                video_to_gif(path_mp4, path_gif, remove=True)
+                video_to_gif(path_video, path_gif, remove=True)
 
                 print(f"GIF saved to {os.path.abspath(path_gif)}")
             else:

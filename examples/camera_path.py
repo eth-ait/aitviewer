@@ -20,13 +20,12 @@ from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.scene.camera import PinholeCamera
-from aitviewer.viewer import Viewer
 from aitviewer.utils import path
+from aitviewer.viewer import Viewer
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Create a neutral SMPL T Pose.
-    smpl_template = SMPLSequence.t_pose(SMPLLayer(model_type='smpl', gender='neutral', device=C.device), name='SMPL')
+    smpl_template = SMPLSequence.t_pose(SMPLLayer(model_type="smpl", gender="neutral", device=C.device), name="SMPL")
 
     d = 10  # Distance from the object at start and end.
     r = 3  # Radius of the circle around the object.
@@ -34,8 +33,14 @@ if __name__ == '__main__':
 
     # Create a path with a line followed by a circle followed by another line.
     first = path.line(start=(r, h, d), end=(r, h, 0), num=100)
-    circle = path.circle(center=(0, h, 0), radius=r, num=int(314 * 2 * r / d), start_angle=360, end_angle=0)
-    second = path.line(start=(r, h, 0), end=(r, h, - d), num=100)
+    circle = path.circle(
+        center=(0, h, 0),
+        radius=r,
+        num=int(314 * 2 * r / d),
+        start_angle=360,
+        end_angle=0,
+    )
+    second = path.line(start=(r, h, 0), end=(r, h, -d), num=100)
     positions = np.vstack((first, circle, second))
 
     # Use a fixed target.

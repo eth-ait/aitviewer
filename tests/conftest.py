@@ -1,8 +1,9 @@
+import os
+import shutil
+
+import pytest
 from utils import FAILURE_DIR
 
-import shutil
-import pytest
-import os
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_failures():

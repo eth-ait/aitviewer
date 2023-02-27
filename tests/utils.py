@@ -1,11 +1,12 @@
 import functools
-import pytest
 import os
+
 import numpy as np
+import pytest
 from PIL import Image, ImageChops
 
-from aitviewer.headless import HeadlessRenderer
 from aitviewer.configuration import CONFIG as C
+from aitviewer.headless import HeadlessRenderer
 
 # Test image size.
 SIZE = (480, 270)
@@ -74,24 +75,30 @@ def viewer(refs):
             diff = ImageChops.difference(img, ref_img)
             diff.save(base + "_diff" + ext)
 
-            assert False, f"Image does not match reference {ref}, the wrong image has been saved to {wrong} (Relative Error {relative_error:.4})"
+            assert (
+                False
+            ), f"Image does not match reference {ref}, the wrong image has been saved to {wrong} (Relative Error {relative_error:.4})"
 
 
 def requires_smpl(func):
     """Decorator for tests that require the SMPL dataset, if the dataset is not found the test will be skipped."""
+
     @pytest.mark.skipif(not SMPL_PRESENT, reason="SMPL dataset directory not found")
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
+
     return wrapper
 
 
 def noreference(func):
     """Decorator for tests that use the viewer but do not require reference images."""
-    @pytest.mark.parametrize('refs', [[]])
+
+    @pytest.mark.parametrize("refs", [[]])
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -101,6 +108,7 @@ def reference(name=None, count=1):
     :param name: file name of the reference image without extension, if None the part after 'test_' of the function name is used.
     :param count: the number of frames to be rendered while testing, if count > 1 a suffix of '_i' is appended to the i-th frame's filename.
     """
+
     def decorator(func):
         nonlocal name, count
 
@@ -122,10 +130,15 @@ def reference(name=None, count=1):
         # Keep track of this test function and its references, this is used to generate reference images for all tests.
         ref_funcs[func] = refs
 
-        @pytest.mark.skipif(any([not os.path.exists(p) for p in refs]), reason=f"{print_name}.png reference(s) not found")
-        @pytest.mark.parametrize('refs', [refs])
+        @pytest.mark.skipif(
+            any([not os.path.exists(p) for p in refs]),
+            reason=f"{print_name}.png reference(s) not found",
+        )
+        @pytest.mark.parametrize("refs", [refs])
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator

@@ -14,26 +14,36 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import numpy as np
-
-from aitviewer.renderables.lines import Lines
-from aitviewer.renderables.spheres import Spheres
-from aitviewer.renderables.arrows import Arrows
-from aitviewer.scene.material import Material
-from aitviewer.scene.node import Node
-from aitviewer.scene.camera_utils import look_at
-from aitviewer.scene.camera_utils import orthographic_projection
 from functools import lru_cache
 
-from aitviewer.utils.utils import direction_from_spherical_coordinates, spherical_coordinates_from_direction
+import numpy as np
+
+from aitviewer.renderables.arrows import Arrows
+from aitviewer.renderables.lines import Lines
+from aitviewer.renderables.spheres import Spheres
+from aitviewer.scene.camera_utils import look_at, orthographic_projection
+from aitviewer.scene.material import Material
+from aitviewer.scene.node import Node
+from aitviewer.utils.utils import (
+    direction_from_spherical_coordinates,
+    spherical_coordinates_from_direction,
+)
 
 
 class Light(Node):
     """Simple point light."""
 
-    def __init__(self, light_color=(1.0, 1.0, 1.0), elevation=-90.0, azimuth=0.0, strength=1.0, shadow_enabled=True, **kwargs):
-        kwargs['gui_material'] = False
-        super(Light, self).__init__(icon='\u0085', **kwargs)
+    def __init__(
+        self,
+        light_color=(1.0, 1.0, 1.0),
+        elevation=-90.0,
+        azimuth=0.0,
+        strength=1.0,
+        shadow_enabled=True,
+        **kwargs,
+    ):
+        kwargs["gui_material"] = False
+        super(Light, self).__init__(icon="\u0085", **kwargs)
 
         self._light_color = light_color
         self.strength = strength
@@ -52,12 +62,18 @@ class Light(Node):
         self._debug_lines = None
         self._show_debug_lines = False
 
-        self.arrow = Lines(np.array([[[0.0, 0.0, 0.0], [ 0, 0, -0.6]]]), 0.15, 0, is_selectable=False, material=Material(diffuse=0.0, ambient=1.0, color=(*tuple(light_color), 1.0)))
+        self.arrow = Lines(
+            np.array([[[0.0, 0.0, 0.0], [0, 0, -0.6]]]),
+            0.15,
+            0,
+            is_selectable=False,
+            material=Material(diffuse=0.0, ambient=1.0, color=(*tuple(light_color), 1.0)),
+        )
         self.add(self.arrow, show_in_hierarchy=False)
 
     @classmethod
     def facing_origin(cls, **kwargs):
-        pos = np.array(kwargs['position'])
+        pos = np.array(kwargs["position"])
         dir = -pos / np.linalg.norm(pos)
         theta, phi = spherical_coordinates_from_direction(dir, degrees=True)
         return cls(elevation=theta, azimuth=phi, **kwargs)
@@ -98,7 +114,7 @@ class Light(Node):
 
             # Setup shadow mapping
             self.shadow_map = ctx.depth_texture(shadow_map_size)
-            self.shadow_map.compare_func = '>'
+            self.shadow_map.compare_func = ">"
             self.shadow_map.repeat_x = False
             self.shadow_map.repeat_y = False
             self.shadow_map_framebuffer = ctx.framebuffer(depth_attachment=self.shadow_map)
@@ -117,36 +133,54 @@ class Light(Node):
         p = np.array(position)
         d = np.array(direction)
         V = look_at(p, p + d, np.array([0.0, 1.0, 0.0]))
-        return (P @ V).astype('f4')
+        return (P @ V).astype("f4")
 
     def mvp(self):
         """Return a model-view-projection matrix to project vertices into the view of the light."""
-        return self._compute_light_matrix(tuple(self.position), tuple(self.direction), self.shadow_map_size, self.shadow_map_near, self.shadow_map_far)
+        return self._compute_light_matrix(
+            tuple(self.position),
+            tuple(self.direction),
+            self.shadow_map_size,
+            self.shadow_map_near,
+            self.shadow_map_far,
+        )
 
     def _update_debug_lines(self):
-        lines = np.array([
-            [-1, -1, -1], [-1,  1, -1],
-            [-1, -1,  1], [-1,  1,  1],
-            [ 1, -1, -1], [ 1,  1, -1],
-            [ 1, -1,  1], [ 1,  1,  1],
-
-            [-1, -1, -1], [-1, -1, 1],
-            [-1,  1, -1], [-1,  1, 1],
-            [ 1, -1, -1], [ 1, -1, 1],
-            [ 1,  1, -1], [ 1,  1, 1],
-
-            [-1, -1, -1], [ 1, -1, -1],
-            [-1, -1,  1], [ 1, -1,  1],
-            [-1,  1, -1], [ 1,  1, -1],
-            [-1,  1,  1], [ 1,  1,  1],
-        ])
+        lines = np.array(
+            [
+                [-1, -1, -1],
+                [-1, 1, -1],
+                [-1, -1, 1],
+                [-1, 1, 1],
+                [1, -1, -1],
+                [1, 1, -1],
+                [1, -1, 1],
+                [1, 1, 1],
+                [-1, -1, -1],
+                [-1, -1, 1],
+                [-1, 1, -1],
+                [-1, 1, 1],
+                [1, -1, -1],
+                [1, -1, 1],
+                [1, 1, -1],
+                [1, 1, 1],
+                [-1, -1, -1],
+                [1, -1, -1],
+                [-1, -1, 1],
+                [1, -1, 1],
+                [-1, 1, -1],
+                [1, 1, -1],
+                [-1, 1, 1],
+                [1, 1, 1],
+            ]
+        )
 
         size = self.shadow_map_size
         view_from_ndc = np.linalg.inv(orthographic_projection(size, size, self.shadow_map_near, self.shadow_map_far))
         lines = np.apply_along_axis(lambda x: (view_from_ndc @ np.append(x, 1.0))[:3], 1, lines)
 
         if self._debug_lines is None:
-            self._debug_lines = Lines(lines, r_base=0.05, mode='lines', cast_shadow=False, is_selectable=False)
+            self._debug_lines = Lines(lines, r_base=0.05, mode="lines", cast_shadow=False, is_selectable=False)
             self.add(self._debug_lines, show_in_hierarchy=False)
         else:
             self._debug_lines.lines = lines
@@ -176,29 +210,76 @@ class Light(Node):
         if self._debug_lines:
             self._debug_lines.redraw(**kwargs)
 
-    def gui_affine(self, imgui):        # Position controls
-        up, pos = imgui.drag_float3('Position##pos{}'.format(self.unique_name), *self.position, 1e-2, format='%.2f')
+    def gui_affine(self, imgui):  # Position controls
+        up, pos = imgui.drag_float3(
+            "Position##pos{}".format(self.unique_name),
+            *self.position,
+            1e-2,
+            format="%.2f",
+        )
         if up:
             self.position = pos
 
     def gui(self, imgui):
-        uc, light_color = imgui.color_edit3('Color', *self.light_color)
+        uc, light_color = imgui.color_edit3("Color", *self.light_color)
         if uc:
             self.light_color = light_color
-        _, self.strength = imgui.drag_float('Strength', self.strength, 0.01, min_value=0.0, max_value=10.0, format='%.2f')
-        u_el, elevation = imgui.drag_float('Elevation', self.elevation, 0.1, min_value=-90, max_value=90.0, format='%.2f')
+        _, self.strength = imgui.drag_float(
+            "Strength",
+            self.strength,
+            0.01,
+            min_value=0.0,
+            max_value=10.0,
+            format="%.2f",
+        )
+        u_el, elevation = imgui.drag_float(
+            "Elevation",
+            self.elevation,
+            0.1,
+            min_value=-90,
+            max_value=90.0,
+            format="%.2f",
+        )
         if u_el:
             self.elevation = elevation
-        u_az, azimuth = imgui.drag_float('Azimuth', self.azimuth, 0.1, min_value=-360.0, max_value=360.0, format='%.2f')
+        u_az, azimuth = imgui.drag_float(
+            "Azimuth",
+            self.azimuth,
+            0.1,
+            min_value=-360.0,
+            max_value=360.0,
+            format="%.2f",
+        )
         if u_az:
             self.azimuth = np.remainder(azimuth, 360.0)
 
         imgui.spacing()
-        _, self.shadow_enabled = imgui.checkbox('Enable Shadows', self.shadow_enabled)
-        u_size, self.shadow_map_size = imgui.drag_float('Shadowmap size', self.shadow_map_size, 0.1, format='%.2f', min_value=0.01, max_value=100.0)
-        u_near, self.shadow_map_near = imgui.drag_float('Shadowmap Near', self.shadow_map_near, 0.1, format='%.2f', min_value=0.01, max_value=100.0)
-        u_far, self.shadow_map_far  = imgui.drag_float('Shadowmap Far', self.shadow_map_far, 0.1, format='%.2f', min_value=0.01, max_value=100.0)
-        u_show, self._show_debug_lines = imgui.checkbox('Show Frustum', self._show_debug_lines)
+        _, self.shadow_enabled = imgui.checkbox("Enable Shadows", self.shadow_enabled)
+        u_size, self.shadow_map_size = imgui.drag_float(
+            "Shadowmap size",
+            self.shadow_map_size,
+            0.1,
+            format="%.2f",
+            min_value=0.01,
+            max_value=100.0,
+        )
+        u_near, self.shadow_map_near = imgui.drag_float(
+            "Shadowmap Near",
+            self.shadow_map_near,
+            0.1,
+            format="%.2f",
+            min_value=0.01,
+            max_value=100.0,
+        )
+        u_far, self.shadow_map_far = imgui.drag_float(
+            "Shadowmap Far",
+            self.shadow_map_far,
+            0.1,
+            format="%.2f",
+            min_value=0.01,
+            max_value=100.0,
+        )
+        u_show, self._show_debug_lines = imgui.checkbox("Show Frustum", self._show_debug_lines)
 
         if self._show_debug_lines:
             if self._debug_lines:
@@ -209,4 +290,3 @@ class Light(Node):
         else:
             if self._debug_lines:
                 self._debug_lines.enabled = False
-

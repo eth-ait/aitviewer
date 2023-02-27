@@ -14,20 +14,30 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import numpy as np
 import os
 import re
-
 from collections import OrderedDict
+
+import numpy as np
+
+from aitviewer.renderables.billboard import Billboard
 from aitviewer.scene.camera import OpenCVCamera
 from aitviewer.scene.node import Node
-from aitviewer.renderables.billboard import Billboard
 
 
 class MultiViewSystem(Node):
     """A multi view camera system which can be used to visualize cameras and images"""
 
-    def __init__(self, camera_info_path, camera_images_path, cols, rows, viewer, **kwargs):
+    def __init__(
+        self,
+        camera_info_path,
+        camera_images_path,
+        cols,
+        rows,
+        viewer,
+        start_frame=0,
+        **kwargs,
+    ):
         """
         Load a MultiViewSystem from a file with camera information for M cameras
         and the path to a directory with M subdirectories, containing N images each.
@@ -47,17 +57,20 @@ class MultiViewSystem(Node):
             camera_images_path/2/image002.png
         :param cols: width  of the image in pixels, matching the size of the image expected by the intrinsics matrix
         :param rows: height of the image in pixels, matching the size of the image expected by the intrinsics matrix
-        :param viewer: the viewer, used for changing the view to one of the cameras'
+        :param viewer: the viewer, used for changing the view to one of the cameras.
+        :param start_frame: crops the sequence of all cameras to start with the frame that has this ID.
         """
         # Load camera information.
         camera_info = np.load(camera_info_path)
 
         # Compute max number of images per camera and use it as number of frames for this node.
         camera_n_frames = []
-        for id in camera_info['ids']:
+        for id in camera_info["ids"]:
             path = os.path.join(camera_images_path, str(id))
             if os.path.isdir(path):
-                camera_n_frames.append(len(os.listdir(path)))
+                n_frames = len(os.listdir(path)) - start_frame
+                assert n_frames > 0, f"Camera {id} has no images after frame {start_frame}"
+                camera_n_frames.append(n_frames)
 
         n_frames = max(camera_n_frames) if camera_n_frames else 1
 
@@ -67,13 +80,20 @@ class MultiViewSystem(Node):
         # Compute position and orientation of each camera.
         positions = []
         self.cameras = []
-        for i in range(len(camera_info['ids'])):
-            intrinsics = camera_info['intrinsics'][i]
-            extrinsics = camera_info['extrinsics'][i]
-            dist_coeffs = camera_info['dist_coeffs'][i]
+        for i in range(len(camera_info["ids"])):
+            intrinsics = camera_info["intrinsics"][i]
+            extrinsics = camera_info["extrinsics"][i]
+            dist_coeffs = camera_info["dist_coeffs"][i]
 
-            camera = OpenCVCamera(intrinsics, extrinsics, cols, rows, dist_coeffs=dist_coeffs, viewer=viewer,
-                                  is_selectable=False)
+            camera = OpenCVCamera(
+                intrinsics,
+                extrinsics,
+                cols,
+                rows,
+                dist_coeffs=dist_coeffs,
+                viewer=viewer,
+                is_selectable=False,
+            )
             self.add(camera, show_in_hierarchy=False)
             self.cameras.append(camera)
 
@@ -92,6 +112,7 @@ class MultiViewSystem(Node):
         self.camera_images_path = camera_images_path
         self.cols = cols
         self.rows = rows
+        self.start_frame = start_frame
 
         # Maps from active camera index to its billboard or None if billboards are disabled.
         self.active_cameras = OrderedDict()
@@ -105,13 +126,13 @@ class MultiViewSystem(Node):
     def _create_billboard_for_camera(self, camera_index):
         """Helper function to create a billboard for the camera at the given index."""
         # Look for images for the given camera.
-        camera_path = os.path.join(self.camera_images_path, str(self.camera_info['ids'][camera_index]))
+        camera_path = os.path.join(self.camera_images_path, str(self.camera_info["ids"][camera_index]))
         if not os.path.isdir(camera_path):
             print(f"Camera directory not found at {camera_path}")
             return
 
         # Sort images by the frame number in the filename.
-        files = os.listdir(camera_path)
+        files = [x for x in os.listdir(camera_path) if x.endswith(".jpg")]
         regex = re.compile(r"(\d*)$")
 
         def sort_key(x):
@@ -123,9 +144,15 @@ class MultiViewSystem(Node):
             print(f"Camera images not found at {camera_path}")
             return
 
+        paths = paths[self.start_frame :]
         # Create a new billboard for the currently active camera.
-        billboard = Billboard.from_camera_and_distance(self.cameras[camera_index], self.billboard_distance, self.cols,
-                                                       self.rows, paths)
+        billboard = Billboard.from_camera_and_distance(
+            self.cameras[camera_index],
+            self.billboard_distance,
+            self.cols,
+            self.rows,
+            paths,
+        )
 
         # Set the current frame index if we have an image for it.
         if self.current_frame_id < len(paths):
@@ -257,7 +284,7 @@ class MultiViewSystem(Node):
         active_index = -1
         if len(self.active_cameras) > 0:
             active_index = next(reversed(self.active_cameras.keys()))
-        u_selected, active_index = imgui.combo("ID", active_index, [str(id) for id in self.camera_info['ids'].tolist()])
+        u_selected, active_index = imgui.combo("ID", active_index, [str(id) for id in self.camera_info["ids"].tolist()])
         if u_selected:
             self.view_from_camera(active_index)
 
@@ -277,7 +304,10 @@ class MultiViewSystem(Node):
         imgui.text(f"Camera {self.camera_info['ids'][self.selected_camera_index]}")
         imgui.separator()
 
-        u, s = imgui.menu_item(f"Activate camera", selected=self.selected_camera_index in self.active_cameras)
+        u, s = imgui.menu_item(
+            f"Activate camera",
+            selected=self.selected_camera_index in self.active_cameras,
+        )
         if u:
             if s:
                 self.activate_camera(self.selected_camera_index)

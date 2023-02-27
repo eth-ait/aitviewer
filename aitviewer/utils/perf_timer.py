@@ -15,9 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import time
+from typing import Tuple
 
 from moderngl_window.timers.base import BaseTimer
-from typing import Tuple
 
 """
 Timer class adapted from moderngl_window.timers.clock.Timer.

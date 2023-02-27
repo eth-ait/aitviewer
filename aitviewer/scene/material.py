@@ -15,15 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+
 class Material(object):
     """Per object material properties."""
 
-    def __init__(self,
-                 diffuse=0.5,
-                 ambient=0.5,
-                 specular=0.5,
-                 color=(0.5, 0.5, 0.5, 1.0),
-                 ):
+    def __init__(
+        self,
+        diffuse=0.5,
+        ambient=0.5,
+        specular=0.5,
+        color=(0.5, 0.5, 0.5, 1.0),
+    ):
         """
         :param diffuse: diffuse coefficient in Phong shading model
         :param ambient: ambient coefficient in Phong shading model

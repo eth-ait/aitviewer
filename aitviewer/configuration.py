@@ -15,35 +15,33 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import os
-import torch
 
+import torch
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 
 class Configuration(object):
-
     class __Configuration:
-
         def next_gui_id(self):
             self._gui_counter += 1
             return self._gui_counter
 
         def __init__(self):
             # Load the default configurations.
-            self._conf = OmegaConf.load(os.path.join(os.path.dirname(__file__), 'aitvconfig.yaml'))
+            self._conf = OmegaConf.load(os.path.join(os.path.dirname(__file__), "aitvconfig.yaml"))
 
             # Check if we have a config file in AITVRC env variable.
-            if os.environ.get('AITVRC', None) is not None:
-                env_conf = os.environ['AITVRC']
+            if os.environ.get("AITVRC", None) is not None:
+                env_conf = os.environ["AITVRC"]
                 if os.path.isdir(env_conf):
-                    conf = OmegaConf.load(os.path.join(env_conf, 'aitvconfig.yaml'))
+                    conf = OmegaConf.load(os.path.join(env_conf, "aitvconfig.yaml"))
                 else:
                     conf = OmegaConf.load(env_conf)
                 self._conf.merge_with(conf)
 
             # Check if we have a config file in the working directory which overrides all previous configs.
-            local_conf = os.path.join(os.getcwd(), 'aitvconfig.yaml')
+            local_conf = os.path.join(os.getcwd(), "aitvconfig.yaml")
             if os.path.exists(local_conf):
                 conf = OmegaConf.load(local_conf)
                 self._conf.merge_with(conf)
@@ -62,12 +60,12 @@ class Configuration(object):
         def __getattr__(self, item):
             if hasattr(self._conf, item):
                 # Some attributes of the config are converted to torch objects automatically.
-                if item == 'device':
-                    return torch.device(self._conf.get('device', 'cuda:0') if self._gpu_available else 'cpu')
-                elif item == 'f_precision':
-                    return getattr(torch, 'float{}'.format(self._conf.get('f_precision', 32)))
-                elif item == 'i_precision':
-                    return getattr(torch, 'int{}'.format(self._conf.get('i_precision', 64)))
+                if item == "device":
+                    return torch.device(self._conf.get("device", "cuda:0") if self._gpu_available else "cpu")
+                elif item == "f_precision":
+                    return getattr(torch, "float{}".format(self._conf.get("f_precision", 32)))
+                elif item == "i_precision":
+                    return getattr(torch, "int{}".format(self._conf.get("i_precision", 64)))
                 else:
                     return getattr(self._conf, item)
             else:

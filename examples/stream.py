@@ -17,8 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from aitviewer.streamables.webcam import Webcam
 from aitviewer.viewer import Viewer
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Stream from a webcam.
     w = Webcam()
 

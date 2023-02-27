@@ -1,14 +1,11 @@
-# Access to data and models on disk.
+# Access SMPL models.
+smplx_models: "../data/smplx_models"
+star_models: "../data/star_models"
+
+# Access to datasets.
 datasets:
   amass:
     "../data/amass"
-  threedpw:
-    ori:
-      "../data/3dpw"
-    smplx:
-      "../data/3dpw_smplx_neutral_pkl"
-smplx_models: "../data/smplx_models"
-star_models: "../data/star_models"
 
 # Pytorch configuration.
 device: "cuda:0"
@@ -38,4 +35,6 @@ backface_culling: True
 background_color: [1.0, 1.0, 1.0, 1.0]
 window_type: "pyqt5"
 
-
+# Server for remote connections.
+server_enabled: False
+server_port: 8417

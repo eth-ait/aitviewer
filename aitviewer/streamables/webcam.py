@@ -15,22 +15,31 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import cv2
+import numpy as np
+from moderngl_window import geometry
 
-from aitviewer.streamables.streamable import Streamable
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_screen_texture_program
-from moderngl_window import geometry
-import numpy as np
+from aitviewer.streamables.streamable import Streamable
+
 
 class Webcam(Streamable):
     """
     Renders webcam stream to a quad. Quad is positioned in screen coordinates.
     """
 
-    def __init__(self, src=0, size=(2.0, 2.0), pos=(0.0, 0.0), transparency=1.0, icon="\u0088", **kwargs):
-        '''
+    def __init__(
+        self,
+        src=0,
+        size=(2.0, 2.0),
+        pos=(0.0, 0.0),
+        transparency=1.0,
+        icon="\u0088",
+        **kwargs,
+    ):
+        """
         :param src: integer denotes device source id, i.e. webcam 0.
-        '''
+        """
 
         super(Webcam, self).__init__(icon=icon, **kwargs)
 
@@ -53,7 +62,9 @@ class Webcam(Streamable):
     @Node.once
     def make_renderable(self, ctx):
         self.ctx = ctx
-        self.quad = geometry.quad_2d(pos=self.pos, size=self.size, normals=False)  # (2,2) is Full Screen i.e. -1 to 1 in x/y
+        self.quad = geometry.quad_2d(
+            pos=self.pos, size=self.size, normals=False
+        )  # (2,2) is Full Screen i.e. -1 to 1 in x/y
         self.prog = get_screen_texture_program()
 
     def capture(self):
@@ -64,8 +75,8 @@ class Webcam(Streamable):
 
     def render(self, camera, **kwargs):
         self._texture.use(0)
-        self.prog['transparency'].value = self.transparency
-        self.prog['mvp'].write(np.eye(4).astype("f4").tobytes())
+        self.prog["transparency"].value = self.transparency
+        self.prog["mvp"].write(np.eye(4).astype("f4").tobytes())
         self.quad.render(self.prog)
 
     @property
@@ -106,4 +117,6 @@ class Webcam(Streamable):
     def gui(self, imgui):
         if self.enabled:
             imgui.text("Clip Info: {}x{} @ {:.2f} fps".format(self.width, self.height, self.fps))
-        _, self.transparency = imgui.slider_float('Opacity##opacity_'.format(self.name), self.transparency, 0.0, 1.0, '%.2f')
+        _, self.transparency = imgui.slider_float(
+            "Opacity##opacity_".format(self.name), self.transparency, 0.0, 1.0, "%.2f"
+        )

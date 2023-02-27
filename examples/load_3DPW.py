@@ -14,24 +14,59 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import numpy as np
+import glob
 import os
 
+from aitviewer.renderables.billboard import Billboard
 from aitviewer.renderables.smpl import SMPLSequence
+from aitviewer.scene.camera import OpenCVCamera
 from aitviewer.viewer import Viewer
-from aitviewer.configuration import CONFIG as C
 
+if __name__ == "__main__":
+    # Load a 3DPW sequence and overlay it on the provided images. The data is expected to be in the same folder
+    # structure that the download provides, i.e.:
+    #  3DPW_root
+    #  |--- sequenceFiles
+    #       |--- test
+    #       |--- train
+    #       |--- validation
+    #            |--- courtyard_jumpBench_01.pkl
+    # |--- imageFiles
+    #      |--- courtyard_jumpBench_01
 
-if __name__ == '__main__':
+    root_3dpw = r"E:\data\3dpw_with_imgs"
+    sequence_name = "courtyard_jumpBench_01"
+
+    pkl_file = None
+    for split in ("test", "train", "validation"):
+        pkl_file = os.path.join(root_3dpw, "sequenceFiles", split, sequence_name + ".pkl")
+        if os.path.exists(pkl_file):
+            break
+
+    if not os.path.exists(pkl_file):
+        raise ValueError("Could not find sequence {} in any of the splits.".format(sequence_name))
+
     # Load 3DPW sequence. This uses the SMPL model. This might return more than one sequence because some 3DPW
     # sequences contain multiple people.
-    seqs_3dpw = SMPLSequence.from_3dpw(
-        pkl_data_path=os.path.join(C.datasets.threedpw.ori, "test/downtown_sitOnStairs_00.pkl"),
-        name="3DPW Sit on Stairs")
+    seqs_3dpw, camera_info = SMPLSequence.from_3dpw(
+        pkl_data_path=pkl_file,
+        name=sequence_name,
+    )
+
+    # Get image paths.
+    image_folder = os.path.join(root_3dpw, "imageFiles", sequence_name)
+    images = sorted(glob.glob(os.path.join(image_folder, "*.jpg")))
+    cols, rows = 1080, 1920
 
     # Display in the viewer.
-    v = Viewer()
-    v.run_animations = True
-    v.scene.camera.position = np.array([10.0, 2.5, 0.0])
-    v.scene.add(*seqs_3dpw)
+    v = Viewer(size=(cols // 2, rows // 2))
+    v.playback_fps = 30.0
+    v.scene.floor.enabled = False
+    v.scene.origin.enabled = False
+
+    cam = OpenCVCamera(camera_info["intrinsics"], camera_info["extrinsics"][:, :3], cols=cols, rows=rows, viewer=v)
+    billboard = Billboard.from_camera_and_distance(cam, 6.0, cols=cols, rows=rows, textures=images)
+    v.scene.add(*seqs_3dpw, cam, billboard)
+
+    v.set_temp_camera(cam)
     v.run()

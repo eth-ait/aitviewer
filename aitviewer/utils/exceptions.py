@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+
 class ExceptionModule(object):
     """
     Source: Trimesh package @ https://github.com/mikedh/trimesh/blob/master/trimesh/exceptions.py
@@ -32,8 +33,7 @@ class ExceptionModule(object):
     def __getattribute__(self, *args, **kwargs):
         # if it's asking for our class type return None
         # this allows isinstance() checks to not re-raise
-        if args[0] == '__class__':
+        if args[0] == "__class__":
             return None.__class__
         # otherwise raise our original exception
-        raise super(ExceptionModule, self).__getattribute__('exc')
-
+        raise super(ExceptionModule, self).__getattribute__("exc")

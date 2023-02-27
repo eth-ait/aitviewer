@@ -44,4 +44,3 @@ class Streamable(Node):
     def record_finish(self):
         self.is_recording = False
         return []
-
