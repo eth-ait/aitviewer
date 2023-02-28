@@ -25,9 +25,11 @@ from smplx.joint_names import JOINT_NAMES, SMPLH_JOINT_NAMES
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
+from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.rigid_bodies import RigidBodies
 from aitviewer.renderables.skeletons import Skeletons
+from aitviewer.renderables.spheres import Spheres
 from aitviewer.scene.node import Node
 from aitviewer.utils import interpolate_positions, local_to_global, resample_positions
 from aitviewer.utils import to_numpy as c2c
@@ -190,6 +192,12 @@ class SMPLSequence(Node):
             name="Mesh",
         )
         self._add_node(self.mesh_seq)
+
+        # Add the root trajectory as a line.
+        path_spheres = Spheres(self.joints[:, 0], color=(0, 0, 0, 1), name="Root Position.")
+        path_lines = Lines(self.joints[:, 0], r_base=0.003, mode="line_strip", color=(0, 0, 0, 1), cast_shadow=False)
+        self._add_node(path_spheres, enabled=False)
+        self._add_node(path_lines, enabled=False)
 
         # Save view mode state to restore when exiting edit mode.
         self._view_mode_color = self.mesh_seq.color
