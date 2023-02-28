@@ -1444,7 +1444,7 @@ class Viewer(moderngl_window.WindowConfig):
         if not self.imgui_user_interacting:
             if self._using_temp_camera:
                 self.reset_camera()
-            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift)
+            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift, self.wnd.modifiers.ctrl)
 
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
