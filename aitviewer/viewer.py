@@ -20,7 +20,7 @@ import struct
 from array import array
 from collections import namedtuple
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple
 
 import imgui
 import moderngl
@@ -28,7 +28,6 @@ import moderngl_window
 import numpy as np
 from moderngl_window import activate_context, geometry, get_local_window_cls
 from moderngl_window.opengl.vao import VAO
-from omegaconf.dictconfig import DictConfig
 from PIL import Image
 from tqdm import tqdm
 
@@ -81,13 +80,12 @@ class Viewer(moderngl_window.WindowConfig):
     size_mult = 1.0
     samples = 4
     gl_version = (4, 0)
-    window_type = C.window_type
+    window_type = None
 
     def __init__(
         self,
         title="aitviewer",
         size: Tuple[int, int] = None,
-        config: Union[DictConfig, dict] = None,
         samples: int = None,
         **kwargs,
     ):
@@ -97,13 +95,8 @@ class Viewer(moderngl_window.WindowConfig):
         :param size: Window size as (width, height) tuple, if None uses the size from the configuration file
         :param kwargs: kwargs.
         """
-
-        # Update config with user parameter.
-        if config is not None:
-            C.update_conf(config)
-
         # Window Setup (Following `moderngl_window.run_window_config`).
-        if self.window_type != "headless":
+        if self.window_type is None:
             self.window_type = C.window_type
 
         # HACK: We use our own version of the PyQt5 windows to override
@@ -322,11 +315,12 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_animation = True
         self.export_animation_range = [0, -1]
         self.export_duration = 10
-        self.export_as_gif = False
+        self.export_format = "mp4"
         self.export_rotate_camera = False
         self.export_seconds_per_rotation = 10
         self.export_fps = self.playback_fps
         self.export_scale_factor = 1.0
+        self.export_transparent = False
 
         # Screenshot settings
         self.screenshot_transparent = False
@@ -880,16 +874,35 @@ class Viewer(moderngl_window.WindowConfig):
 
             # Output settings.
             imgui.text("Output")
+
             imgui.spacing()
             imgui.text("Format:")
             imgui.same_line()
-            if imgui.radio_button("MP4", not self.export_as_gif):
-                self.export_as_gif = False
+            if imgui.radio_button("MP4", self.export_format == "mp4"):
+                self.export_format = "mp4"
             imgui.same_line(spacing=15)
-            if imgui.radio_button("GIF", self.export_as_gif):
-                self.export_as_gif = True
+            if imgui.radio_button("WEBM", self.export_format == "webm"):
+                self.export_format = "webm"
+            imgui.same_line(spacing=15)
+            if imgui.radio_button("GIF", self.export_format == "gif"):
+                self.export_format = "gif"
 
-            if self.export_as_gif:
+            imgui.spacing()
+            if self.export_format != "webm":
+                imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
+                self.export_transparent = False
+
+            _, self.export_transparent = imgui.checkbox("Transparent background", self.export_transparent)
+            if self.export_format != "webm":
+                imgui.pop_style_var()
+                self.export_transparent = False
+
+            if imgui.is_item_hovered():
+                imgui.begin_tooltip()
+                imgui.text("Available only for WEBM format")
+                imgui.end_tooltip()
+
+            if self.export_format == "gif":
                 max_output_fps = 30.0
             else:
                 max_output_fps = 120.0
@@ -973,7 +986,7 @@ class Viewer(moderngl_window.WindowConfig):
                     os.path.join(
                         C.export_dir,
                         "videos",
-                        self.window.title + (".gif" if self.export_as_gif else ".mp4"),
+                        f"{self.window.title}.{self.export_format}",
                     ),
                     animation=self.export_animation,
                     animation_range=self.export_animation_range,
@@ -983,6 +996,7 @@ class Viewer(moderngl_window.WindowConfig):
                     rotate_camera=not self.export_animation or self.export_rotate_camera,
                     seconds_per_rotation=self.export_seconds_per_rotation,
                     scale_factor=self.export_scale_factor,
+                    transparent=self.export_transparent,
                 )
 
             imgui.end_popup()
@@ -1430,7 +1444,7 @@ class Viewer(moderngl_window.WindowConfig):
         if not self.imgui_user_interacting:
             if self._using_temp_camera:
                 self.reset_camera()
-            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift)
+            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift, self.wnd.modifiers.ctrl)
 
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
@@ -1469,7 +1483,7 @@ class Viewer(moderngl_window.WindowConfig):
             fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components),
         )
         if width != self.wnd.size[0] or height != self.wnd.size[1]:
-            image.resize(self.wnd.size, Image.NEAREST)
+            image = image.resize(self.wnd.size, Image.NEAREST)
 
         return image.transpose(Image.FLIP_TOP_BOTTOM)
 
@@ -1502,7 +1516,7 @@ class Viewer(moderngl_window.WindowConfig):
         )
 
         if width != self.wnd.size[0] or height != self.wnd.size[1]:
-            depth.resize(self.wnd.size, Image.NEAREST)
+            depth = depth.resize(self.wnd.size, Image.NEAREST)
 
         # Convert from [0, 1] range to [-1, 1] range.
         # This is necessary because our projection matrix computes NDC
@@ -1542,7 +1556,7 @@ class Viewer(moderngl_window.WindowConfig):
         )
 
         if width != self.wnd.size[0] or height != self.wnd.size[1]:
-            id.resize(self.wnd.size, Image.NEAREST)
+            id = id.resize(self.wnd.size, Image.NEAREST)
 
         # Convert the id to integer values.
         id_int = np.asarray(id).astype(dtype=np.int32)
@@ -1619,6 +1633,7 @@ class Viewer(moderngl_window.WindowConfig):
         rotate_camera=False,
         seconds_per_rotation=10.0,
         scale_factor=None,
+        transparent=False,
     ):
         # Load this module to reduce load time.
         import skvideo.io
@@ -1691,29 +1706,39 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Initialize video writer.
         if output_path is not None:
-            path_mp4, path_gif, is_gif = get_video_paths(output_path)
+            path_video, path_gif, is_gif = get_video_paths(output_path)
+            pix_fmt = "yuva420p" if transparent else "yuv420p"
+            outputdict = {
+                "-pix_fmt": pix_fmt,
+                "-vf": "pad=ceil(iw/2)*2:ceil(ih/2)*2",  # Avoid error when image res is not divisible by 2.
+                "-r": str(output_fps),
+            }
+
+            if path_video.endswith("mp4"):
+                # MP4 specific options
+                outputdict.update(
+                    {
+                        "-c:v": "libx264",
+                        "-preset": "slow",
+                        "-profile:v": "high",
+                        "-level:v": "4.0",
+                    }
+                )
+
             writer = skvideo.io.FFmpegWriter(
-                path_mp4,
+                path_video,
                 inputdict={
-                    "-framerate": str(output_fps),  # must be this early in the command, otherwise it is not applied.
+                    "-framerate": str(output_fps),
                 },
-                outputdict={
-                    "-c:v": "libx264",
-                    "-preset": "slow",
-                    "-profile:v": "high",
-                    "-level:v": "4.0",
-                    "-pix_fmt": "yuv420p",
-                    "-vf": "pad=ceil(iw/2)*2:ceil(ih/2)*2",  # Avoid error when image res is not divisible by 2.
-                    "-r": str(output_fps),
-                },
+                outputdict=outputdict,
             )
 
         for i in tqdm(range(frames), desc="Rendering frames"):
             if rotate_camera:
                 self.scene.camera.rotate_azimuth(az_delta)
 
-            self.render(time, time + dt, export=True)
-            img = self.get_current_frame_as_image()
+            self.render(time, time + dt, export=True, transparent_background=transparent)
+            img = self.get_current_frame_as_image(alpha=transparent)
 
             # Scale image by the scale factor.
             if scale_factor is not None and scale_factor != 1.0:
@@ -1740,7 +1765,7 @@ class Viewer(moderngl_window.WindowConfig):
             writer.close()
             if is_gif:
                 # Convert to gif.
-                video_to_gif(path_mp4, path_gif, remove=True)
+                video_to_gif(path_video, path_gif, remove=True)
 
                 print(f"GIF saved to {os.path.abspath(path_gif)}")
             else:

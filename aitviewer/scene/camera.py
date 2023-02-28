@@ -399,8 +399,8 @@ class WeakPerspectiveCamera(Camera):
         translation,
         cols,
         rows,
-        near=C.znear,
-        far=C.zfar,
+        near=None,
+        far=None,
         viewer=None,
         **kwargs,
     ):
@@ -433,8 +433,8 @@ class WeakPerspectiveCamera(Camera):
 
         self.cols = cols
         self.rows = rows
-        self.near = near
-        self.far = far
+        self.near = near if near is not None else C.znear
+        self.far = far if far is not None else C.zfar
         self.viewer = viewer
 
         self.position = np.array([0, 0, 1], dtype=np.float32)
@@ -516,8 +516,8 @@ class OpenCVCamera(Camera):
         cols,
         rows,
         dist_coeffs=None,
-        near=C.znear,
-        far=C.zfar,
+        near=None,
+        far=None,
         viewer=None,
         **kwargs,
     ):
@@ -551,8 +551,8 @@ class OpenCVCamera(Camera):
         self.cols = cols
         self.rows = rows
 
-        self.near = near
-        self.far = far
+        self.near = near if near is not None else C.znear
+        self.far = far if far is not None else C.zfar
 
     def on_frame_update(self):
         self.position = self.current_position
@@ -727,8 +727,8 @@ class PinholeCamera(Camera):
         cols,
         rows,
         fov=45,
-        near=C.znear,
-        far=C.zfar,
+        near=None,
+        far=None,
         viewer=None,
         **kwargs,
     ):
@@ -745,8 +745,8 @@ class PinholeCamera(Camera):
         self.cols = cols
         self.rows = rows
 
-        self.near = near
-        self.far = far
+        self.near = near if near is not None else C.znear
+        self.far = far if far is not None else C.zfar
         self.fov = fov
 
     @property
@@ -870,11 +870,12 @@ class ViewerCamera(CameraInterface):
     This camera also supports orbiting, panning and generating camera rays.
     """
 
-    def __init__(self, fov=45, orthographic=None, znear=C.znear, zfar=C.zfar):
+    def __init__(self, fov=45, orthographic=None, znear=None, zfar=None):
         super(ViewerCamera, self).__init__()
         self.fov = fov
         self.is_ortho = orthographic is not None
         self.ortho_size = 1.0 if orthographic is None else orthographic
+        self.constant_speed = 1.0
 
         # Default camera settings.
         self._position = np.array([0.0, 0.0, 2.5])
@@ -885,8 +886,8 @@ class ViewerCamera(CameraInterface):
         self.ROT_FACTOR = 0.0025
         self.PAN_FACTOR = 0.01
 
-        self.near = znear
-        self.far = zfar
+        self.near = znear if znear is not None else C.znear
+        self.far = zfar if zfar is not None else C.zfar
 
         # GUI options
         self.name = "Camera"
@@ -977,7 +978,7 @@ class ViewerCamera(CameraInterface):
         self.view_matrix = V.astype("f4")
         self.view_projection_matrix = np.matmul(P, V).astype("f4")
 
-    def dolly_zoom(self, speed, move_target=False):
+    def dolly_zoom(self, speed, move_target=False, constant_speed=False):
         """
         Zoom by moving the camera along its view direction.
         If move_target is true the camera target will also move rigidly with the camera.
@@ -994,7 +995,9 @@ class ViewerCamera(CameraInterface):
         # Adjust speed according to config
         speed *= C.camera_zoom_speed
 
-        if move_target:
+        if move_target or constant_speed:
+            if constant_speed:
+                norm = self.constant_speed * 20
             self.position += fwd * speed * norm
             self.target += fwd * speed * norm
         else:

@@ -61,7 +61,7 @@ class ViewerServer:
 
             # Async entry point of the main thread.
             async def main():
-                server = await websockets.serve(serve, "0.0.0.0", port)
+                server = await websockets.serve(serve, "0.0.0.0", port, max_size=None)
                 await server.serve_forever()
 
             asyncio.run(main())
@@ -170,8 +170,10 @@ class ViewerServer:
 # If this module is invoke directly it starts an empty viewer
 # with the server functionality enabled.
 if __name__ == "__main__":
+    from aitviewer.configuration import CONFIG as C
     from aitviewer.viewer import Viewer
 
-    v = Viewer(config={"server_enabled": True})
+    C.update_conf({"server_enabled": True})
+    v = Viewer()
     v.scene.floor.enabled = False
     v.run()

@@ -40,13 +40,14 @@ def to_numpy(x):
 
 
 def get_video_paths(video_path):
+    is_webm = video_path.endswith(".webm")
     is_mp4 = video_path.endswith(".mp4")
     is_gif = video_path.endswith(".gif")
-    if not (is_mp4 or is_gif):
+    if not (is_mp4 or is_gif or is_webm):
         video_path += ".mp4"
         is_mp4 = True
 
-    suffix = ".gif" if is_gif else ".mp4"
+    suffix = os.path.splitext(video_path)[1]
 
     dir_of_file = os.path.dirname(os.path.abspath(video_path))
     if not os.path.exists(dir_of_file):
@@ -59,11 +60,11 @@ def get_video_paths(video_path):
         counter += 1
         video_path_candidate = video_path.replace(suffix, f"_{counter}{suffix}")
 
-    if is_mp4:
+    if is_mp4 or is_webm:
         return video_path_candidate, None, is_gif
     else:
-        video_path_mp4 = video_path_candidate.replace(suffix, f"_temp.mp4")
-        return video_path_mp4, video_path_candidate, is_gif
+        video_path_temp = video_path_candidate.replace(suffix, f"_temp.mp4")
+        return video_path_temp, video_path_candidate, is_gif
 
 
 def video_to_gif(path_mp4, path_gif, remove=False):

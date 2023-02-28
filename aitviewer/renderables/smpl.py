@@ -59,8 +59,8 @@ class SMPLSequence(Node):
         trans=None,
         poses_left_hand=None,
         poses_right_hand=None,
-        device=C.device,
-        dtype=C.f_precision,
+        device=None,
+        dtype=None,
         include_root=True,
         normalize_root=False,
         is_rigged=True,
@@ -103,6 +103,11 @@ class SMPLSequence(Node):
             icon = "\u0092"
         elif smpl_layer.model_type == "flame":
             icon = "\u0091"
+
+        if device is None:
+            device = C.device
+        if dtype is None:
+            dtype = C.f_precision
 
         super(SMPLSequence, self).__init__(n_frames=poses_body.shape[0], icon=icon, gui_material=False, **kwargs)
 
@@ -152,6 +157,7 @@ class SMPLSequence(Node):
         self._edit_joint = None
         self._edit_pose = None
         self._edit_pose_dirty = False
+        self._edit_local_axes = True
 
         # Nodes
         self.vertices, self.joints, self.faces, self.skeleton = self.fk()
@@ -599,14 +605,56 @@ class SMPLSequence(Node):
             imgui.text(f"{j} - {name}")
 
         if e:
-            aa = self._edit_pose[j * 3 : (j + 1) * 3]
-            euler = aa2euler_numpy(aa.cpu().numpy(), degrees=True)
-            u, euler = imgui.drag_float3(f"##joint{j}", *euler, 0.1, format="%.2f")
-            if u:
+            # Euler angles sliders.
+            aa = self._edit_pose[j * 3 : (j + 1) * 3].cpu().numpy()
+            euler = aa2euler_numpy(aa, degrees=True)
+
+            _, self._edit_local_axes = imgui.checkbox("Local axes", self._edit_local_axes)
+
+            # If we are editing local axes generate an empty slider on top
+            # of the euler angle sliders to capture the input of the slider
+            # without modifying the euler angle values.
+            if self._edit_local_axes:
+                # Get the current draw position.
+                pos = imgui.get_cursor_position()
+
+                # Make the next widget transparent.
+                imgui.push_style_var(imgui.STYLE_ALPHA, 0.0)
+                u, new_euler = imgui.drag_float3(f"", 0, 0, 0, 0.003, format="")
+                imgui.pop_style_var()
+
+                if u:
+                    base = Rotation.from_rotvec(aa)
+                    for i in range(3):
+                        delta = new_euler[i]
+                        if delta == 0:
+                            continue
+
+                        # Get the world coordinates of the current axis from the
+                        # respective column of the rotation matrix.
+                        axis = Rotation.as_matrix(base)[:, i]
+
+                        # Create a rotation of 'delta[i]' radians around the axis.
+                        rot = Rotation.from_rotvec(axis * delta)
+
+                        # Rotate the current joint and convert back to axis angle.
+                        aa = Rotation.as_rotvec(rot * base)
+
+                        self._edit_pose[j * 3 : (j + 1) * 3] = torch.from_numpy(aa)
+                        self._edit_pose_dirty = True
+                        self.redraw(current_frame_only=True)
+
+                # Reset the draw position so that the next slider is drawn on top of this.
+                imgui.set_cursor_pos(pos)
+
+            name = "Local XYZ" if self._edit_local_axes else "Euler XYZ"
+            u, euler = imgui.drag_float3(f"{name}##joint{j}", *euler, 0.1, format="%.3f")
+            if not self._edit_local_axes and u:
                 aa = euler2aa_numpy(np.array(euler), degrees=True)
                 self._edit_pose[j * 3 : (j + 1) * 3] = torch.from_numpy(aa)
                 self._edit_pose_dirty = True
                 self.redraw(current_frame_only=True)
+
             if tree:
                 for c in tree.get(j, []):
                     self._gui_joint(imgui, c, tree)

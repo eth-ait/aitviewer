@@ -63,7 +63,7 @@ if __name__ == "__main__":
     cols, rows = image0.shape[1], image0.shape[0]
 
     # Display in the viewer.
-    v = Viewer(size=(cols//2, rows//2))
+    v = Viewer(size=(cols // 2, rows // 2))
     v.playback_fps = 30.0
     v.scene.floor.enabled = False
     v.scene.origin.enabled = False

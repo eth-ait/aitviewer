@@ -43,6 +43,12 @@ class RemoteViewer:
 
         self.process: subprocess.Popen = None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close_connection()
+
     @classmethod
     def create_new_process(cls, args=None, **kwargs):
         """
@@ -92,7 +98,7 @@ class RemoteViewer:
         try:
             while self.loop.time() < start_time + self.timeout:
                 try:
-                    self.websocket = await websockets.connect(url)
+                    self.websocket = await websockets.connect(url, max_size=None)
                     self.connected = True
                     break
                 except Exception as e:
@@ -120,10 +126,6 @@ class RemoteViewer:
 
         # Mark the connection as closed.
         self.connected = False
-
-    def __del__(self):
-        # Gracefully close the connection when the viewer is deleted.
-        self.close_connection()
 
     async def _async_send(self, data):
         # Append to the mesage queue.

@@ -61,11 +61,14 @@ if not args.server:
     # be sent to the viewer's 'process_message()' method.
     v.send_message(CUSTOM_MESSAGE, index=1)
 
+    v.close_connection()
+
 else:
     #
     # Server script running the custom viewer.
     #
 
+    from aitviewer.configuration import CONFIG as C
     from aitviewer.remote.message import Message
     from aitviewer.viewer import Viewer
 
@@ -112,7 +115,8 @@ else:
 
     # Create the viewer. Overriding the default configuration to ensure that
     # the viewer is listening for incoming connections.
-    v = CustomViewer(config={"server_enabled": True})
+    C.update_conf({"server_enabled": True})
+    v = CustomViewer()
     v.scene.floor.enabled = False
     v.scene.camera.position = (1, 1, 1)
     v.run()
