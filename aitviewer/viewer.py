@@ -373,6 +373,17 @@ class Viewer(moderngl_window.WindowConfig):
         except Exception as e:
             print(f"Exception while processing mesage: type = {type}, remote_uid = {remote_uid}:\n{e}")
 
+    def send_message(self, msg, client: Tuple[str, str] = None):
+        """
+        Send a message to a single client or to all connected clients.
+
+        :param msg: a python object that is serialized with pickle and sent to the client.
+        :param client: a tuple (host, port) representing the client to which to send the message,
+            if None the message is sent to all connected clients.
+        """
+        if self.server is not None:
+            self.server.send_message(msg, client)
+
     def run(self, *args, log=True):
         """
         Enter a blocking visualization loop. This is built following `moderngl_window.run_window_config`.
@@ -765,7 +776,7 @@ class Viewer(moderngl_window.WindowConfig):
                 if imgui.begin_menu("Server", True):
                     imgui.text("Connected clients:")
                     imgui.separator()
-                    for c in self.server.connections:
+                    for c in self.server.connections.keys():
                         imgui.text(f"{c[0]}:{c[1]}")
                     imgui.end_menu()
 
@@ -1580,9 +1591,13 @@ class Viewer(moderngl_window.WindowConfig):
         """
         Clean up before destroying the window
         """
-        # Shut down all streams
+        # Shut down all streams.
         for s in self.scene.collect_nodes(obj_type=Streamable):
             s.stop()
+
+        # Shut down server.
+        if self.server is not None:
+            self.server.close()
 
         # Clear the lru_cache on all shaders, we do this so that future instances of the viewer
         # have to recompile shaders with the current moderngl context.
