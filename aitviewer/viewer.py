@@ -52,6 +52,19 @@ MeshMouseIntersection = namedtuple(
     "node instance_id tri_id vert_id point_world point_local bc_coords",
 )
 
+if os.name == "nt":
+    import ctypes
+
+    try:
+        # On windows we need to modify the current App User Model Id to make the taskbar icon of the viewer
+        # the one that we set for the window and not the default python icon.
+        #
+        # For more details see:
+        # https://stackoverflow.com/questions/1551605/how-to-set-applications-taskbar-icon-in-windows-7/1552105#1552105
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ait.viewer.window.1")
+    except:
+        pass
+
 SHORTCUTS = {
     "SPACE": "Start/stop playing animation.",
     ".": "Go to next frame.",
@@ -134,6 +147,13 @@ class Viewer(moderngl_window.WindowConfig):
         self.window_size = size
         self.window.print_context_info()
         activate_context(window=self.window)
+
+        # Try to set the window icon.
+        try:
+            icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "aitviewer_icon.png")
+            self.window.set_icon(icon_path=icon_path)
+        except:
+            pass
 
         self.timer = PerfTimer()
         self.ctx = self.window.ctx
