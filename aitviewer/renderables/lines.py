@@ -356,6 +356,7 @@ class Lines(Node):
         prog["uniform_color"] = tuple(self.color)
         prog["draw_edges"].value = 1.0 if self.draw_edges else 0.0
         prog["win_size"].value = kwargs["window_size"]
+        prog["clip_control"].value = (0, 0, 0)
 
         self.set_camera_matrices(prog, camera, **kwargs)
         set_lights_in_program(

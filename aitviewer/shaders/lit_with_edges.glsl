@@ -29,6 +29,7 @@
 
     out VS_OUT {
         vec3 vert;
+        vec3 local_vert;
 
 #if SMOOTH_SHADING
         vec3 norm;
@@ -62,6 +63,7 @@
 #if !FACE_COLOR
         vs_out.color = in_color;
 #endif
+        vs_out.local_vert = in_position;
         vec3 world_position = (transform * vec4(in_position, 1.0)).xyz;
         vs_out.vert = world_position;
         gl_Position = view_projection_matrix * vec4(world_position, 1.0);
@@ -88,6 +90,7 @@
     // pass-through variables
     in VS_OUT {
         vec3 vert;
+        vec3 local_vert;
 
 #if SMOOTH_SHADING
         vec3 norm;
@@ -115,6 +118,7 @@
 
     out vec4 g_color;
     out vec3 g_vert;
+    out vec3 g_local_vert;
     out vec4 g_vert_light[NR_DIR_LIGHTS];
 
     vec3 distanceToEdge(vec4 v0, vec4 v1, vec4 v2, vec2 win_size) {
@@ -149,6 +153,7 @@
             dist = dist_vecs[i];
             gl_Position = gl_in[i].gl_Position;
             g_vert = gs_in[i].vert;
+            g_local_vert = gs_in[i].local_vert;
 
 #if SMOOTH_SHADING
             g_norm = gs_in[i].norm;
@@ -186,8 +191,12 @@
     uniform bool use_uniform_color;
     uniform vec4 uniform_color;
 
+    uniform ivec3 clip_control;
+    uniform vec3 clip_value;
+
     const vec4 edge_color = vec4(0.0, 0.0, 0.0, 1.0);
 
+    in vec3 g_local_vert;
     in vec3 g_vert;
     in vec3 g_norm;
 
@@ -202,6 +211,34 @@
     out vec4 f_color;
 
     void main() {
+        // Clip fragments if clipping is enabled.
+        if(clip_control.x != 0) {
+            if(clip_control.x < 0 && g_local_vert.x < clip_value.x) {
+                discard;
+            }
+            if(clip_control.x > 0 && g_local_vert.x > clip_value.x) {
+                discard;
+            }
+        }
+
+        if(clip_control.y != 0) {
+            if(clip_control.y < 0 && g_local_vert.y < clip_value.y) {
+                discard;
+            }
+            if(clip_control.y > 0 && g_local_vert.y > clip_value.y) {
+                discard;
+            }
+        }
+
+        if(clip_control.z != 0) {
+            if(clip_control.z < 0 && g_local_vert.z < clip_value.z) {
+                discard;
+            }
+            if(clip_control.z > 0 && g_local_vert.z > clip_value.z) {
+                discard;
+            }
+        }
+
         // Determine distance of this fragment to the closest edge.
         float d = min(min(dist[0], dist[1]), dist[2]);
         float ei = exp2(-1.0*d*d);

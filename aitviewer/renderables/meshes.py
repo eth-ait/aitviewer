@@ -151,6 +151,9 @@ class Meshes(Node):
         self._use_uniform_color = self._vertex_colors is None and self._face_colors is None
         self._vertex_faces_sparse = trimesh.geometry.index_sparse(self._vertices.shape[1], self._faces)
 
+        self.clip_control = np.array((0, 0, 0), np.int32)
+        self.clip_value = np.array((0, 0, 0), np.float32)
+
     @classmethod
     def instanced(cls, *args, positions=None, rotations=None, scales=None, **kwargs):
         """
@@ -588,6 +591,9 @@ class Meshes(Node):
         prog["uniform_color"] = self.material.color
         prog["draw_edges"].value = 1.0 if self.draw_edges else 0.0
         prog["win_size"].value = kwargs["window_size"]
+
+        prog["clip_control"].value = tuple(self.clip_control)
+        prog["clip_value"].value = tuple(self.clip_value)
 
         self.set_camera_matrices(prog, camera, **kwargs)
         set_lights_in_program(

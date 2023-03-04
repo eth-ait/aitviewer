@@ -51,8 +51,9 @@ class BoundingBoxes(Node):
             mode="lines",
             r_base=thickness,
             color=self.color,
+            cast_shadow=False,
         )
-        self.spheres = Spheres(positions=self.vertices, radius=thickness, color=self.color)
+        self.spheres = Spheres(positions=self.vertices, radius=thickness, color=self.color, cast_shadow=False)
         self._add_nodes(self.lines, self.spheres, show_in_hierarchy=False)
 
     @staticmethod

@@ -69,8 +69,8 @@ else:
             global position, name
 
             # Crate a new window with a default position and size.
-            imgui.set_next_window_position(self.window_size[0] * 0.8, 275, imgui.FIRST_USE_EVER)
-            imgui.set_next_window_size(self.window_size[0] * 0.1, 110, imgui.FIRST_USE_EVER)
+            imgui.set_next_window_position(self.window_size[0] * 0.8, 50, imgui.FIRST_USE_EVER)
+            imgui.set_next_window_size(275, 110, imgui.FIRST_USE_EVER)
             expanded, _ = imgui.begin("Custom window")
             if expanded:
                 _, position = imgui.drag_float3("Position", *position, 1e-2, format="%.2f")

@@ -77,6 +77,7 @@ class Spheres(Node):
         rings=16,
         sectors=32,
         icon="\u008d",
+        cast_shadow=False,
         **kwargs,
     ):
         """
@@ -114,6 +115,7 @@ class Spheres(Node):
         self.outline = True
         self.fragmap = True
         self.depth_prepass = True
+        self.cast_shadow = cast_shadow
 
     @property
     def bounds(self):
@@ -233,6 +235,7 @@ class Spheres(Node):
             prog["use_uniform_color"] = False
         prog["draw_edges"].value = 1.0 if self.draw_edges else 0.0
         prog["win_size"].value = kwargs["window_size"]
+        prog["clip_control"].value = (0, 0, 0)
 
         self.set_camera_matrices(prog, camera, **kwargs)
         set_lights_in_program(

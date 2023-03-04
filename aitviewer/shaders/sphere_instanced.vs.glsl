@@ -14,6 +14,7 @@
 
     out VS_OUT {
         vec3 vert;
+        vec3 local_vert;
         vec3 norm;
         vec4 color;
         vec4 vert_light[NR_DIR_LIGHTS];
@@ -23,6 +24,7 @@
     void main() {
         vec3 position = in_position * radius + instance_position;
         vec3 world_position = (model_matrix * vec4(position, 1.0)).xyz;
+        vs_out.local_vert = position;
         vs_out.vert = world_position;
         vs_out.norm = (model_matrix * vec4(in_position, 0.0)).xyz;
         vs_out.color = instance_color;
