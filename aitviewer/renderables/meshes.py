@@ -494,6 +494,7 @@ class Meshes(Node):
                 np.transpose(self.current_instance_transforms.astype("f4"), (0, 2, 1)).tobytes()
             )
 
+    @hooked
     def redraw(self, **kwargs):
         self._need_upload = True
 
