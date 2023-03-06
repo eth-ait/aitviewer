@@ -3,6 +3,7 @@ import pickle
 import queue
 import subprocess
 import threading
+from typing import Callable
 
 import websockets
 
@@ -149,6 +150,26 @@ class RemoteViewer:
                     return self.recv_queue.get_nowait()
 
         return None
+
+    def process_messages(self, handler: Callable[["RemoteViewer", object], None], block=True):
+        """
+        Processes messages in a loop calling 'handler' for each message.
+
+        :param block: if True this function blocks until the connection is closed, otherwise it returns
+            after all messages received so far have been processed.
+
+        :return: if block is True always returns False when the connection has been closed.
+                 if block is False returns True if the connection is still open or False if the connection
+                 has been closed.
+        """
+        while True:
+            msg = self.get_message(block)
+            if msg is None:
+                if block:
+                    return False
+                else:
+                    return self.connected
+            handler(self, msg)
 
     async def _async_send(self, data):
         await self.websocket.send(data)

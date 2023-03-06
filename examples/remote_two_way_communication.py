@@ -27,22 +27,23 @@ if not args.server:
 
     cube = trimesh.load("resources/cube.obj")
 
+    def message_handler(v: RemoteViewer, msg: object):
+        # Print the message that we received.
+        print(f"{msg}")
+
+        # Send a cube with name and position as specified in the message.
+        RemoteMeshes(
+            v, cube.vertices, cube.faces, name=msg["name"], position=msg["position"], flat_shading=True, scale=0.5
+        )
+
+    # Create a Viewer in a separate process running this script with the --server flag on.
     with RemoteViewer.create_new_process([__file__, "--server"]) as v:
-        while True:
-            # Get the next message, blocking until one is received.
-            msg = v.get_message(block=True)
-
-            # If msg is None the connection was closed by the remote viewer and we just exit.
-            if msg is None:
-                break
-
-            # Print the message that we received.
-            print(f"{msg}")
-
-            # Send a cube with name and position as specified in the message.
-            RemoteMeshes(
-                v, cube.vertices, cube.faces, name=msg["name"], position=msg["position"], flat_shading=True, scale=0.5
-            )
+        # Process messages until the connection is closed on the other side.
+        # This helper function calls the 'message_handler' function passing in the
+        # RemoteViewer object and the message to process.
+        #
+        # Alternatively, passing block=False only processes the messages received so far.
+        v.process_messages(message_handler, block=True)
 
 else:
     #
