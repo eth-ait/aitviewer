@@ -243,6 +243,14 @@ class Meshes(Node):
         self.redraw()
 
     @property
+    def current_transformed_vertices(self):
+        return (self.current_vertices @ self.model_matrix[:3, :3].T) + self.model_matrix[:3, 3]
+
+    @property
+    def transformed_vertices(self):
+        return (self.vertices @ self.model_matrix[:3, :3].T) + self.model_matrix[:3, 3]
+
+    @property
     def n_faces(self):
         return self.faces.shape[0]
 
