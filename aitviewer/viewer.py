@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import copy
 import os
 import struct
+import sys
 from array import array
 from collections import namedtuple
 from pathlib import Path
@@ -92,7 +93,10 @@ class Viewer(moderngl_window.WindowConfig):
     resource_dir = Path(__file__).parent / "shaders"
     size_mult = 1.0
     samples = 4
-    gl_version = (4, 0)
+    if sys.platform == "darwin":
+        gl_version = (4, 0)
+    else:
+        gl_version = (4, 5)
     window_type = None
 
     def __init__(
