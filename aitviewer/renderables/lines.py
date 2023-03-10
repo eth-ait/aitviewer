@@ -255,7 +255,10 @@ class Lines(Node):
         self.n_lines = self.lines.shape[1] // 2 if mode == "lines" else self.lines.shape[1] - 1
 
         kwargs["material"] = kwargs.get("material", Material(color=color, ambient=0.2))
-        super(Lines, self).__init__(n_frames=self.lines.shape[0], **kwargs)
+
+        if "n_frames" not in kwargs:
+            kwargs["n_frames"] = self.lines.shape[0]
+        super(Lines, self).__init__(**kwargs)
 
         self._need_upload = True
         self.draw_edges = False

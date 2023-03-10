@@ -99,7 +99,10 @@ class Spheres(Node):
         else:
             assert color.shape[1] == 4 and positions.shape[1] == color.shape[0]
             self.sphere_colors = color
-        super().__init__(n_frames=positions.shape[0], icon=icon, **kwargs)
+
+        if "n_frames" not in kwargs:
+            kwargs["n_frames"] = positions.shape[0]
+        super().__init__(icon=icon, **kwargs)
 
         self._sphere_positions = positions
         self.radius = radius
