@@ -191,9 +191,6 @@
     uniform bool use_uniform_color;
     uniform vec4 uniform_color;
 
-    uniform ivec3 clip_control;
-    uniform vec3 clip_value;
-
     const vec4 edge_color = vec4(0.0, 0.0, 0.0, 1.0);
 
     in vec3 g_local_vert;
@@ -210,34 +207,10 @@
 
     out vec4 f_color;
 
+#include clipping.glsl
+
     void main() {
-        // Clip fragments if clipping is enabled.
-        if(clip_control.x != 0) {
-            if(clip_control.x < 0 && g_local_vert.x < clip_value.x) {
-                discard;
-            }
-            if(clip_control.x > 0 && g_local_vert.x > clip_value.x) {
-                discard;
-            }
-        }
-
-        if(clip_control.y != 0) {
-            if(clip_control.y < 0 && g_local_vert.y < clip_value.y) {
-                discard;
-            }
-            if(clip_control.y > 0 && g_local_vert.y > clip_value.y) {
-                discard;
-            }
-        }
-
-        if(clip_control.z != 0) {
-            if(clip_control.z < 0 && g_local_vert.z < clip_value.z) {
-                discard;
-            }
-            if(clip_control.z > 0 && g_local_vert.z > clip_value.z) {
-                discard;
-            }
-        }
+        discard_if_clipped(g_local_vert);
 
         // Determine distance of this fragment to the closest edge.
         float d = min(min(dist[0], dist[1]), dist[2]);

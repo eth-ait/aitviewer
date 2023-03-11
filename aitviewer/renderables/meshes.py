@@ -617,6 +617,10 @@ class Meshes(Node):
     def render_positions(self, prog):
         if self.is_renderable:
             self._upload_buffers()
+
+            prog["clip_control"].value = tuple(self.clip_control)
+            prog["clip_value"].value = tuple(self.clip_value)
+
             self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_instances)
 
     def _show_normals(self):
