@@ -12,6 +12,7 @@
     in vec3 in_position;
     in vec3 instance_base;
     in vec3 instance_tip;
+    in vec4 instance_color;
 
     out VS_OUT {
         vec3 vert;
@@ -72,7 +73,7 @@
         vec3 world_position = (model_matrix * vec4(position, 1.0)).xyz;
         vs_out.vert = world_position;
         vs_out.norm = (model_matrix * vec4(normal, 0.0)).xyz;
-        vs_out.color = vec4(0.0);
+        vs_out.color = instance_color;
 
         gl_Position = view_projection_matrix * vec4(world_position, 1.0);
 
