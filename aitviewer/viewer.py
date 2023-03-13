@@ -337,7 +337,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_duration = 10
         self.export_format = "mp4"
         self.export_rotate_camera = False
-        self.export_seconds_per_rotation = 10
+        self.export_rotation_degrees = 360
         self.export_fps = self.playback_fps
         self.export_scale_factor = 1.0
         self.export_transparent = False
@@ -882,22 +882,9 @@ class Viewer(moderngl_window.WindowConfig):
                     imgui.pop_style_var(1)
 
             if not self.export_animation or self.export_rotate_camera:
-                _, self.export_seconds_per_rotation = imgui.drag_float(
-                    "Rotation time (s)",
-                    self.export_seconds_per_rotation,
-                    min_value=0.1,
-                    max_value=10000.0,
-                    change_speed=0.01,
-                    format="%.2f",
+                _, self.export_rotation_degrees = imgui.drag_int(
+                    "Rotation angle (degrees)", self.export_rotation_degrees
                 )
-                imgui.same_line()
-                if imgui.button("Once"):
-                    if self.export_animation:
-                        self.export_seconds_per_rotation = (
-                            self.export_animation_range[1] - self.export_animation_range[0] + 1
-                        ) / self.playback_fps
-                    else:
-                        self.export_seconds_per_rotation = self.export_duration
 
             imgui.spacing()
             imgui.separator()
@@ -1025,7 +1012,7 @@ class Viewer(moderngl_window.WindowConfig):
                     frame=self.scene.current_frame_id,
                     output_fps=self.export_fps,
                     rotate_camera=not self.export_animation or self.export_rotate_camera,
-                    seconds_per_rotation=self.export_seconds_per_rotation,
+                    rotation_degrees=self.export_rotation_degrees,
                     scale_factor=self.export_scale_factor,
                     transparent=self.export_transparent,
                 )
@@ -1666,7 +1653,7 @@ class Viewer(moderngl_window.WindowConfig):
         frame=None,
         output_fps=60.0,
         rotate_camera=False,
-        seconds_per_rotation=10.0,
+        rotation_degrees=360.0,
         scale_factor=None,
         transparent=False,
     ):
@@ -1737,7 +1724,7 @@ class Viewer(moderngl_window.WindowConfig):
         time = 0
 
         # Compute camera speed.
-        az_delta = 2 * np.pi / seconds_per_rotation * (duration / frames)
+        az_delta = np.radians(rotation_degrees) / frames
 
         # Initialize video writer.
         if output_path is not None:
