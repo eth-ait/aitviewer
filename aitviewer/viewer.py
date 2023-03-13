@@ -341,6 +341,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.export_fps = self.playback_fps
         self.export_scale_factor = 1.0
         self.export_transparent = False
+        self.export_quality = "medium"
 
         # Screenshot settings
         self.screenshot_transparent = False
@@ -979,6 +980,19 @@ class Viewer(moderngl_window.WindowConfig):
                 frames = int(np.ceil(duration * self.export_fps))
 
             imgui.spacing()
+            if self.export_format == "mp4":
+                imgui.text("Quality: ")
+                imgui.same_line()
+                if imgui.radio_button("high", self.export_quality == "high"):
+                    self.export_quality = "high"
+                imgui.same_line()
+                if imgui.radio_button("medium", self.export_quality == "medium"):
+                    self.export_quality = "medium"
+                imgui.same_line()
+                if imgui.radio_button("low", self.export_quality == "low"):
+                    self.export_quality = "low"
+
+            imgui.spacing()
             imgui.text(f"Duration: {duration:.2f}s ({frames} frames @ {self.export_fps:.2f}fps)")
             imgui.spacing()
 
@@ -1015,6 +1029,7 @@ class Viewer(moderngl_window.WindowConfig):
                     rotation_degrees=self.export_rotation_degrees,
                     scale_factor=self.export_scale_factor,
                     transparent=self.export_transparent,
+                    quality=self.export_quality,
                 )
 
             imgui.end_popup()
@@ -1656,6 +1671,7 @@ class Viewer(moderngl_window.WindowConfig):
         rotation_degrees=360.0,
         scale_factor=None,
         transparent=False,
+        quality="medium",
     ):
         # Load this module to reduce load time.
         import skvideo.io
@@ -1737,6 +1753,11 @@ class Viewer(moderngl_window.WindowConfig):
             }
 
             if path_video.endswith("mp4"):
+                quality_to_crf = {
+                    "high": 23,
+                    "medium": 28,
+                    "low": 33,
+                }
                 # MP4 specific options
                 outputdict.update(
                     {
@@ -1744,6 +1765,7 @@ class Viewer(moderngl_window.WindowConfig):
                         "-preset": "slow",
                         "-profile:v": "high",
                         "-level:v": "4.0",
+                        "-crf": str(quality_to_crf[quality]),
                     }
                 )
 
