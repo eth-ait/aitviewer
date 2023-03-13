@@ -41,6 +41,7 @@ setup(
         "omegaconf>=2.1.1",
         "roma>=1.2.3",
         "joblib",
+        "scikit-image>=0.9.0",
         "scikit-video",
         "Pillow",
         "websockets",
