@@ -879,7 +879,7 @@ class ViewerCamera(CameraInterface):
 
         # Default camera settings.
         self._position = np.array([0.0, 0.0, 2.5])
-        self.target = np.array([0.0, 0.0, 0.0])
+        self._target = np.array([0.0, 0.0, 0.0])
         self._up = np.array([0.0, 1.0, 0.0])
 
         self.ZOOM_FACTOR = 4
@@ -926,6 +926,14 @@ class ViewerCamera(CameraInterface):
     def right(self):
         right = np.cross(self.up, self.forward)
         return right / np.linalg.norm(right)
+
+    @property
+    def target(self):
+        return self._target
+
+    @target.setter
+    def target(self, t):
+        self._target = np.array(t).copy()
 
     def save_cam(self):
         """Saves the current camera parameters"""

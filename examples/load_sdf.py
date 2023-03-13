@@ -23,25 +23,14 @@ volume = np.load(open("resources/dragon.npz", "rb"))["volume"]
 
 v = Viewer()
 
-o_shells = np.linspace(0.3, 1.5, 5)
-o_shell_colors = np.linspace(np.array([0.7, 0.6, 0.6, 1.0]), np.array([0.7, 0.2, 0.2, 1.0]), len(o_shells))
-
-i_shells = -np.linspace(0.1, 0.8, 5)
-i_shell_colors = np.linspace(np.array([0.6, 0.6, 0.7, 1.0]), np.array([0.2, 0.2, 0.7, 1.0]), len(i_shells))
-
-shells = np.hstack((o_shells, i_shells))
-shell_colors = np.vstack((o_shell_colors, i_shell_colors))
-
-s = SDF(
+s = SDF.with_level_sets(
     volume,
     size=(np.array(volume.shape) / float(max(volume.shape)) * 6),
-    mc_step_size=1,
     level=0.0,
-    shells=shells,
-    shell_colors=shell_colors,
+    inside_levels=-np.linspace(0.1, 0.8, 5),
+    outside_levels=np.linspace(0.3, 1.4, 5),
 )
 s.clip_extents = (0.5, 1.0, 1.0)
-s.mesh.color = (0.7, 0.7, 0.7, 0.5)
 
 v.scene.add(s)
 v.scene.camera.position = (10, 4, -2)
