@@ -1565,12 +1565,16 @@ class Viewer(moderngl_window.WindowConfig):
         z = b / (a + depth)
         return Image.fromarray(z, mode="F").transpose(Image.FLIP_TOP_BOTTOM)
 
-    def get_current_mask_image(self):
+    def get_current_mask_ids(self, id_map: dict[int, int] = None):
         """
-        Render and return a color mask as a 'RGB' PIL image. Each object in the mask
-        has a uniform color computed as an hash of the Node uid.
-        """
+        Return a mask as a numpy array of shape (height, width) and type np.uint32.
+        Each element in the array is the UID of the node covering that pixel (can be accessed from a node with 'node.uid')
+        or zero if not covered.
 
+        :param id_map:
+            if not None the UIDs in the mask are mapped using this dictionary to the specified ID.
+            The final mask only contains the IDs specified in this mapping and zeros everywhere else.
+        """
         width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
         height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
 
@@ -1592,21 +1596,64 @@ class Viewer(moderngl_window.WindowConfig):
             id = id.resize(self.wnd.size, Image.NEAREST)
 
         # Convert the id to integer values.
-        id_int = np.asarray(id).astype(dtype=np.int32)
+        id_int = np.asarray(id).astype(dtype=np.uint32)
 
-        # Hash the ids.
-        def hash(h):
-            h ^= h >> 16
-            h *= 0x85EBCA6B
-            h ^= h >> 13
-            h *= 0xC2B2AE35
-            h ^= h >> 16
-            return h
+        # If an id_map is given use this to map the ids.
+        if id_map is not None:
+            output = np.zeros(id_int.shape, dtype=np.uint32)
+            for k, v in id_map.items():
+                output[id_int == k] = v
+            return output
+        else:
+            # Copy here because the array constructed from a PIL image is read-only.
+            return id_int.copy()
 
-        hashed = hash(id_int.copy())
+    def get_current_mask_image(self, color_map: dict[int, Tuple[int, int, int]] = None, id_map: dict[int, int] = None):
+        """
+        Return a color mask as a 'RGB' PIL image.
+        Each object in the mask has a uniform color computed from the Node UID (can be accessed from a node with 'node.uid').
+
+        :param color_map:
+            if not None specifies the color to use for a given Node UID as a tuple (R, G, B) of integer values from 0 to 255.
+            If None the color is computed as an hash of the Node UID instead.
+        :param id_map:
+            if not None the UIDs in the mask are mapped using this dictionary from Node UID to the specified ID.
+            This mapping is applied before the color map (or before hashing if the color map is None).
+        """
+
+        if color_map is None:
+            # If no colormap is given hash the ids mapped with id_map.
+            ids = self.get_current_mask_ids(id_map)
+
+            # Hash the ids.
+            def hash(h):
+                h ^= h >> 16
+                h *= 0x85EBCA6B
+                h ^= h >> 13
+                h *= 0xC2B2AE35
+                h ^= h >> 16
+                return h
+
+            output = hash(ids)
+        else:
+            # If a colormap is given use it to map from UID to colors.
+            ids = self.get_current_mask_ids()
+
+            def rgb_to_uint(r, g, b):
+                return ((b & 0xFF) << 16) | ((g & 0xFF) << 8) | (r & 0xFF)
+
+            output = np.zeros(ids.shape, dtype=np.uint32)
+            if id_map is not None:
+                # If a id_map is given use it before indexing into the color map
+                for k, v in id_map.items():
+                    output[ids == k] = rgb_to_uint(*color_map[v])
+            else:
+                # If no id_map is given use the color_map directly.
+                for k, v in color_map.items():
+                    output[ids == k] = rgb_to_uint(*v)
 
         # Convert the hashed ids to an RGBA image and then throw away the alpha channel.
-        img = Image.frombytes("RGBA", id.size, hashed.tobytes()).convert("RGB")
+        img = Image.frombytes("RGBA", (ids.shape[1], ids.shape[0]), output.tobytes()).convert("RGB")
         return img.transpose(Image.FLIP_TOP_BOTTOM)
 
     def on_close(self):
