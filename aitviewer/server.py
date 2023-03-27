@@ -2,7 +2,7 @@ import asyncio
 import pickle
 import queue
 import threading
-from typing import Tuple
+from typing import Dict, Tuple
 
 import websockets
 
@@ -36,7 +36,7 @@ class ViewerServer:
 
         # A map of connections that are currently open. Each entry maps
         # the remote address (host, port) to a websocket.
-        self.connections: dict[Tuple[str, str], websockets.server.WebSocketServerProtocol] = {}
+        self.connections: Dict[Tuple[str, str], websockets.server.WebSocketServerProtocol] = {}
 
         # Entry point of server thread
         def entry():

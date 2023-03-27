@@ -20,7 +20,7 @@ import struct
 from array import array
 from collections import namedtuple
 from pathlib import Path
-from typing import Tuple
+from typing import Dict, Tuple
 
 import imgui
 import moderngl
@@ -1565,7 +1565,7 @@ class Viewer(moderngl_window.WindowConfig):
         z = b / (a + depth)
         return Image.fromarray(z, mode="F").transpose(Image.FLIP_TOP_BOTTOM)
 
-    def get_current_mask_ids(self, id_map: dict[int, int] = None):
+    def get_current_mask_ids(self, id_map: Dict[int, int] = None):
         """
         Return a mask as a numpy array of shape (height, width) and type np.uint32.
         Each element in the array is the UID of the node covering that pixel (can be accessed from a node with 'node.uid')
@@ -1608,7 +1608,7 @@ class Viewer(moderngl_window.WindowConfig):
             # Copy here because the array constructed from a PIL image is read-only.
             return id_int.copy()
 
-    def get_current_mask_image(self, color_map: dict[int, Tuple[int, int, int]] = None, id_map: dict[int, int] = None):
+    def get_current_mask_image(self, color_map: Dict[int, Tuple[int, int, int]] = None, id_map: Dict[int, int] = None):
         """
         Return a color mask as a 'RGB' PIL image.
         Each object in the mask has a uniform color computed from the Node UID (can be accessed from a node with 'node.uid').

@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import os
-from typing import Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 from PIL.Image import Image
@@ -76,7 +76,7 @@ class HeadlessRenderer(Viewer):
             os.makedirs(dir, exist_ok=True)
         self.get_depth().save(file_path)
 
-    def save_mask(self, file_path, color_map: dict[int, Tuple[int, int, int]] = None, id_map: dict[int, int] = None):
+    def save_mask(self, file_path, color_map: Dict[int, Tuple[int, int, int]] = None, id_map: Dict[int, int] = None):
         """
         Render and save a color mask as a 'RGB' PIL image.
         Each object in the mask has a uniform color computed from the Node UID (can be accessed from a node with 'node.uid').
@@ -124,7 +124,7 @@ class HeadlessRenderer(Viewer):
         self._render_frame()
         return self.get_current_depth_image()
 
-    def get_mask_ids(self, id_map: dict[int, int] = None) -> np.ndarray:
+    def get_mask_ids(self, id_map: Dict[int, int] = None) -> np.ndarray:
         """
         Return a mask as a numpy array of shape (height, width) and type np.uint32.
         Each element in the array is the UID of the node covering that pixel (can be accessed from a node with 'node.uid')
@@ -137,7 +137,7 @@ class HeadlessRenderer(Viewer):
         self._render_frame()
         return self.get_current_mask_ids(id_map)
 
-    def get_mask(self, color_map: dict[int, Tuple[int, int, int]] = None, id_map: dict[int, int] = None) -> Image:
+    def get_mask(self, color_map: Dict[int, Tuple[int, int, int]] = None, id_map: Dict[int, int] = None) -> Image:
         """
         Render and return a color mask as a 'RGB' PIL image.
         Each object in the mask has a uniform color computed from the Node UID (can be accessed from a node with 'node.uid').
