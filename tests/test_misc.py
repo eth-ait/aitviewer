@@ -3,7 +3,14 @@ from tempfile import TemporaryDirectory
 
 import numpy as np
 import trimesh
-from utils import RESOURCE_DIR, noreference, reference, requires_smpl, viewer
+from utils import (
+    RESOURCE_DIR,
+    noreference,
+    reference,
+    requires_ffmpeg,
+    requires_smpl,
+    viewer,
+)
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.headless import HeadlessRenderer
@@ -17,6 +24,7 @@ from aitviewer.viewer import Viewer
 
 
 @noreference
+@requires_ffmpeg
 def test_headless(viewer: HeadlessRenderer):
     sphere_positions = np.array(
         [
