@@ -51,9 +51,7 @@ if __name__ == "__main__":
     # Load 3DPW sequence. This uses the SMPL model. This might return more than one sequence because some 3DPW
     # sequences contain multiple people.
     seqs_3dpw, camera_info = SMPLSequence.from_3dpw(
-        pkl_data_path=pkl_file,
-        name=sequence_name,
-        color=(24/255, 106/255, 153/255, 1.0)
+        pkl_data_path=pkl_file, name=sequence_name, color=(24 / 255, 106 / 255, 153 / 255, 1.0)
     )
 
     # Get image paths.
