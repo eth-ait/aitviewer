@@ -1,6 +1,10 @@
+import asyncio
+import pickle
 import queue
 import threading
-from typing import Tuple
+from typing import Dict, Tuple
+
+import websockets
 
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.remote.message import Message
@@ -30,22 +34,18 @@ class ViewerServer:
         # received messages from the server thread to the main thread.
         self.queue = queue.Queue()
 
-        # A list of connections that are currently open. Each entry is
-        # the remote address (host, port) tuple.
-        self.connections = []
+        # A map of connections that are currently open. Each entry maps
+        # the remote address (host, port) to a websocket.
+        self.connections: Dict[Tuple[str, str], websockets.server.WebSocketServerProtocol] = {}
 
         # Entry point of server thread
-        def entry(queue: queue.Queue):
-            import asyncio
-            import pickle
-
-            import websockets
-
+        def entry():
             # Called whenever a new connection is enstablished.
             async def serve(websocket):
                 addr = websocket.remote_address
+                self.connections[addr] = websocket
+
                 print(f"New connection: {addr[0]}:{addr[1]}")
-                self.connections.append(addr)
                 try:
                     # Message loop.
                     # This loop is exited whenever the connection is dropped
@@ -53,21 +53,25 @@ class ViewerServer:
                     async for message in websocket:
                         data = pickle.loads(message)
                         # Equeue data for the main thread to process.
-                        queue.put_nowait((addr, data))
-                except:
-                    pass
-                self.connections.remove(addr)
+                        self.queue.put_nowait((addr, data))
+                    await websocket.close()
+                except Exception as e:
+                    print(f"Except {e}")
+                del self.connections[addr]
                 print(f"Connection closed: {addr[0]}:{addr[1]}")
 
             # Async entry point of the main thread.
             async def main():
-                server = await websockets.serve(serve, "0.0.0.0", port, max_size=None)
-                await server.serve_forever()
+                async with websockets.serve(serve, "0.0.0.0", port, max_size=None):
+                    await self.stop
 
-            asyncio.run(main())
+            asyncio.set_event_loop(self.loop)
+            self.loop.run_until_complete(main())
 
+        self.loop = asyncio.new_event_loop()
+        self.stop = self.loop.create_future()
         # daemon = true means that the thread is abruptly stopped once the main thread exits.
-        self.thread = threading.Thread(target=entry, args=(self.queue,), daemon=True)
+        self.thread = threading.Thread(target=entry, daemon=True)
         self.thread.start()
 
     def process_messages(self):
@@ -155,6 +159,26 @@ class ViewerServer:
             if not self.viewer.run_animations:
                 self.viewer.scene.previous_frame()
 
+    async def _async_send(self, msg, client):
+        data = pickle.dumps(msg)
+        if client is None:
+            websockets.broadcast(self.connections.values(), data)
+        else:
+            websocket = self.connections.get(client)
+            if websocket is not None:
+                await websocket.send(msg)
+
+    def send_message(self, msg, client: Tuple[str, str] = None):
+        """
+        Send a message to a single client or to all connected clients.
+
+        :param msg: a python object that is serialized with pickle and sent to the client.
+        :param client: a tuple (host, port) representing the client to which to send the message,
+            if None the message is sent to all connected clients.
+        """
+        # Send a message by adding a send coroutine to the thread's loop and wait for it to complete.
+        asyncio.run_coroutine_threadsafe(self._async_send(msg, client), self.loop).result()
+
     def get_node_by_remote_uid(self, remote_uid: int, client: Tuple[str, str]):
         """
         Returns the Node corresponding to the remote uid and client passed in.
@@ -165,6 +189,10 @@ class ViewerServer:
         :return: Node corresponding to the remote uid.
         """
         return self.viewer.scene.get_node_by_uid(self.remote_to_local_id.get((client, remote_uid), None))
+
+    def close(self):
+        self.loop.call_soon_threadsafe(self.stop.set_result, None)
+        self.thread.join()
 
 
 # If this module is invoke directly it starts an empty viewer

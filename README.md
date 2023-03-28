@@ -1,4 +1,5 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Tests](https://github.com/eth-ait/aitviewer/actions/workflows/tests.yml/badge.svg)](https://github.com/eth-ait/aitviewer/actions/workflows/tests.yml)
 
 # [![aitviewer](assets/aitviewer_logo.svg)](https://github.com/eth-ait/aitviewer)
 A set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS. See the official page at [https://eth-ait.github.io/aitviewer](https://eth-ait.github.io/aitviewer/) for all the details.
