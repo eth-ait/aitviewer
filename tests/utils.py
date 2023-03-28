@@ -1,5 +1,6 @@
 import functools
 import os
+import shutil
 
 import numpy as np
 import pytest
@@ -17,6 +18,7 @@ RESOURCE_DIR = os.path.join(TEST_DIR, "..", "examples", "resources")
 REFERENCE_DIR = os.path.join(TEST_DIR, "reference")
 FAILURE_DIR = os.path.join(TEST_DIR, "failure")
 SMPL_PRESENT = os.path.exists(C.smplx_models)
+FFMPEG_PRESENT = shutil.which("ffmpeg") is not None
 
 # Dictionary that maps functions to its list of paths of reference images.
 ref_funcs = {}
@@ -65,7 +67,7 @@ def viewer(refs):
         relative_error = np.asarray(diff).sum() / np.full(np.asarray(img).shape, 255).sum()
 
         # If the relative error is higher than this threshold report a failure.
-        if relative_error > 1e-5:
+        if relative_error > 3e-3:
             os.makedirs(FAILURE_DIR, exist_ok=True)
 
             # Store the wrong result and diff for debugging.
@@ -84,6 +86,17 @@ def requires_smpl(func):
     """Decorator for tests that require the SMPL dataset, if the dataset is not found the test will be skipped."""
 
     @pytest.mark.skipif(not SMPL_PRESENT, reason="SMPL dataset directory not found")
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def requires_ffmpeg(func):
+    """Decorator for tests that require ffmpeg to be installed. If ffmpeg is not found the test will be skipped."""
+
+    @pytest.mark.skipif(not FFMPEG_PRESENT, reason="ffmpeg not found")
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

@@ -12,6 +12,7 @@
     uniform mat4 model_matrix;
 
     out vec4 pos;
+    out vec3 local_pos;
     flat out int instance_id;
 
 
@@ -27,5 +28,6 @@
         instance_id = gl_InstanceID;
 
         pos = vec4(world_position, 1.0);
+        local_pos = in_position;
     }
 #endif

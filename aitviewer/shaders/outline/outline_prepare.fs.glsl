@@ -13,7 +13,13 @@
 
 #elif defined FRAGMENT_SHADER
     out vec4 color;
+
+#include clipping.glsl
+    in vec3 local_pos;
+
     void main() {
+        discard_if_clipped(local_pos);
+
         // Draw everything white.
         color = vec4(1.0);
     }

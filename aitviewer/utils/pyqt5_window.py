@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from moderngl_window.context.pyqt5 import Window
-from PyQt5 import QtOpenGL, QtWidgets
+from PyQt5 import QtGui, QtOpenGL, QtWidgets
 
 """
 Window class adapted from  moderngl_window.context.pyqt5.Window.
@@ -111,3 +111,6 @@ class PyQt5Window(Window):
         self._buffer_height = self._height * self._widget.devicePixelRatio()
 
         self.set_default_viewport()
+
+    def _set_icon(self, icon_path: str) -> None:
+        self._widget.setWindowIcon(QtGui.QIcon(str(icon_path)))

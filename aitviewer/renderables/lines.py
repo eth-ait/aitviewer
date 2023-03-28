@@ -234,11 +234,12 @@ class Lines(Node):
         :param r_base: Thickness of the line.
         :param r_tip: If set, the thickness of the line will taper from r_base to r_tip. If set to 0.0 it will create
           a proper cone.
-        :param color: Color of the line (4-tuple).
-        :param mode: 'lines' or 'line_strip' -> ModernGL drawing mode - LINE_STRIP oder LINES
+        :param color: Color of the line (4-tuple) or array of color (N_LINES, 4), one for each line.
+        :param mode: 'lines' or 'line_strip'.
+            'lines': a line is drawn from point 0 to 1, from 2 to 3, and so on, number of lines is L / 2.
+            'line_strip': a line is drawn between all adjacent points, 0 to 1, 1 to 2 and so on, number of lines is L - 1.
         :param cast_shadow: If True the mesh casts a shadow on other objects.
         """
-        assert len(color) == 4
         if len(lines.shape) == 2:
             lines = lines[np.newaxis]
         assert len(lines.shape) == 3
@@ -254,7 +255,16 @@ class Lines(Node):
         self.vertices, self.faces = self.get_mesh()
         self.n_lines = self.lines.shape[1] // 2 if mode == "lines" else self.lines.shape[1] - 1
 
-        kwargs["material"] = kwargs.get("material", Material(color=color, ambient=0.2))
+        # Define a default material in case there is None.
+        if isinstance(color, tuple) or len(color.shape) == 1:
+            kwargs["material"] = kwargs.get("material", Material(color=color, ambient=0.2))
+            self.line_colors = kwargs["material"].color
+        else:
+            assert (
+                color.shape[1] == 4 and color.shape[0] == self.n_lines
+            ), "Color must be a tuple of 4 values or a numpy array of shape (N_LINES, 4)"
+            self.line_colors = color
+
         super(Lines, self).__init__(n_frames=self.lines.shape[0], **kwargs)
 
         self._need_upload = True
@@ -304,6 +314,27 @@ class Lines(Node):
         self._lines[idx] = lines
         self.redraw()
 
+    @Node.color.setter
+    def color(self, color):
+        self.material.color = color
+        self.line_colors = color
+        self.redraw()
+
+    @property
+    def line_colors(self):
+        if len(self._line_colors.shape) == 1:
+            t = np.tile(np.array(self._line_colors), (self.n_lines, 1))
+            return t
+        else:
+            return self._line_colors
+
+    @line_colors.setter
+    def line_colors(self, color):
+        if isinstance(color, tuple):
+            color = np.array(color)
+        self._line_colors = color
+        self.redraw()
+
     def on_frame_update(self):
         self.redraw()
 
@@ -323,11 +354,13 @@ class Lines(Node):
         self.vbo_indices = ctx.buffer(self.faces.astype("i4").tobytes())
         self.vbo_instance_base = ctx.buffer(reserve=self.n_lines * 12)
         self.vbo_instance_tip = ctx.buffer(reserve=self.n_lines * 12)
+        self.vbo_instance_color = ctx.buffer(reserve=self.n_lines * 16)
 
         self.vao = VAO()
         self.vao.buffer(self.vbo_vertices, "3f4", "in_position")
         self.vao.buffer(self.vbo_instance_base, "3f4/i", "instance_base")
         self.vao.buffer(self.vbo_instance_tip, "3f4/i", "instance_tip")
+        self.vao.buffer(self.vbo_instance_color, "4f4/i", "instance_color")
         self.vao.index_buffer(self.vbo_indices)
 
     def _upload_buffers(self):
@@ -346,16 +379,23 @@ class Lines(Node):
         self.vbo_instance_base.write(v0s.astype("f4").tobytes())
         self.vbo_instance_tip.write(v1s.astype("f4").tobytes())
 
+        if len(self._line_colors.shape) > 1:
+            self.vbo_instance_color.write(self._line_colors.astype("f4").tobytes())
+
     def render(self, camera, **kwargs):
         self._upload_buffers()
 
         prog = self.prog
         prog["r_base"] = self.r_base
         prog["r_tip"] = self.r_tip
-        prog["use_uniform_color"] = True
-        prog["uniform_color"] = tuple(self.color)
+        if len(self._line_colors.shape) == 1:
+            prog["use_uniform_color"] = True
+            prog["uniform_color"] = tuple(self.color)
+        else:
+            prog["use_uniform_color"] = False
         prog["draw_edges"].value = 1.0 if self.draw_edges else 0.0
         prog["win_size"].value = kwargs["window_size"]
+        prog["clip_control"].value = (0, 0, 0)
 
         self.set_camera_matrices(prog, camera, **kwargs)
         set_lights_in_program(

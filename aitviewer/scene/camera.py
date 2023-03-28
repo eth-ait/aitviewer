@@ -875,10 +875,11 @@ class ViewerCamera(CameraInterface):
         self.fov = fov
         self.is_ortho = orthographic is not None
         self.ortho_size = 1.0 if orthographic is None else orthographic
+        self.constant_speed = 1.0
 
         # Default camera settings.
         self._position = np.array([0.0, 0.0, 2.5])
-        self.target = np.array([0.0, 0.0, 0.0])
+        self._target = np.array([0.0, 0.0, 0.0])
         self._up = np.array([0.0, 1.0, 0.0])
 
         self.ZOOM_FACTOR = 4
@@ -925,6 +926,14 @@ class ViewerCamera(CameraInterface):
     def right(self):
         right = np.cross(self.up, self.forward)
         return right / np.linalg.norm(right)
+
+    @property
+    def target(self):
+        return self._target
+
+    @target.setter
+    def target(self, t):
+        self._target = np.array(t).copy()
 
     def save_cam(self):
         """Saves the current camera parameters"""
@@ -977,7 +986,7 @@ class ViewerCamera(CameraInterface):
         self.view_matrix = V.astype("f4")
         self.view_projection_matrix = np.matmul(P, V).astype("f4")
 
-    def dolly_zoom(self, speed, move_target=False):
+    def dolly_zoom(self, speed, move_target=False, constant_speed=False):
         """
         Zoom by moving the camera along its view direction.
         If move_target is true the camera target will also move rigidly with the camera.
@@ -994,7 +1003,9 @@ class ViewerCamera(CameraInterface):
         # Adjust speed according to config
         speed *= C.camera_zoom_speed
 
-        if move_target:
+        if move_target or constant_speed:
+            if constant_speed:
+                norm = self.constant_speed * 20
             self.position += fwd * speed * norm
             self.target += fwd * speed * norm
         else:

@@ -1,7 +1,9 @@
 import asyncio
 import pickle
+import queue
 import subprocess
 import threading
+from typing import Callable
 
 import websockets
 
@@ -90,9 +92,6 @@ class RemoteViewer:
     async def _async_entry(self, url):
         # Async entry point of the client thread.
 
-        # Create an async queue for communicating with the main thread.
-        self.queue = asyncio.Queue()
-
         # Attempt to connect until 'self.timeout' seconds passed.
         start_time = self.loop.time()
         try:
@@ -113,29 +112,72 @@ class RemoteViewer:
         if not self.connected:
             return
 
+        # Create a queue for incoming messages to the main thread.
+        self.recv_queue = queue.Queue()
+
         # Message loop.
         try:
-            while True:
-                data = await self.queue.get()
-                if data is None:
-                    await self.websocket.close()
-                    break
-                await self.websocket.send(data)
+            # This loop is exited whenever the connection is dropped
+            # which causes and exception to be raised.
+            async for message in self.websocket:
+                data = pickle.loads(message)
+                # Equeue data for the main thread to process.
+                self.recv_queue.put_nowait(data)
         except Exception as e:
             print(f"Message loop exception: {e}")
 
         # Mark the connection as closed.
         self.connected = False
 
+    def get_message(self, block=True):
+        """
+        Returns the next message received by the remote viewer.
+
+        :param block: if True this function blocks until a message is received, otherwise it returns immediately.
+
+        :return: if block is True returns the next message or None if the connection has been closed.
+                 if block is False returns the next message or None if there are no messages.
+        """
+        if self.connected:
+            if block:
+                while self.connected:
+                    try:
+                        return self.recv_queue.get(timeout=0.1)
+                    except queue.Empty:
+                        pass
+            else:
+                if not self.recv_queue.empty():
+                    return self.recv_queue.get_nowait()
+
+        return None
+
+    def process_messages(self, handler: Callable[["RemoteViewer", object], None], block=True):
+        """
+        Processes messages in a loop calling 'handler' for each message.
+
+        :param block: if True this function blocks until the connection is closed, otherwise it returns
+            after all messages received so far have been processed.
+
+        :return: if block is True always returns False when the connection has been closed.
+                 if block is False returns True if the connection is still open or False if the connection
+                 has been closed.
+        """
+        while True:
+            msg = self.get_message(block)
+            if msg is None:
+                if block:
+                    return False
+                else:
+                    return self.connected
+            handler(self, msg)
+
     async def _async_send(self, data):
-        # Append to the mesage queue.
-        await self.queue.put(data)
+        await self.websocket.send(data)
 
     def send(self, data):
         try:
             if self.connected:
-                # Append a message to the client thread queue by adding a send coroutine to the
-                # thread's loop and wait for it to complete.
+                # Send a message by adding a send coroutine to the thread's loop and wait for it to complete.
                 asyncio.run_coroutine_threadsafe(self._async_send(data), self.loop).result()
         except Exception as e:
             print(f"Send exception: {e}")
@@ -166,11 +208,13 @@ class RemoteViewer:
         """Set the current active frame of the remote viewer to the previous frame"""
         self.send_message(Message.PREVIOUS_FRAME)
 
+    async def _async_close(self):
+        await self.websocket.close()
+
     def close_connection(self):
         """Close the connection with the remote viewer."""
         if self.connected:
-            # Send a special None message to signal the client thread to close the connection.
-            self.send(None)
+            asyncio.run_coroutine_threadsafe(self._async_close(), self.loop).result()
 
             # Wait for the client thread to exit.
             self.thread.join()

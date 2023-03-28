@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import glob
 import os
 
+import cv2
+
 from aitviewer.renderables.billboard import Billboard
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.scene.camera import OpenCVCamera
@@ -35,7 +37,7 @@ if __name__ == "__main__":
     #      |--- courtyard_jumpBench_01
 
     root_3dpw = r"E:\data\3dpw_with_imgs"
-    sequence_name = "courtyard_jumpBench_01"
+    sequence_name = "outdoors_slalom_01"
 
     pkl_file = None
     for split in ("test", "train", "validation"):
@@ -49,14 +51,14 @@ if __name__ == "__main__":
     # Load 3DPW sequence. This uses the SMPL model. This might return more than one sequence because some 3DPW
     # sequences contain multiple people.
     seqs_3dpw, camera_info = SMPLSequence.from_3dpw(
-        pkl_data_path=pkl_file,
-        name=sequence_name,
+        pkl_data_path=pkl_file, name=sequence_name, color=(24 / 255, 106 / 255, 153 / 255, 1.0)
     )
 
     # Get image paths.
     image_folder = os.path.join(root_3dpw, "imageFiles", sequence_name)
     images = sorted(glob.glob(os.path.join(image_folder, "*.jpg")))
-    cols, rows = 1080, 1920
+    image0 = cv2.imread(images[0])
+    cols, rows = image0.shape[1], image0.shape[0]
 
     # Display in the viewer.
     v = Viewer(size=(cols // 2, rows // 2))
@@ -65,7 +67,7 @@ if __name__ == "__main__":
     v.scene.origin.enabled = False
 
     cam = OpenCVCamera(camera_info["intrinsics"], camera_info["extrinsics"][:, :3], cols=cols, rows=rows, viewer=v)
-    billboard = Billboard.from_camera_and_distance(cam, 6.0, cols=cols, rows=rows, textures=images)
+    billboard = Billboard.from_camera_and_distance(cam, 15.0, cols=cols, rows=rows, textures=images)
     v.scene.add(*seqs_3dpw, cam, billboard)
 
     v.set_temp_camera(cam)

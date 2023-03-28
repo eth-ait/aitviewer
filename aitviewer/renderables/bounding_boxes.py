@@ -51,9 +51,18 @@ class BoundingBoxes(Node):
             mode="lines",
             r_base=thickness,
             color=self.color,
+            cast_shadow=False,
         )
-        self.spheres = Spheres(positions=self.vertices, radius=thickness, color=self.color)
+        self.spheres = Spheres(positions=self.vertices, radius=thickness, color=self.color, cast_shadow=False)
         self._add_nodes(self.lines, self.spheres, show_in_hierarchy=False)
+
+    @property
+    def bounds(self):
+        return self.get_bounds(self.vertices)
+
+    @property
+    def current_bounds(self):
+        return self.get_bounds(self.vertices[self.current_frame_id])
 
     @staticmethod
     def from_min_max_diagonal(v_min, v_max, **kwargs):

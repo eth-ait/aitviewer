@@ -151,6 +151,9 @@ class Meshes(Node):
         self._use_uniform_color = self._vertex_colors is None and self._face_colors is None
         self._vertex_faces_sparse = trimesh.geometry.index_sparse(self._vertices.shape[1], self._faces)
 
+        self.clip_control = np.array((0, 0, 0), np.int32)
+        self.clip_value = np.array((0, 0, 0), np.float32)
+
     @classmethod
     def instanced(cls, *args, positions=None, rotations=None, scales=None, **kwargs):
         """
@@ -238,6 +241,14 @@ class Meshes(Node):
         self._vertices[idx] = vertices
         self.compute_vertex_and_face_normals.cache_clear()
         self.redraw()
+
+    @property
+    def current_transformed_vertices(self):
+        return (self.current_vertices @ self.model_matrix[:3, :3].T) + self.model_matrix[:3, 3]
+
+    @property
+    def transformed_vertices(self):
+        return (self.vertices @ self.model_matrix[:3, :3].T) + self.model_matrix[:3, 3]
 
     @property
     def n_faces(self):
@@ -494,6 +505,7 @@ class Meshes(Node):
                 np.transpose(self.current_instance_transforms.astype("f4"), (0, 2, 1)).tobytes()
             )
 
+    @hooked
     def redraw(self, **kwargs):
         self._need_upload = True
 
@@ -588,6 +600,9 @@ class Meshes(Node):
         prog["draw_edges"].value = 1.0 if self.draw_edges else 0.0
         prog["win_size"].value = kwargs["window_size"]
 
+        prog["clip_control"].value = tuple(self.clip_control)
+        prog["clip_value"].value = tuple(self.clip_value)
+
         self.set_camera_matrices(prog, camera, **kwargs)
         set_lights_in_program(
             prog,
@@ -602,6 +617,10 @@ class Meshes(Node):
     def render_positions(self, prog):
         if self.is_renderable:
             self._upload_buffers()
+
+            prog["clip_control"].value = tuple(self.clip_control)
+            prog["clip_value"].value = tuple(self.clip_value)
+
             self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_instances)
 
     def _show_normals(self):

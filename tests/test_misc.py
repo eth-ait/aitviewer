@@ -3,10 +3,18 @@ from tempfile import TemporaryDirectory
 
 import numpy as np
 import trimesh
-from utils import RESOURCE_DIR, noreference, reference, requires_smpl, viewer
+from utils import (
+    RESOURCE_DIR,
+    noreference,
+    reference,
+    requires_ffmpeg,
+    requires_smpl,
+    viewer,
+)
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.headless import HeadlessRenderer
+from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.smpl import SMPLLayer, SMPLSequence
 from aitviewer.renderables.spheres import Spheres
@@ -16,6 +24,7 @@ from aitviewer.viewer import Viewer
 
 
 @noreference
+@requires_ffmpeg
 def test_headless(viewer: HeadlessRenderer):
     sphere_positions = np.array(
         [
@@ -271,3 +280,21 @@ def test_instancing(viewer: Viewer):
 
     cube_mesh = Meshes.instanced(cube.vertices, cube.faces, positions=p, rotations=r, scales=s, flat_shading=True)
     viewer.scene.add(cube_mesh)
+
+
+@reference()
+def test_sphere_and_line_colors(viewer: Viewer):
+    s_pos = np.linspace(np.array([-1, 0, 0]), np.array([1, 0, 0]), 10)
+    ls_pos = np.linspace(np.array([-1, 0, 1]), np.array([1, 0, 1]), 10)
+    ll_pos = np.linspace(np.array([-1, 0, -1]), np.array([1, 0, -1]), 10)
+
+    s_cols = np.linspace(np.array([0, 0, 1, 1]), np.array([1, 0, 0, 1]), 10)
+    ls_cols = np.linspace(np.array([0, 0, 1, 1]), np.array([1, 0, 0, 1]), 9)
+    ll_cols = np.linspace(np.array([0, 0, 1, 1]), np.array([1, 0, 0, 1]), 5)
+
+    viewer.scene.camera.position = (2, 2, 2)
+    viewer.scene.camera.target = (0, 0, 0)
+
+    viewer.scene.add(Spheres(s_pos, color=s_cols, radius=0.05))
+    viewer.scene.add(Lines(ls_pos, color=ls_cols, r_base=0.05, mode="line_strip"))
+    viewer.scene.add(Lines(ll_pos, color=ll_cols, r_base=0.05, mode="lines"))
