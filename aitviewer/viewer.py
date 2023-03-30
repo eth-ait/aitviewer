@@ -841,10 +841,8 @@ class Viewer(moderngl_window.WindowConfig):
                 )
                 if animation_range[0] != self.export_animation_range[0]:
                     self.export_animation_range[0] = animation_range[0]
-                    self.export_animation_range[1] = max(animation_range[0], animation_range[1])
                 elif animation_range[-1] != self.export_animation_range[1]:
                     self.export_animation_range[1] = animation_range[1]
-                    self.export_animation_range[0] = min(animation_range[0], animation_range[1])
 
                 _, self.playback_fps = imgui.drag_float(
                     "Playback fps",
@@ -968,17 +966,6 @@ class Viewer(moderngl_window.WindowConfig):
             if imgui.button("1/4x##scale", width=35):
                 self.export_scale_factor = 0.25
 
-            if self.export_animation:
-                duration = (animation_range[1] - animation_range[0] + 1) / self.playback_fps
-                # Compute exact number of frames if playback fps is an exact multiple of export fps.
-                if np.fmod(self.playback_fps, self.export_fps) < 0.1:
-                    playback_count = int(np.round(self.playback_fps / self.export_fps))
-                    frames = (animation_range[1] - animation_range[0] + 1) // playback_count
-                else:
-                    frames = int(np.ceil(duration * self.export_fps))
-            else:
-                frames = int(np.ceil(duration * self.export_fps))
-
             imgui.spacing()
             if self.export_format == "mp4":
                 imgui.text("Quality: ")
@@ -992,8 +979,25 @@ class Viewer(moderngl_window.WindowConfig):
                 if imgui.radio_button("low", self.export_quality == "low"):
                     self.export_quality = "low"
 
+            if self.export_animation:
+                duration = (animation_range[1] - animation_range[0] + 1) / self.playback_fps
+                # Compute exact number of frames if playback fps is an exact multiple of export fps.
+                if np.fmod(self.playback_fps, self.export_fps) < 0.1:
+                    playback_count = int(np.round(self.playback_fps / self.export_fps))
+                    frames = (animation_range[1] - animation_range[0] + 1) // playback_count
+                else:
+                    frames = int(np.ceil(duration * self.export_fps))
+            else:
+                frames = int(np.ceil(duration * self.export_fps))
+
             imgui.spacing()
-            imgui.text(f"Duration: {duration:.2f}s ({frames} frames @ {self.export_fps:.2f}fps)")
+            if frames > 0:
+                imgui.text(f"Duration: {duration:.2f}s ({frames} frames @ {self.export_fps:.2f}fps)")
+            else:
+                if self.export_animation:
+                    imgui.text(f"Error: Animation range is empty")
+                else:
+                    imgui.text(f"Error: Duration is 0 seconds")
             imgui.spacing()
 
             # Draw a cancel and exit button on the same line using the available space
@@ -1012,7 +1016,11 @@ class Viewer(moderngl_window.WindowConfig):
             imgui.pop_style_color()
 
             imgui.same_line()
-            if imgui.button("Export", button_width):
+
+            if frames <= 0:
+                imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
+
+            if imgui.button("Export", button_width) and frames >= 0:
                 imgui.close_current_popup()
                 self.export_video(
                     os.path.join(
@@ -1031,6 +1039,9 @@ class Viewer(moderngl_window.WindowConfig):
                     transparent=self.export_transparent,
                     quality=self.export_quality,
                 )
+
+            if frames <= 0:
+                imgui.pop_style_var()
 
             imgui.end_popup()
 
