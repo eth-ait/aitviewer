@@ -73,6 +73,9 @@ uniform uint u_max_vertices;
 // Maximum number of triangle indices.
 uniform uint u_max_indices;
 
+// Boolean flag for inverting normals.
+uniform bool u_invert_normals;
+
 
 // OPT: Can reduce shared memory usage by overlapping some of these arrays that are not used at the same time.
 shared float s_volume_data[BLOCK_SIZE_Z + 1][BLOCK_SIZE_Y + 1][BLOCK_SIZE_X + 1];
@@ -123,7 +126,13 @@ uint get_vertex_index(uvec3 cell_idx, uint cube_index, uint tri_index) {
 vec3 getNormal(uvec3 idx_a, uvec3 idx_b, float t) {
     vec3 a = s_gradient[idx_a.z][idx_a.y][idx_a.x];
     vec3 b = s_gradient[idx_b.z][idx_b.y][idx_b.x];
-    return normalize(mix(a, b, t));
+    vec3 n = normalize(mix(a, b, t));
+
+    if(u_invert_normals) {
+        n = -n;
+    }
+
+    return n;
 }
 
 void main() {

@@ -1145,7 +1145,7 @@ class MarchingCubesMeshes(Meshes):
     BZ = 8
     COMPACT_GROUP_SIZE = 128
 
-    def __init__(self, volume, size=(1, 1, 1), level=0.0, max_triangles=None, max_vertices=None, **kwargs):
+    def __init__(self, volume, size=(1, 1, 1), level=0.0, max_triangles=None, max_vertices=None, invert_normals=False, **kwargs):
         super().__init__(np.zeros((1, 0, 3)), np.zeros((0, 3)), **kwargs)
 
         # Disable backface culling for this mesh.
@@ -1173,6 +1173,7 @@ class MarchingCubesMeshes(Meshes):
         self.level = level
         self.size = size
         self.spacing = size / (np.array(volume.shape[::-1]) - 1.0)
+        self.invert_normals = invert_normals
 
         # Internal variables.
         self._need_update = True
@@ -1330,6 +1331,7 @@ class MarchingCubesMeshes(Meshes):
             self.prog_mc["u_volume_spacing"] = tuple(self.spacing)
             self.prog_mc["u_max_indices"] = self.MAX_TRIANGLES * 3
             self.prog_mc["u_max_vertices"] = self.MAX_VERTICES
+            self.prog_mc["u_invert_normals"] = self.invert_normals
 
             self.prog_mc.run_indirect(buffer=self._out_blocks)
             self.ctx.memory_barrier()
@@ -1400,12 +1402,13 @@ class MarchingCubesMeshes(Meshes):
     @hooked
     def release(self):
         # vao and vbos are released by Meshes release method.
-        self._tris_table.release()
-        self._texture3d.release()
-        self._all_blocks.release()
-        self._out_blocks.release()
-        self._num_vertices.release()
-        self._draw_args.release()
+        if self.is_renderable:
+            self._tris_table.release()
+            self._texture3d.release()
+            self._all_blocks.release()
+            self._out_blocks.release()
+            self._num_vertices.release()
+            self._draw_args.release()
 
     def gui(self, imgui):
         u, self.level = imgui.drag_float("Level", self.level, 2e-3, min_value=-1.0, max_value=1.0)
