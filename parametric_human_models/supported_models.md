@@ -41,7 +41,7 @@ Please note that you only have to install the SMPL/STAR models if you plan to us
 ### SMPL models
 The `smplx` package is automatically installed as one of the dependencies. However, you have to download the various body models. Please follow the instructions provided on the [SMPL-X Github](https://github.com/vchoutas/smplx#downloading-the-model) page to do so. We expect the same directory structure as the `smplx` package does.
 
-After the download of the body models, configure aitviewer to point the root directory of where you stored the body models by updating the `smplx_models` parameter in the `aitvconfig.yaml`. Please refer to the [Configuration](https://eth-ait.github.io/aitviewer/configuration.html) page to find out about various ways how to create your custom configuration file.
+After the download of the body models, configure aitviewer to point the root directory of where you stored the body models by updating the `smplx_models` parameter in the `aitvconfig.yaml`. Please refer to the [configuration section here](https://eth-ait.github.io/aitviewer/frontend.html#configure-the-viewer) to find out about various ways how to create your custom configuration file.
 
 ### STAR
 If you would like to use STAR, you have to manually install the package via
