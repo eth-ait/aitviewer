@@ -1145,7 +1145,9 @@ class MarchingCubesMeshes(Meshes):
     BZ = 8
     COMPACT_GROUP_SIZE = 128
 
-    def __init__(self, volume, size=(1, 1, 1), level=0.0, max_triangles=None, max_vertices=None, invert_normals=False, **kwargs):
+    def __init__(
+        self, volume, size=(1, 1, 1), level=0.0, max_triangles=None, max_vertices=None, invert_normals=False, **kwargs
+    ):
         super().__init__(np.zeros((1, 0, 3)), np.zeros((0, 3)), **kwargs)
 
         # Disable backface culling for this mesh.
@@ -1169,7 +1171,7 @@ class MarchingCubesMeshes(Meshes):
         self.MAX_TRIANGLES = max_triangles
 
         # Store parameters.
-        self.volume = volume
+        self._volume = volume
         self.level = level
         self.size = size
         self.spacing = size / (np.array(volume.shape[::-1]) - 1.0)
@@ -1246,6 +1248,20 @@ class MarchingCubesMeshes(Meshes):
         max = self.size
         return self.get_bounds(np.vstack((min, max)))
 
+    @property
+    def volume(self):
+        return self._volume
+
+    @volume.setter
+    def volume(self, volume):
+        assert (
+            self._volume.shape == volume.shape
+        ), f"New volume shape {volume.shape} must match old volume shape {self._volume.shape}"
+        self._volume = volume
+        if self.is_renderable:
+            self._texture3d.write(self._volume.astype(np.float32).tobytes())
+        self.redraw()
+
     @hooked
     def redraw(self, **kwargs):
         self._need_update = True
@@ -1269,7 +1285,7 @@ class MarchingCubesMeshes(Meshes):
 
             # This ensures that buffers used by the GPU are never mapped in host memory.
             # If we don't do this the buffers stay mapped on the host and GPU operations on
-            # these buffer becomes significantly slower.
+            # these buffer become significantly slower.
             def readback(buffer, size):
                 readback_buffer = self.ctx.buffer(reserve=size)
                 self.ctx.copy_buffer(readback_buffer, buffer, size)
@@ -1359,7 +1375,9 @@ class MarchingCubesMeshes(Meshes):
         self._tris_table = ctx.buffer(TRIS_TABLE.tobytes())
 
         # Create compute shader buffers.
-        self._texture3d = ctx.texture3d((self.NX, self.NY, self.NZ), 1, self.volume.tobytes(), dtype="f4")
+        self._texture3d = ctx.texture3d(
+            (self.NX, self.NY, self.NZ), 1, self.volume.astype(np.float32).tobytes(), dtype="f4"
+        )
         self._all_blocks = ctx.buffer(reserve=self.TOTAL_BLOCKS * 4, dynamic=True)
         self._out_blocks = ctx.buffer(reserve=self.TOTAL_BLOCKS * 4 + 12, dynamic=True)
         self._num_vertices = ctx.buffer(reserve=4, dynamic=True)
