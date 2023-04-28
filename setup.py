@@ -34,7 +34,7 @@ setup(
         "moderngl-window>=2.4.0",
         "moderngl>=5.6.4,<5.7.1",
         "PyQt5>=5.15.4",
-        "imgui==1.4.1",
+        "imgui==2.0.0",
         "tqdm>=4.60.0",
         "trimesh>=3.9.15,<4",
         "scipy>=1.5.2,<1.8",

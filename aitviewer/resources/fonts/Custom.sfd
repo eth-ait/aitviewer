@@ -22,7 +22,7 @@ OS2Version: 0
 OS2_WeightWidthSlopeOnly: 0
 OS2_UseTypoMetrics: 1
 CreationTime: 1592304593
-ModificationTime: 1664131406
+ModificationTime: 1682671469
 OS2TypoAscent: 0
 OS2TypoAOffset: 1
 OS2TypoDescent: 0
@@ -38,16 +38,16 @@ HheadDescent: 0
 HheadDOffset: 1
 MarkAttachClasses: 1
 DEI: 91125
-Encoding: ISO8859-1
+Encoding: UnicodeBmp
 UnicodeInterp: none
 NameList: AGL For New Fonts
 DisplaySize: -36
 AntiAlias: 1
 FitToEm: 0
-WinInfo: 0 37 10
+WinInfo: 0 24 11
 BeginPrivate: 0
 EndPrivate
-BeginChars: 256 174
+BeginChars: 65536 175
 
 StartChar: exclam
 Encoding: 33 33 0
@@ -5084,6 +5084,13 @@ SplineSet
 1120.44824219 557.727539062 m 1024
 927.536132812 557.727539062 m 1024
 EndSplineSet
+EndChar
+
+StartChar: uni0020
+Encoding: 32 32 174
+Width: 500
+Flags: HW
+LayerCount: 2
 EndChar
 EndChars
 EndSplineFont

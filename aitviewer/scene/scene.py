@@ -340,7 +340,7 @@ class Scene(Node):
     def gui(self, imgui):
         imgui.text(f"FPS: {self.fps:.1f}")
         # Background color
-        uc, color = imgui.color_edit4("Background", *self.background_color, show_alpha=True)
+        uc, color = imgui.color_edit4("Background", *self.background_color)
         if uc:
             self.background_color = color
 

@@ -1056,7 +1056,6 @@ class VariableTopologyMeshes(Node):
         uc, color = imgui.color_edit4(
             "Color##color{}'".format(self.unique_name),
             *self.material.color,
-            show_alpha=True,
         )
         if uc:
             self.color = color
