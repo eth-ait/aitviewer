@@ -25,7 +25,12 @@ from aitviewer.utils.decorators import hooked
 
 
 class SDF(Node):
-    """Renderable that can be used to draw level sets of a dense SDF volume meshed using marching cubes."""
+    """
+    Renderable that can be used to draw level sets of a dense SDF volume meshed using marching cubes.
+
+    This renderable internally uses the marching cubes algorithm from skimage.
+    For a faster marching cubes implementation see the Volume renderable.
+    """
 
     def __init__(
         self,

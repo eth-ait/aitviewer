@@ -933,7 +933,7 @@ class ViewerCamera(CameraInterface):
 
     @target.setter
     def target(self, t):
-        self._target = np.array(t).copy()
+        self._target = np.array(t, np.float32).copy()
 
     def save_cam(self):
         """Saves the current camera parameters"""
