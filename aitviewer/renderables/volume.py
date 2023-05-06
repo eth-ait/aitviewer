@@ -252,53 +252,58 @@ class Volume(Meshes):
 
     @Node.once
     def make_renderable(self, ctx: moderngl.Context):
-        # Load shaders for drawing.
-        vs = "lit_with_edges.glsl"
-        positions_vs = "mesh_positions.vs.glsl"
-        self._load_programs(vs, positions_vs)
+        try:
+            # Load shaders for drawing.
+            vs = "lit_with_edges.glsl"
+            positions_vs = "mesh_positions.vs.glsl"
+            self._load_programs(vs, positions_vs)
 
-        # Load compute shaders for marching cubes.
-        BX = self.BX
-        BY = self.BY
-        BZ = self.BZ
-        CS = self.COMPACT_GROUP_SIZE
-        self.prog_check_surface = get_marching_cubes_shader("check_surface.cs.glsl", BX, BY, BZ, CS)
-        self.prog_compact = get_marching_cubes_shader("compact.cs.glsl", BX, BY, BZ, CS)
-        self.prog_mc = get_marching_cubes_shader("marching_cubes.cs.glsl", BX, BY, BZ, CS)
+            # Load compute shaders for marching cubes.
+            BX = self.BX
+            BY = self.BY
+            BZ = self.BZ
+            CS = self.COMPACT_GROUP_SIZE
+            self.prog_check_surface = get_marching_cubes_shader("check_surface.cs.glsl", BX, BY, BZ, CS)
+            self.prog_compact = get_marching_cubes_shader("compact.cs.glsl", BX, BY, BZ, CS)
+            self.prog_mc = get_marching_cubes_shader("marching_cubes.cs.glsl", BX, BY, BZ, CS)
 
-        # Upload lookup table.
-        self._tris_table = ctx.buffer(TRIS_TABLE.tobytes())
+            # Upload lookup table.
+            self._tris_table = ctx.buffer(TRIS_TABLE.tobytes())
 
-        # Create compute shader buffers.
-        self._texture3d = ctx.texture3d(
-            (self.NX, self.NY, self.NZ), 1, self.volume.astype(np.float32).tobytes(), dtype="f4"
-        )
-        self._all_blocks = ctx.buffer(reserve=self.TOTAL_BLOCKS * 4, dynamic=True)
-        self._out_blocks = ctx.buffer(reserve=self.TOTAL_BLOCKS * 4 + 12, dynamic=True)
-        self._num_vertices = ctx.buffer(reserve=4, dynamic=True)
-        self._draw_args = ctx.buffer(reserve=20, dynamic=True)
+            # Create compute shader buffers.
+            self._texture3d = ctx.texture3d(
+                (self.NX, self.NY, self.NZ), 1, self.volume.astype(np.float32).tobytes(), dtype="f4"
+            )
+            self._all_blocks = ctx.buffer(reserve=self.TOTAL_BLOCKS * 4, dynamic=True)
+            self._out_blocks = ctx.buffer(reserve=self.TOTAL_BLOCKS * 4 + 12, dynamic=True)
+            self._num_vertices = ctx.buffer(reserve=4, dynamic=True)
+            self._draw_args = ctx.buffer(reserve=20, dynamic=True)
 
-        self._triangles = ctx.buffer(reserve=self.MAX_TRIANGLES * 12, dynamic=True)
-        self._vertices = ctx.buffer(reserve=self.MAX_VERTICES * 12, dynamic=True)
-        self._normals = ctx.buffer(reserve=self.MAX_VERTICES * 12, dynamic=True)
-        self._colors = ctx.buffer(reserve=16, dynamic=True)
+            self._triangles = ctx.buffer(reserve=self.MAX_TRIANGLES * 12, dynamic=True)
+            self._vertices = ctx.buffer(reserve=self.MAX_VERTICES * 12, dynamic=True)
+            self._normals = ctx.buffer(reserve=self.MAX_VERTICES * 12, dynamic=True)
+            self._colors = ctx.buffer(reserve=16, dynamic=True)
 
-        self.prog = get_smooth_lit_with_edges_program("lit_with_edges.glsl", 0)
+            self.prog = get_smooth_lit_with_edges_program("lit_with_edges.glsl", 0)
 
-        self.vao = VAO()
-        self.vao.buffer(self._vertices, "3f4", "in_position")
-        self.vao.buffer(self._normals, "3f4", "in_normal")
-        self.vao.buffer(self._colors, "4f4", "in_color")
-        self.vao.index_buffer(self._triangles)
+            self.vao = VAO()
+            self.vao.buffer(self._vertices, "3f4", "in_position")
+            self.vao.buffer(self._normals, "3f4", "in_normal")
+            self.vao.buffer(self._colors, "4f4", "in_color")
+            self.vao.index_buffer(self._triangles)
 
-        self.ctx = ctx
+            self.ctx = ctx
 
-        self.time_queries = {
-            "check_surface": ctx.query(time=True),
-            "compact": ctx.query(time=True),
-            "mc": ctx.query(time=True),
-            "render": ctx.query(time=True),
-        }
+            self.time_queries = {
+                "check_surface": ctx.query(time=True),
+                "compact": ctx.query(time=True),
+                "mc": ctx.query(time=True),
+                "render": ctx.query(time=True),
+            }
+        except Exception as e:
+            raise Exception(
+                f"Failed to initialize Volume renderable. This renderable requires support for OpenGL 4.5 (not available on macOS and old GPUs).\nError:\n{e}"
+            )
 
     def render(self, camera, **kwargs):
         if self._need_update:
