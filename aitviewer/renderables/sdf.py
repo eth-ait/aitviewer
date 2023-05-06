@@ -93,6 +93,7 @@ class SDF(Node):
             np.array([self.size], dtype=np.float32),
             color=(0, 0, 0, 1),
             name="Bounding Box",
+            gui_affine=False,
         )
 
         # Clip plane lines.
@@ -114,14 +115,14 @@ class SDF(Node):
             lines = np.roll(lines, axis=1, shift=(0, i))
             color = np.array([0, 0, 0, 1])
             color[i] = 1
-            self.clip_lines.append(Lines(lines, cast_shadow=False, color=color, name=f"Clip {axis}"))
+            self.clip_lines.append(Lines(lines, cast_shadow=False, color=color, name=f"Clip {axis}", gui_affine=False))
 
         # Group clip planes under a common parent node.
-        self.clip_planes_node = Node("Clip planes")
+        self.clip_planes_node = Node("Clip planes", gui_affine=False, gui_material=False)
         self.clip_planes_node.add(*self.clip_lines)
 
         # Group level sets under a common parent node.
-        self.level_sets_node = Node("Level sets")
+        self.level_sets_node = Node("Level sets", gui_material=False)
         self.level_sets_node.add(*self.level_sets)
 
         # Add all children nodes.
