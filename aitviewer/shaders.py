@@ -22,7 +22,7 @@ from moderngl_window import resources
 from moderngl_window.meta import ProgramDescription
 
 
-def _load(name, defines={}):
+def _load(name, defines: dict = None):
     return resources.programs.load(ProgramDescription(path=name, defines=defines))
 
 
