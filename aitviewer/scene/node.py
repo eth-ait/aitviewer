@@ -517,11 +517,7 @@ class Node(object):
         """Render GUI with material properties"""
 
         # Color Control
-        uc, color = imgui.color_edit4(
-            "Color##color{}'".format(self.unique_name),
-            *self.material.color,
-            show_alpha=True,
-        )
+        uc, color = imgui.color_edit4("Color##color{}'".format(self.unique_name), *self.material.color)
         if uc:
             self.color = color
 

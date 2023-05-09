@@ -15,12 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import functools
+import os
 
+import moderngl
 from moderngl_window import resources
 from moderngl_window.meta import ProgramDescription
 
 
-def _load(name, defines={}):
+def _load(name, defines: dict = None):
     return resources.programs.load(ProgramDescription(path=name, defines=defines))
 
 
@@ -130,6 +132,18 @@ def get_chessboard_program():
     return _load("chessboard.glsl")
 
 
+@functools.lru_cache()
+def get_marching_cubes_shader(name, BX, BY, BZ, COMPACT_GROUP_SIZE) -> moderngl.ComputeShader:
+    defines = {
+        "BLOCK_SIZE_X": BX,
+        "BLOCK_SIZE_Y": BY,
+        "BLOCK_SIZE_Z": BZ,
+        "COMPACT_GROUP_SIZE": COMPACT_GROUP_SIZE,
+    }
+    path = os.path.join("marching_cubes", name)
+    return resources.programs.load(ProgramDescription(compute_shader=path, defines=defines))
+
+
 def clear_shader_cache():
     """Clear all cached shaders."""
     funcs = [
@@ -141,6 +155,7 @@ def clear_shader_cache():
         get_cylinder_program,
         get_screen_texture_program,
         get_chessboard_program,
+        get_marching_cubes_shader,
     ]
     for f in funcs:
         f.cache_clear()

@@ -224,8 +224,8 @@ class ChessboardPlane(Node):
         return self.bounds
 
     def gui(self, imgui):
-        _, self.c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
-        _, self.c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True)
+        _, self.c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1)
+        _, self.c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2)
         _, self.tiling = imgui.checkbox("Toggle Tiling", self.tiling)
         _, self.n_tiles = imgui.drag_int("Number of tiles", self.n_tiles, 1.0, 1, 200)
 
@@ -340,12 +340,12 @@ class Chessboard(Node):
         self.mesh.face_colors = self.fcs_tiled
 
     def gui(self, imgui):
-        u, c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1, show_alpha=True)
+        u, c1 = imgui.color_edit4("Color 1##color{}'".format(self.unique_name), *self.c1)
         if u:
             self.c1 = c1
             self._update_colors()
 
-        u, c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2, show_alpha=True)
+        u, c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2)
         if u:
             self.c2 = c2
             self._update_colors()

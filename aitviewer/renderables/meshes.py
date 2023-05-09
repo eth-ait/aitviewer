@@ -509,13 +509,7 @@ class Meshes(Node):
     def redraw(self, **kwargs):
         self._need_upload = True
 
-    # noinspection PyAttributeOutsideInit
-    @Node.once
-    def make_renderable(self, ctx: moderngl.Context):
-        """Prepares this object for rendering. This function must be called before `render` is used."""
-
-        vs = "lit_with_edges.glsl"
-        positions_vs = "mesh_positions.vs.glsl"
+    def _load_programs(self, vs, positions_vs):
         instanced = 1 if self.instance_transforms is not None else 0
         self.smooth_prog = get_smooth_lit_with_edges_program(vs, instanced)
         self.flat_prog = get_flat_lit_with_edges_program(vs, instanced)
@@ -525,6 +519,14 @@ class Meshes(Node):
         self.depth_only_program = get_depth_only_program(positions_vs, instanced)
         self.outline_program = get_outline_program(positions_vs, instanced)
         self.fragmap_program = get_fragmap_program(positions_vs, instanced)
+
+    # noinspection PyAttributeOutsideInit
+    @Node.once
+    def make_renderable(self, ctx: moderngl.Context):
+        """Prepares this object for rendering. This function must be called before `render` is used."""
+        vs = "lit_with_edges.glsl"
+        positions_vs = "mesh_positions.vs.glsl"
+        self._load_programs(vs, positions_vs)
 
         vertices = self.current_vertices
         vertex_normals = self.vertex_normals_at(self.current_frame_id)
@@ -573,9 +575,7 @@ class Meshes(Node):
             if self.has_texture:
                 self.texture.release()
 
-    def render(self, camera, **kwargs):
-        self._upload_buffers()
-
+    def _use_program(self, camera, **kwargs):
         if self.has_texture and self.show_texture:
             prog = self.texture_prog
             prog["diffuse_texture"] = 0
@@ -612,6 +612,11 @@ class Meshes(Node):
         )
         set_material_properties(prog, self.material)
         self.receive_shadow(prog, **kwargs)
+        return prog
+
+    def render(self, camera, **kwargs):
+        self._upload_buffers()
+        prog = self._use_program(camera, **kwargs)
         self.vao.render(prog, moderngl.TRIANGLES, instances=self.n_instances)
 
     def render_positions(self, prog):
@@ -1056,7 +1061,6 @@ class VariableTopologyMeshes(Node):
         uc, color = imgui.color_edit4(
             "Color##color{}'".format(self.unique_name),
             *self.material.color,
-            show_alpha=True,
         )
         if uc:
             self.color = color
