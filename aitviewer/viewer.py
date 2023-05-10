@@ -183,6 +183,15 @@ class Viewer(moderngl_window.WindowConfig):
         self.outline_quad = geometry.quad_2d(size=(2.0, 2.0), pos=(0.0, 0.0))
 
         # Create framebuffers
+        self.offscreen_p_depth = None
+        self.offscreen_p_viewpos = None
+        self.offscreen_p_tri_id = None
+        self.offscreen_p = None
+        self.outline_texture = None
+        self.outline_framebuffer = None
+        self.headless_fbo_color = None
+        self.headless_fbo_depth = None
+        self.headless_fbo = None
         self.create_framebuffers()
 
         # Custom UI Font
@@ -274,6 +283,19 @@ class Viewer(moderngl_window.WindowConfig):
         Create all framebuffers which depend on the window size.
         This is called once at startup and every time the window is resized.
         """
+
+        # Release framebuffers if they already exist.
+        def safe_release(b):
+            if b is not None:
+                b.release()
+
+        safe_release(self.offscreen_p_depth)
+        safe_release(self.offscreen_p_viewpos)
+        safe_release(self.offscreen_p_tri_id)
+        safe_release(self.offscreen_p)
+        safe_release(self.outline_texture)
+        safe_release(self.outline_framebuffer)
+
         # Mesh mouse intersection
         self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
         self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype="f4")
@@ -291,6 +313,9 @@ class Viewer(moderngl_window.WindowConfig):
         # If in headlesss mode we create a framebuffer without multisampling that we can use
         # to resolve the default framebuffer before reading.
         if self.window_type == "headless":
+            safe_release(self.headless_fbo_color)
+            safe_release(self.headless_fbo_depth)
+            safe_release(self.headless_fbo)
             self.headless_fbo_color = self.ctx.texture(self.wnd.buffer_size, 4)
             self.headless_fbo_depth = self.ctx.depth_texture(self.wnd.buffer_size)
             self.headless_fbo = self.ctx.framebuffer(self.headless_fbo_color, self.headless_fbo_depth)
