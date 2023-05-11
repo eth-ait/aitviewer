@@ -149,19 +149,19 @@ class Scene(Node):
             key=lambda x: np.linalg.norm(x.position - self.camera.position),
             reverse=True,
         ):
-            # Render to depth buffer only
-            self.ctx.depth_func = "<"
-
-            fbo.color_mask = (False, False, False, False)
-            self.safe_render_depth_prepass(r, **kwargs)
-            fbo.color_mask = (True, True, True, True)
-
             # Turn off backface culling if enabled for the scene
             # and requested by the current object
             if self.backface_culling and r.backface_culling:
                 self.ctx.enable(moderngl.CULL_FACE)
             else:
                 self.ctx.disable(moderngl.CULL_FACE)
+
+            # Render to depth buffer only
+            self.ctx.depth_func = "<"
+
+            fbo.color_mask = (False, False, False, False)
+            self.safe_render_depth_prepass(r, **kwargs)
+            fbo.color_mask = (True, True, True, True)
 
             # Render normally with less equal depth comparison function,
             # drawing only the pixels closer to the camera to avoid
