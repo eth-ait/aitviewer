@@ -690,7 +690,7 @@ class Meshes(Node):
             if imgui.button("Show Normals ##show_normals{}".format(self.unique_name)):
                 self._show_normals()
 
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
@@ -698,7 +698,7 @@ class Meshes(Node):
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-        super().gui_context_menu(imgui)
+        super().gui_context_menu(imgui, x, y)
 
     def gui_io(self, imgui):
         if imgui.button("Export OBJ##export_{}".format(self.unique_name)):
@@ -1017,7 +1017,7 @@ class VariableTopologyMeshes(Node):
     def render_outline(self, *args, **kwargs):
         self.current_mesh.render_outline(*args, **kwargs)
 
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)
         _, self.draw_outline = imgui.menu_item("Draw outline", selected=self.draw_outline)
@@ -1025,7 +1025,7 @@ class VariableTopologyMeshes(Node):
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-        super().gui_context_menu(imgui)
+        super().gui_context_menu(imgui, x, y)
 
     def gui_affine(self, imgui):
         """Render GUI for affine transformations"""

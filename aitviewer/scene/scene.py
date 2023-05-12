@@ -175,12 +175,12 @@ class Scene(Node):
     def safe_render_depth_prepass(self, r, **kwargs):
         if not r.is_renderable:
             r.make_renderable(self.ctx)
-        r.render_depth_prepass(self.camera, **kwargs)
+        r.render_depth_prepass(**kwargs)
 
     def safe_render(self, r, **kwargs):
         if not r.is_renderable:
             r.make_renderable(self.ctx)
-        r.render(self.camera, **kwargs)
+        r.render(**kwargs)
 
     def make_renderable(self, ctx):
         self.ctx = ctx

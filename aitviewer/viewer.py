@@ -16,19 +16,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import copy
 import os
-import struct
 import sys
 from array import array
 from collections import namedtuple
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple, Union
 
 import imgui
-import moderngl
 import moderngl_window
 import numpy as np
-from moderngl_window import activate_context, geometry, get_local_window_cls
-from moderngl_window.opengl.vao import VAO
+from moderngl_window import activate_context, get_local_window_cls
 from PIL import Image
 from tqdm import tqdm
 
@@ -37,6 +34,7 @@ from aitviewer.remote.message import Message
 from aitviewer.renderables.billboard import Billboard
 from aitviewer.renderables.meshes import Meshes, VariableTopologyMeshes
 from aitviewer.renderables.point_clouds import PointClouds
+from aitviewer.renderer import Renderer, Viewport
 from aitviewer.scene.camera import PinholeCamera, ViewerCamera
 from aitviewer.scene.node import Node
 from aitviewer.scene.scene import Scene
@@ -163,36 +161,13 @@ class Viewer(moderngl_window.WindowConfig):
         self.ctx = self.window.ctx
         super().__init__(self.ctx, self.window, self.timer)
 
+        # Create renderer
+        self.renderer = Renderer(self.ctx, self.wnd, self.window_type)
+
         # Create GUI context
         self.imgui_ctx = imgui.create_context()
         self.imgui = ImGuiRenderer(self.wnd, self.window_type)
         self.imgui_user_interacting = False
-
-        # Shaders for rendering the shadow map
-        self.raw_depth_prog = self.load_program("shadow_mapping/raw_depth.glsl")
-
-        # Shaders for mesh mouse intersection
-        self.frag_pick_prog = self.load_program("fragment_picking/frag_pick.glsl")
-        self.frag_pick_prog["position_texture"].value = 0  # Read from texture channel 0
-        self.frag_pick_prog["obj_info_texture"].value = 1  # Read from texture channel 0
-        self.picker_output = self.ctx.buffer(reserve=6 * 4)  # 3 floats, 3 ints
-        self.picker_vao = VAO(mode=moderngl.POINTS)
-
-        # Shaders for drawing outlines
-        self.outline_draw_prog = self.load_program("outline/outline_draw.glsl")
-        self.outline_quad = geometry.quad_2d(size=(2.0, 2.0), pos=(0.0, 0.0))
-
-        # Create framebuffers
-        self.offscreen_p_depth = None
-        self.offscreen_p_viewpos = None
-        self.offscreen_p_tri_id = None
-        self.offscreen_p = None
-        self.outline_texture = None
-        self.outline_framebuffer = None
-        self.headless_fbo_color = None
-        self.headless_fbo_depth = None
-        self.headless_fbo = None
-        self.create_framebuffers()
 
         # Custom UI Font
         self.font_dir = Path(__file__).parent / "resources" / "fonts"
@@ -214,10 +189,6 @@ class Viewer(moderngl_window.WindowConfig):
             "exit": self.gui_exit,
             "go_to_frame": self.gui_go_to_frame,
         }
-
-        # Debug
-        self.vis_prog = self.load_program("visualize.glsl")
-        self.vis_quad = geometry.quad_2d(size=(0.9, 0.9), pos=(0.5, 0.5))
 
         # Initialize viewer
         self.scene = None
@@ -272,53 +243,11 @@ class Viewer(moderngl_window.WindowConfig):
         self._go_to_frame_popup_open = False
         self._go_to_frame_string = ""
         self._show_shortcuts_window = False
+        self._mouse_position = (0, 0)
 
         self.server = None
         if C.server_enabled:
             self.server = ViewerServer(self, C.server_port)
-
-    # noinspection PyAttributeOutsideInit
-    def create_framebuffers(self):
-        """
-        Create all framebuffers which depend on the window size.
-        This is called once at startup and every time the window is resized.
-        """
-
-        # Release framebuffers if they already exist.
-        def safe_release(b):
-            if b is not None:
-                b.release()
-
-        safe_release(self.offscreen_p_depth)
-        safe_release(self.offscreen_p_viewpos)
-        safe_release(self.offscreen_p_tri_id)
-        safe_release(self.offscreen_p)
-        safe_release(self.outline_texture)
-        safe_release(self.outline_framebuffer)
-
-        # Mesh mouse intersection
-        self.offscreen_p_depth = self.ctx.depth_texture(self.wnd.buffer_size)
-        self.offscreen_p_viewpos = self.ctx.texture(self.wnd.buffer_size, 4, dtype="f4")
-        self.offscreen_p_tri_id = self.ctx.texture(self.wnd.buffer_size, 4, dtype="f4")
-        self.offscreen_p = self.ctx.framebuffer(
-            color_attachments=[self.offscreen_p_viewpos, self.offscreen_p_tri_id],
-            depth_attachment=self.offscreen_p_depth,
-        )
-        self.offscreen_p_tri_id.filter = (moderngl.NEAREST, moderngl.NEAREST)
-
-        # Outline rendering
-        self.outline_texture = self.ctx.texture(self.wnd.buffer_size, 1, dtype="f4")
-        self.outline_framebuffer = self.ctx.framebuffer(color_attachments=[self.outline_texture])
-
-        # If in headlesss mode we create a framebuffer without multisampling that we can use
-        # to resolve the default framebuffer before reading.
-        if self.window_type == "headless":
-            safe_release(self.headless_fbo_color)
-            safe_release(self.headless_fbo_depth)
-            safe_release(self.headless_fbo)
-            self.headless_fbo_color = self.ctx.texture(self.wnd.buffer_size, 4)
-            self.headless_fbo_depth = self.ctx.depth_texture(self.wnd.buffer_size)
-            self.headless_fbo = self.ctx.framebuffer(self.headless_fbo_color, self.headless_fbo_depth)
 
     # noinspection PyAttributeOutsideInit
     def reset(self):
@@ -378,6 +307,62 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Set the mode once the viewer has been completely initialized
         self.selected_mode = "view"
+
+        self.viewports: List[Viewport] = []
+        self._viewport_mode = None
+        self.viewport_mode = "single"
+
+    def resize_viewports(self):
+        mode = self.viewport_mode
+
+        w, h = self.wnd.buffer_size
+        if mode == "single":
+            self.viewports[0].extents = [0, 0, w, h]
+        elif mode == "split_v":
+            self.viewports[0].extents = [0, 0, w // 2 - 1, h]
+            self.viewports[1].extents = [w // 2 + 1, 0, w - w // 2 - 1, h]
+        elif mode == "split_h":
+            self.viewports[0].extents = [0, h // 2 + 1, w, h - h // 2 - 1]
+            self.viewports[1].extents = [0, 0, w, h // 2 - 1]
+        elif mode == "split_vh":
+            self.viewports[0].extents = [0, h // 2 + 1, w // 2 - 1, h - h // 2 - 1]
+            self.viewports[1].extents = [w // 2 + 1, h // 2 + 1, w - w // 2 - 1, h - h // 2 - 1]
+            self.viewports[2].extents = [0, 0, w // 2 - 1, h // 2 - 1]
+            self.viewports[3].extents = [w // 2 + 1, 0, w - w // 2 - 1, h // 2 - 1]
+        else:
+            raise ValueError(f"Invalid viewport mode: {mode}")
+
+    @property
+    def viewport_mode(self):
+        return self._viewport_mode
+
+    @viewport_mode.setter
+    def viewport_mode(self, mode):
+        if mode == self._viewport_mode:
+            return
+
+        self._viewport_mode = mode
+        num_viewports = len(self.viewports)
+        if mode == "single":
+            new_num_viewports = 1
+        elif mode == "split_v":
+            new_num_viewports = 2
+        elif mode == "split_h":
+            new_num_viewports = 2
+        elif mode == "split_vh":
+            new_num_viewports = 4
+        else:
+            raise ValueError(f"Invalid viewport mode: {mode}")
+
+        if num_viewports > new_num_viewports:
+            self.viewports = self.viewports[:new_num_viewports]
+        elif num_viewports < new_num_viewports:
+            for _ in range(num_viewports, new_num_viewports):
+                camera = self.scene.camera
+                if isinstance(self.scene.camera, ViewerCamera):
+                    camera = camera.copy()
+                self.viewports.append(Viewport([], camera))
+        self.resize_viewports()
 
     def _init_scene(self):
         self.scene.make_renderable(self.ctx)
@@ -477,55 +462,26 @@ class Viewer(moderngl_window.WindowConfig):
         # Update camera matrices that will be used for rendering
         if isinstance(self.scene.camera, ViewerCamera):
             self.scene.camera.update_animation(frame_time)
-        self.scene.camera.update_matrices(self.window.size[0], self.window.size[1])
 
+        # Update streamable captures.
         if not export:
             self.streamable_capture()
 
-        # Disable some renderables for exporting.
-        renderables_to_enable = []
-        if export:
-
-            def disable_for_export(r):
-                if r.enabled:
-                    r.enabled = False
-                    renderables_to_enable.append(r)
-
-            # Disable lights.
-            for l in self.scene.lights:
-                disable_for_export(l.arrow)
-
-            # Disable camera target.
-            disable_for_export(self.scene.camera_target)
-
-        self.render_fragmap()
-        self.render_shadowmap()
-        self.render_prepare(transparent_background)
-        self.render_scene()
-        self.render_outline(
-            [n for n in self.scene.collect_nodes() if n.draw_outline],
-            self.outline_color,
+        # Render.
+        self.renderer.render(
+            self.scene,
+            viewports=self.viewports,
+            outline_color=self.outline_color,
+            light_outline_color=self.light_outline_color,
+            selected_outline_color=self.selected_outline_color,
+            export=export,
+            transparent_background=transparent_background,
+            window_size=self.window_size,
+            shadows_enabled=self.shadows_enabled,
+            visualize=self.visualize,
         )
 
-        # Re-enable renderables that were disabled for exporting.
-        if export:
-            for r in renderables_to_enable:
-                r.enabled = True
-
         if not export:
-            self.render_outline([l for l in self.scene.lights if l.enabled], self.light_outline_color)
-
-            # If the selected object is a Node render its outline.
-            if isinstance(self.scene.selected_object, Node):
-                self.render_outline([self.scene.selected_object], self.selected_outline_color)
-
-            # If visualize is True draw a texture with the object id to the screen for debugging.
-            if self.visualize:
-                self.ctx.enable_only(moderngl.NOTHING)
-                self.offscreen_p_tri_id.use(location=0)
-                self.vis_prog["hash_color"] = True
-                self.vis_quad.render(self.vis_prog)
-
             # FPS accounting.
             self._past_frametimes[:-1] = self._past_frametimes[1:]
             self._past_frametimes[-1] = frame_time
@@ -539,77 +495,6 @@ class Viewer(moderngl_window.WindowConfig):
         for r in rs:
             r.capture()
 
-    def render_shadowmap(self):
-        """A pass to render the shadow map, i.e. render the entire scene once from the view of the light."""
-        self.ctx.enable_only(moderngl.DEPTH_TEST)
-        if self.shadows_enabled:
-            rs = self.scene.collect_nodes()
-
-            for light in self.scene.lights:
-                if light.shadow_enabled:
-                    light.use(self.ctx)
-                    light_matrix = light.mvp()
-                    for r in rs:
-                        r.render_shadowmap(light_matrix)
-
-    def render_fragmap(self):
-        """A pass to render the fragment picking map, i.e. render the scene with world coords as colors."""
-        self.ctx.enable_only(moderngl.DEPTH_TEST)
-        self.offscreen_p.clear()
-        self.offscreen_p.use()
-        rs = self.scene.collect_nodes()
-        for r in rs:
-            r.render_fragmap(self.ctx, self.scene.camera)
-
-    def render_outline(self, nodes, color):
-        # Prepare the outline buffer, all objects rendered to this buffer will be outlined.
-        self.outline_framebuffer.clear()
-        self.outline_framebuffer.use()
-        # Render outline of the nodes with outlining enabled, this potentially also renders their children.
-        for n in nodes:
-            n.render_outline(self.ctx, self.scene.camera)
-
-        # Render the outline effect to the window.
-        self.wnd.use()
-        self.wnd.fbo.depth_mask = False
-        self.ctx.enable_only(moderngl.NOTHING)
-        self.outline_texture.use(0)
-        self.outline_draw_prog["outline"] = 0
-        self.outline_draw_prog["outline_color"] = color
-        self.outline_quad.render(self.outline_draw_prog)
-        self.wnd.fbo.depth_mask = True
-
-    def render_scene(self):
-        """Render the current scene to the framebuffer without time accounting and GUI elements."""
-        self.scene.render(
-            window_size=self.window.size,
-            lights=self.scene.lights,
-            shadows_enabled=self.shadows_enabled,
-            ambient_strength=self.scene.ambient_strength,
-            fbo=self.wnd.fbo,
-        )
-
-    def render_prepare(self, transparent_background=True):
-        """Prepare the framebuffer."""
-        self.wnd.use()
-        # Clear background and make sure only the flags we want are enabled.
-        if transparent_background:
-            self.ctx.clear(0, 0, 0, 0)
-        else:
-            if self.scene.light_mode == "dark":
-                self.ctx.clear(0.1, 0.1, 0.1, 1.0)
-            else:
-                self.ctx.clear(*self.scene.background_color)
-
-        self.ctx.enable_only(moderngl.DEPTH_TEST | moderngl.BLEND | moderngl.CULL_FACE)
-        self.ctx.cull_face = "back"
-        self.ctx.blend_func = (
-            moderngl.SRC_ALPHA,
-            moderngl.ONE_MINUS_SRC_ALPHA,
-            moderngl.ONE,
-            moderngl.ONE,
-        )
-
     def prevent_background_interactions(self):
         """Prevent background interactions when hovering over any imgui window."""
         self.imgui_user_interacting = self.imgui.io.want_capture_mouse
@@ -619,24 +504,22 @@ class Viewer(moderngl_window.WindowConfig):
         if self.run_animations:
             self._last_frame_rendered_at = self.timer.time
 
-    def reset_camera(self):
-        if self._using_temp_camera:
-            self._using_temp_camera = False
+    def reset_camera(self, viewport=None):
+        if viewport is None:
+            viewport = self.viewports[0]
+        viewport.reset_camera()
+        if viewport == self.viewports[0]:
+            self.scene.camera = self.viewports[0].camera
 
-            fwd = self.scene.camera.forward
-            pos = self.scene.camera.position
-
-            self.scene.camera = ViewerCamera(45)
-            self.scene.camera.position = np.copy(pos)
-            self.scene.camera.target = pos + fwd * 3
-            self.scene.camera.update_matrices(self.window_size[0], self.window_size[1])
-
-    def set_temp_camera(self, camera):
-        self.scene.camera = camera
+    def set_temp_camera(self, camera, viewport=None):
         self.scene.camera_target.enabled = False
-        self._using_temp_camera = True
+        if viewport is None:
+            viewport = self.viewports[0]
+        viewport.set_temp_camera(camera)
+        if viewport == self.viewports[0]:
+            self.scene.camera = self.viewports[0].camera
 
-    def lock_to_node(self, node: Node, relative_position, smooth_sigma=None):
+    def lock_to_node(self, node: Node, relative_position, smooth_sigma=None, viewport=None):
         """
         Create and return a PinholeCamera that follows a node, the target of the camera is the center
         of the node at each frame and the camera is positioned with a constant offset (relative_position)
@@ -646,8 +529,15 @@ class Viewer(moderngl_window.WindowConfig):
         pos, tar = path.lock_to_node(node, relative_position, smooth_sigma=smooth_sigma)
         cam = PinholeCamera(pos, tar, self.window_size[0], self.window_size[1], viewer=self)
         self.scene.add(cam)
-        self.set_temp_camera(cam)
+        self.set_temp_camera(cam, viewport)
         return cam
+
+    def get_viewport_at_position(self, x: int, y: int) -> Union[Viewport, None]:
+        x, y = self._mouse_to_buffer(x, y)
+        for v in self.viewports:
+            if v.contains(x, y):
+                return v
+        return None
 
     def gui(self):
         imgui.new_frame()
@@ -658,19 +548,21 @@ class Viewer(moderngl_window.WindowConfig):
             and imgui.is_mouse_released(button=1)
             and not self._mouse_moved
         ):
-            # Select the object under the cursor
-            if self.select_object(*imgui.get_io().mouse_pos) or not isinstance(self.scene.selected_object, Node):
+            x, y = imgui.get_io().mouse_pos
+            # Select the object under the cursor.
+            if self.select_object(x, y) or not isinstance(self.scene.selected_object, Node):
+                self._context_menu_position = (x, y)
                 imgui.open_popup("Context Menu")
 
-        # Draw the context menu for the selected object
+        # Draw the context menu for the selected object.
         if imgui.begin_popup("Context Menu"):
             if self.scene.selected_object is None or not isinstance(self.scene.selected_object, Node):
                 imgui.close_current_popup()
             else:
-                self.scene.selected_object.gui_context_menu(imgui)
+                self.scene.selected_object.gui_context_menu(imgui, *self._context_menu_position)
             imgui.end_popup()
 
-        # Reset user interacting state
+        # Reset user interacting state.
         self.imgui_user_interacting = False
 
         if self._render_gui:
@@ -683,6 +575,16 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Contains live examples of all possible displays/controls - useful for browsing for new components
         # imgui.show_test_window()
+
+        # Add viewport separators to draw list.
+        w, h = self.wnd.buffer_size
+        draw = imgui.get_foreground_draw_list()
+        c = 36 / 255
+        color = imgui.get_color_u32_rgba(c, c, c, 1.0)
+        if self.viewport_mode == "split_v" or self.viewport_mode == "split_vh":
+            draw.add_rect_filled(w // 2 - 1, 0, w // 2 + 1, h, color)
+        if self.viewport_mode == "split_h" or self.viewport_mode == "split_vh":
+            draw.add_rect_filled(0, h // 2 - 1, w, h // 2 + 1, color)
 
         imgui.render()
         self.imgui.render(imgui.get_draw_data())
@@ -751,7 +653,22 @@ class Viewer(moderngl_window.WindowConfig):
                     self.lock_selection,
                     True,
                 )
+
+                if imgui.begin_menu("Viewports"):
+
+                    def menu_entry(text, name):
+                        if imgui.menu_item(text, None, self.viewport_mode == name)[1]:
+                            self.viewport_mode = name
+
+                    menu_entry("Single", "single")
+                    menu_entry("Split vertical", "split_v")
+                    menu_entry("Split horizontal", "split_h")
+                    menu_entry("Split both", "split_vh")
+
+                    imgui.end_menu()
+
                 _, self._render_gui = imgui.menu_item("Render GUI", None, self._render_gui, True)
+
                 imgui.end_menu()
 
             if imgui.begin_menu("Camera", True):
@@ -1273,23 +1190,17 @@ class Viewer(moderngl_window.WindowConfig):
                 imgui.close_current_popup()
             imgui.end_popup()
 
+    def _mouse_to_buffer(self, x: int, y: int):
+        return int(x * self.wnd.pixel_ratio), int(self.wnd.buffer_height - (y * self.wnd.pixel_ratio))
+
     def mesh_mouse_intersection(self, x: int, y: int):
         """Given an x/y screen coordinate, get the intersected object, triangle id, and xyz point in camera space"""
-
-        # Texture is y=0 at bottom, so we flip y coords
-        pos = int(x * self.wnd.pixel_ratio), int(self.wnd.buffer_height - (y * self.wnd.pixel_ratio))
-
-        # Fragment picker uses already encoded position/object/triangle in the frag_pos program textures
-        self.frag_pick_prog["texel_pos"].value = pos
-        self.offscreen_p_viewpos.use(location=0)
-        self.offscreen_p_tri_id.use(location=1)
-        self.picker_vao.transform(self.frag_pick_prog, self.picker_output, vertices=1)
-        x, y, z, obj_id, tri_id, instance_id = struct.unpack("3f3i", self.picker_output.read())
+        x, y = self._mouse_to_buffer(x, y)
+        point_world, obj_id, tri_id, instance_id = self.renderer.read_fragmap_at_pixel(x, y)
 
         if obj_id >= 0 and tri_id >= 0:
             node = self.scene.get_node_by_uid(obj_id)
             # Camera space to world space
-            point_world = np.array((x, y, z))
             point_local = (np.linalg.inv(node.model_matrix) @ np.append(point_world, 1.0))[:-1]
             if isinstance(node, Meshes) or isinstance(node, Billboard) or isinstance(node, VariableTopologyMeshes):
                 vert_id = node.closest_vertex_in_triangle(tri_id, point_local)
@@ -1326,8 +1237,7 @@ class Viewer(moderngl_window.WindowConfig):
 
     def center_view_on_selection(self):
         if isinstance(self.scene.selected_object, Node):
-            if self._using_temp_camera:
-                self.reset_camera()
+            self.reset_camera()
             forward = self.scene.camera.forward
             bounds = self.scene.selected_object.current_bounds
             diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
@@ -1338,8 +1248,9 @@ class Viewer(moderngl_window.WindowConfig):
 
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
+        self.resize_viewports()
+        self.renderer.resize(width, height)
         self.imgui.resize(width, height)
-        self.create_framebuffers()
 
     def files_dropped_event(self, x: int, y: int, paths):
         for path in paths:
@@ -1409,8 +1320,7 @@ class Viewer(moderngl_window.WindowConfig):
                 self.scene.camera_target.enabled = not self.scene.camera_target.enabled
 
             elif key == self._orthographic_camera_key:
-                if self._using_temp_camera:
-                    self.reset_camera()
+                self.reset_camera()
                 self.scene.camera.is_ortho = not self.scene.camera.is_ortho
 
             elif key == self._center_view_on_selection_key:
@@ -1429,12 +1339,10 @@ class Viewer(moderngl_window.WindowConfig):
                 self._screenshot_popup_just_opened = True
 
             elif key == self._save_cam_key:
-                if self._using_temp_camera:
-                    self.reset_camera()
+                self.reset_camera()
                 self.scene.camera.save_cam()
             elif key == self._load_cam_key:
-                if self._using_temp_camera:
-                    self.reset_camera()
+                self.reset_camera()
                 self.scene.camera.load_cam()
 
             elif key == self._visualize_key:
@@ -1451,6 +1359,7 @@ class Viewer(moderngl_window.WindowConfig):
             pass
 
     def mouse_position_event(self, x, y, dx, dy):
+        self._mouse_position = (x, y)
         self.imgui.mouse_position_event(x, y, dx, dy)
 
         if self.selected_mode == "inspect":
@@ -1460,6 +1369,10 @@ class Viewer(moderngl_window.WindowConfig):
         self.imgui.mouse_press_event(x, y, button)
 
         if not self.imgui_user_interacting:
+            self._moving_camera_viewport = self.get_viewport_at_position(x, y)
+            if self._moving_camera_viewport is None:
+                return
+
             # Pan or rotate camera on middle click.
             if button == self._middle_mouse_button:
                 self._pan_camera = self.wnd.modifiers.shift
@@ -1482,6 +1395,7 @@ class Viewer(moderngl_window.WindowConfig):
 
         self._pan_camera = False
         self._rotate_camera = False
+        self._moving_camera_viewport = None
 
         if not self.imgui_user_interacting:
             # Select the mesh under the cursor on left click.
@@ -1495,15 +1409,16 @@ class Viewer(moderngl_window.WindowConfig):
         self.imgui.mouse_drag_event(x, y, dx, dy)
 
         if not self.imgui_user_interacting:
+            if self._moving_camera_viewport is None:
+                return
+
             if self._pan_camera:
-                if self._using_temp_camera:
-                    self.reset_camera()
-                self.scene.camera.pan(dx, dy)
+                self.reset_camera(self._moving_camera_viewport)
+                self._moving_camera_viewport.camera.pan(dx, dy)
 
             if self._rotate_camera:
-                if self._using_temp_camera:
-                    self.reset_camera()
-                self.scene.camera.rotate_azimuth_elevation(dx, dy)
+                self.reset_camera(self._moving_camera_viewport)
+                self._moving_camera_viewport.camera.rotate_azimuth_elevation(dx, dy)
 
             if (
                 not self._mouse_moved
@@ -1515,9 +1430,9 @@ class Viewer(moderngl_window.WindowConfig):
         self.imgui.mouse_scroll_event(x_offset, y_offset)
 
         if not self.imgui_user_interacting:
-            if self._using_temp_camera:
-                self.reset_camera()
-            self.scene.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift, self.wnd.modifiers.ctrl)
+            if v := self.get_viewport_at_position(*self._mouse_position):
+                self.reset_camera(v)
+                v.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift, self.wnd.modifiers.ctrl)
 
     def unicode_char_entered(self, char):
         self.imgui.unicode_char_entered(char)
@@ -1532,169 +1447,16 @@ class Viewer(moderngl_window.WindowConfig):
         image.save(path)
 
     def get_current_frame_as_image(self, alpha=False):
-        """Return the FBO content as a PIL image."""
-        if alpha:
-            fmt = "RGBA"
-            components = 4
-        else:
-            fmt = "RGB"
-            components = 3
-
-        # If in headless mode we first resolve the multisampled framebuffer into
-        # a non multisampled one and read from that instead.
-        if self.window_type == "headless":
-            self.ctx.copy_framebuffer(self.headless_fbo, self.wnd.fbo)
-            fbo = self.headless_fbo
-        else:
-            fbo = self.wnd.fbo
-
-        width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
-        height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
-        image = Image.frombytes(
-            fmt,
-            (width, height),
-            fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, components=components),
-        )
-        if width != self.wnd.size[0] or height != self.wnd.size[1]:
-            image = image.resize(self.wnd.size, Image.NEAREST)
-
-        return image.transpose(Image.FLIP_TOP_BOTTOM)
-
-    def get_current_depth_image(self):
-        """
-        Return the depth buffer as a 'F' PIL image.
-        Depth is stored as the z coordinate in eye (view) space.
-        Therefore values in the depth image represent the distance from the pixel to
-        the plane passing through the camera and orthogonal to the view direction.
-        Values are between the near and far plane distances of the camera used for rendering,
-        everything outside this range is clipped by OpenGL.
-        """
-
-        # If in headless mode we first resolve the multisampled framebuffer into
-        # a non multisampled one and read from that instead.
-        if self.window_type == "headless":
-            self.ctx.copy_framebuffer(self.headless_fbo, self.wnd.fbo)
-            fbo = self.headless_fbo
-        else:
-            fbo = self.wnd.fbo
-
-        width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
-        height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
-
-        # Get depth image from depth buffer.
-        depth = Image.frombytes(
-            "F",
-            (width, height),
-            fbo.read(viewport=self.wnd.fbo.viewport, alignment=1, attachment=-1, dtype="f4"),
-        )
-
-        if width != self.wnd.size[0] or height != self.wnd.size[1]:
-            depth = depth.resize(self.wnd.size, Image.NEAREST)
-
-        # Convert from [0, 1] range to [-1, 1] range.
-        # This is necessary because our projection matrix computes NDC
-        # from [-1, 1], but depth is then stored normalized from 0 to 1.
-        depth = np.array(depth) * 2.0 - 1.0
-
-        # Extract projection matrix parameters used for mapping Z coordinates.
-        P = self.scene.camera.get_projection_matrix()
-        a, b = P[2, 2], P[2, 3]
-
-        # Linearize depth values. This converts from [-1, 1] range to the
-        # view space Z coordinate value, with positive z in front of the camera.
-        z = b / (a + depth)
-        return Image.fromarray(z, mode="F").transpose(Image.FLIP_TOP_BOTTOM)
-
-    def get_current_mask_ids(self, id_map: Dict[int, int] = None):
-        """
-        Return a mask as a numpy array of shape (height, width) and type np.uint32.
-        Each element in the array is the UID of the node covering that pixel (can be accessed from a node with 'node.uid')
-        or zero if not covered.
-
-        :param id_map:
-            if not None the UIDs in the mask are mapped using this dictionary to the specified ID.
-            The final mask only contains the IDs specified in this mapping and zeros everywhere else.
-        """
-        width = self.wnd.fbo.viewport[2] - self.wnd.fbo.viewport[0]
-        height = self.wnd.fbo.viewport[3] - self.wnd.fbo.viewport[1]
-
-        # Get object ids as floating point numbers from the first channel of
-        # the first attachment of the picking framebuffer.
-        id = Image.frombytes(
-            "F",
-            (width, height),
-            self.offscreen_p.read(
-                viewport=self.wnd.fbo.viewport,
-                alignment=1,
-                components=1,
-                attachment=1,
-                dtype="f4",
-            ),
-        )
-
-        if width != self.wnd.size[0] or height != self.wnd.size[1]:
-            id = id.resize(self.wnd.size, Image.NEAREST)
-
-        # Convert the id to integer values.
-        id_int = np.asarray(id).astype(dtype=np.uint32)
-
-        # If an id_map is given use this to map the ids.
-        if id_map is not None:
-            output = np.zeros(id_int.shape, dtype=np.uint32)
-            for k, v in id_map.items():
-                output[id_int == k] = v
-            return output
-        else:
-            # Copy here because the array constructed from a PIL image is read-only.
-            return id_int.copy()
+        return self.renderer.get_current_frame_as_image(alpha)
 
     def get_current_mask_image(self, color_map: Dict[int, Tuple[int, int, int]] = None, id_map: Dict[int, int] = None):
-        """
-        Return a color mask as a 'RGB' PIL image.
-        Each object in the mask has a uniform color computed from the Node UID (can be accessed from a node with 'node.uid').
+        return self.renderer.get_current_mask_image(color_map, id_map)
 
-        :param color_map:
-            if not None specifies the color to use for a given Node UID as a tuple (R, G, B) of integer values from 0 to 255.
-            If None the color is computed as an hash of the Node UID instead.
-        :param id_map:
-            if not None the UIDs in the mask are mapped using this dictionary from Node UID to the specified ID.
-            This mapping is applied before the color map (or before hashing if the color map is None).
-        """
+    def get_current_mask_ids(self, id_map: Dict[int, int] = None):
+        return self.renderer.get_current_mask_ids(id_map)
 
-        if color_map is None:
-            # If no colormap is given hash the ids mapped with id_map.
-            ids = self.get_current_mask_ids(id_map)
-
-            # Hash the ids.
-            def hash(h):
-                h ^= h >> 16
-                h *= 0x85EBCA6B
-                h ^= h >> 13
-                h *= 0xC2B2AE35
-                h ^= h >> 16
-                return h
-
-            output = hash(ids)
-        else:
-            # If a colormap is given use it to map from UID to colors.
-            ids = self.get_current_mask_ids()
-
-            def rgb_to_uint(r, g, b):
-                return ((b & 0xFF) << 16) | ((g & 0xFF) << 8) | (r & 0xFF)
-
-            output = np.zeros(ids.shape, dtype=np.uint32)
-            if id_map is not None:
-                # If a id_map is given use it before indexing into the color map
-                for k, v in id_map.items():
-                    output[ids == k] = rgb_to_uint(*color_map[v])
-            else:
-                # If no id_map is given use the color_map directly.
-                for k, v in color_map.items():
-                    output[ids == k] = rgb_to_uint(*v)
-
-        # Convert the hashed ids to an RGBA image and then throw away the alpha channel.
-        img = Image.frombytes("RGBA", (ids.shape[1], ids.shape[0]), output.tobytes()).convert("RGB")
-        return img.transpose(Image.FLIP_TOP_BOTTOM)
+    def get_current_depth_image(self):
+        return self.renderer.get_current_depth_image(self.scene.camera)
 
     def on_close(self):
         """

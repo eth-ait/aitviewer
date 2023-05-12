@@ -22,7 +22,7 @@ from moderngl_window import resources
 from moderngl_window.meta import ProgramDescription
 
 
-def _load(name, defines: dict = None):
+def load_program(name, defines: dict = None):
     return resources.programs.load(ProgramDescription(path=name, defines=defines))
 
 
@@ -114,22 +114,22 @@ def get_depth_only_program(vs_path, instanced=0):
 
 @functools.lru_cache()
 def get_simple_unlit_program():
-    return _load("simple_unlit.glsl")
+    return load_program("simple_unlit.glsl")
 
 
 @functools.lru_cache()
 def get_cylinder_program():
-    return _load("cylinder.glsl")
+    return load_program("cylinder.glsl")
 
 
 @functools.lru_cache()
 def get_screen_texture_program():
-    return _load("screen_texture.glsl")
+    return load_program("screen_texture.glsl")
 
 
 @functools.lru_cache()
 def get_chessboard_program():
-    return _load("chessboard.glsl")
+    return load_program("chessboard.glsl")
 
 
 @functools.lru_cache()

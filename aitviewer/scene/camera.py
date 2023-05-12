@@ -354,17 +354,17 @@ class Camera(Node, CameraInterface):
         # the frustum and coordinate system visualization.
         self.mesh.render_outline(*args, **kwargs)
 
-    def view_from_camera(self):
+    def view_from_camera(self, viewport):
         """If the viewer is specified for this camera, change the current view to view from this camera"""
         if self.viewer:
             self.hide_path()
             self.hide_frustum()
-            self.viewer.set_temp_camera(self)
+            self.viewer.set_temp_camera(self, viewport)
 
     def gui(self, imgui):
         if self.viewer:
             if imgui.button("View from camera"):
-                self.view_from_camera()
+                self.view_from_camera(self.viewer.viewports[0])
 
         u, show = imgui.checkbox("Show path", self.path is not None)
         if u:
@@ -373,10 +373,10 @@ class Camera(Node, CameraInterface):
             else:
                 self.hide_path()
 
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         if self.viewer:
             if imgui.menu_item("View from camera", shortcut=None, selected=False, enabled=True)[1]:
-                self.view_from_camera()
+                self.view_from_camera(self.viewer.get_viewport_at_position(x, y))
 
         u, show = imgui.checkbox("Show path", self.path is not None)
         if u:
@@ -492,7 +492,7 @@ class WeakPerspectiveCamera(Camera):
                 self.hide_frustum()
 
     @hooked
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
         if u:
             if show:
@@ -503,7 +503,7 @@ class WeakPerspectiveCamera(Camera):
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-        super(Camera, self).gui_context_menu(imgui)
+        super(Camera, self).gui_context_menu(imgui, x, y)
 
 
 class OpenCVCamera(Camera):
@@ -701,7 +701,7 @@ class OpenCVCamera(Camera):
                 self.hide_frustum()
 
     @hooked
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
         if u:
             if show:
@@ -712,7 +712,7 @@ class OpenCVCamera(Camera):
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-        super(Camera, self).gui_context_menu(imgui)
+        super(Camera, self).gui_context_menu(imgui, x, y)
 
 
 class PinholeCamera(Camera):
@@ -850,7 +850,7 @@ class PinholeCamera(Camera):
                 self.hide_frustum()
 
     @hooked
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
         if u:
             if show:
@@ -861,7 +861,7 @@ class PinholeCamera(Camera):
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-        super(Camera, self).gui_context_menu(imgui)
+        super(Camera, self).gui_context_menu(imgui, x, y)
 
 
 class ViewerCamera(CameraInterface):
@@ -901,6 +901,14 @@ class ViewerCamera(CameraInterface):
         self._animation_start_target = None
         self._animation_end_target = None
 
+    def copy(self):
+        camera = ViewerCamera(self.fov, self.ortho_size, self.near, self.far)
+        camera.is_ortho = self.is_ortho
+        camera.position = self.position
+        camera.target = self.target
+        camera.up = self.up
+        return camera
+
     @property
     def position(self):
         return self._position
@@ -920,7 +928,7 @@ class ViewerCamera(CameraInterface):
 
     @up.setter
     def up(self, up):
-        self._up = up
+        self._up = np.array(up, dtype=np.float32).copy()
 
     @property
     def right(self):
