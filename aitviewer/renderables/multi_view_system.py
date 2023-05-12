@@ -191,7 +191,7 @@ class MultiViewSystem(Node):
             # Remove camera from active cameras
             del self.active_cameras[index]
 
-    def view_from_camera(self, index):
+    def view_from_camera(self, index, viewport):
         """
         View from the camera with the given index deactivating all other cameras,
         this also enables the billboard and disables the frustums.
@@ -203,7 +203,7 @@ class MultiViewSystem(Node):
             if i != index:
                 self.deactivate_camera(i)
         self.activate_camera(index)
-        self.cameras[index].view_from_camera()
+        self.cameras[index].view_from_camera(viewport)
 
     @property
     def frustums_enabled(self):
@@ -286,18 +286,18 @@ class MultiViewSystem(Node):
             active_index = next(reversed(self.active_cameras.keys()))
         u_selected, active_index = imgui.combo("ID", active_index, [str(id) for id in self.camera_info["ids"].tolist()])
         if u_selected:
-            self.view_from_camera(active_index)
+            self.view_from_camera(active_index, self.viewer.viewports[0])
 
         imgui.text("Active cameras:")
         active_cameras = list(self.active_cameras.keys())
         for i in active_cameras:
             if imgui.button(f"{self.camera_info['ids'][i]}", width=50):
-                self.view_from_camera(i)
+                self.view_from_camera(i, self.viewer.viewports[0])
             imgui.same_line(spacing=10)
             if imgui.button(f"x##{i}"):
                 self.deactivate_camera(i)
 
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         if self.selected_camera_index is None:
             return
 
@@ -316,7 +316,7 @@ class MultiViewSystem(Node):
 
         _, v = imgui.menu_item(f"View from camera")
         if v:
-            self.view_from_camera(self.selected_camera_index)
+            self.view_from_camera(self.selected_camera_index, self.viewer.get_viewport_at_position(x, y))
 
         imgui.spacing()
         imgui.spacing()
