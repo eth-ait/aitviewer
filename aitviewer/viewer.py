@@ -313,6 +313,7 @@ class Viewer(moderngl_window.WindowConfig):
         self.viewport_mode = "single"
 
     def resize_viewports(self):
+        """TODO: docs"""
         mode = self.viewport_mode
 
         w, h = self.wnd.buffer_size
@@ -332,12 +333,60 @@ class Viewer(moderngl_window.WindowConfig):
         else:
             raise ValueError(f"Invalid viewport mode: {mode}")
 
+    def set_ortho_grid_viewports(self, invert=(False, False, False)):
+        """TODO: docs"""
+        self.viewport_mode = "split_vh"
+
+        bounds = self.scene.bounds_without_floor
+        center = bounds.mean(-1)
+        size = bounds[:, 1] - bounds[:, 0]
+
+        axis = [
+            np.array([1, 0, 0]),
+            np.array([0, 0, 1]),
+            np.array([0, 1, 0]),
+        ]
+        for i in range(3):
+            if invert[i]:
+                axis[i] = -axis[i]
+
+        up = [
+            np.array([0, 1, 0]),
+            np.array([0, 1, 0]),
+            np.array([0, 0, 1]),
+        ]
+
+        ar = self.window.width / self.window.height
+
+        def compute_ortho_size(w, h):
+            if w / h > ar:
+                # Limiting size is width, convert to limit on height.
+                size = w / ar
+            else:
+                # Limiting size is height, return directly
+                size = h
+            return size * 0.55
+
+        ortho_size = [
+            compute_ortho_size(size[2], size[1]),
+            compute_ortho_size(size[0], size[1]),
+            compute_ortho_size(size[0], size[2]),
+        ]
+
+        for i, v in enumerate(self.viewports[1:]):
+            v.camera = ViewerCamera(orthographic=ortho_size[i])
+            v.camera.target = center
+            v.camera.position = center + size[i] * axis[i]
+            v.camera.up = up[i]
+
     @property
     def viewport_mode(self):
+        """TODO: docs"""
         return self._viewport_mode
 
     @viewport_mode.setter
     def viewport_mode(self, mode):
+        """TODO: docs"""
         if mode == self._viewport_mode:
             return
 
@@ -542,6 +591,16 @@ class Viewer(moderngl_window.WindowConfig):
     def gui(self):
         imgui.new_frame()
 
+        # Add viewport separators to draw list.
+        w, h = self.wnd.buffer_size
+        draw = imgui.get_background_draw_list()
+        c = 36 / 255
+        color = imgui.get_color_u32_rgba(c, c, c, 1.0)
+        if self.viewport_mode == "split_v" or self.viewport_mode == "split_vh":
+            draw.add_rect_filled(w // 2 - 1, 0, w // 2 + 1, h, color)
+        if self.viewport_mode == "split_h" or self.viewport_mode == "split_vh":
+            draw.add_rect_filled(0, h // 2 - 1, w, h // 2 + 1, color)
+
         # Create a context menu when right clicking on the background.
         if (
             not any([imgui.is_window_hovered(), imgui.is_any_item_hovered()])
@@ -575,16 +634,6 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Contains live examples of all possible displays/controls - useful for browsing for new components
         # imgui.show_test_window()
-
-        # Add viewport separators to draw list.
-        w, h = self.wnd.buffer_size
-        draw = imgui.get_foreground_draw_list()
-        c = 36 / 255
-        color = imgui.get_color_u32_rgba(c, c, c, 1.0)
-        if self.viewport_mode == "split_v" or self.viewport_mode == "split_vh":
-            draw.add_rect_filled(w // 2 - 1, 0, w // 2 + 1, h, color)
-        if self.viewport_mode == "split_h" or self.viewport_mode == "split_vh":
-            draw.add_rect_filled(0, h // 2 - 1, w, h // 2 + 1, color)
 
         imgui.render()
         self.imgui.render(imgui.get_draw_data())
@@ -664,6 +713,11 @@ class Viewer(moderngl_window.WindowConfig):
                     menu_entry("Split vertical", "split_v")
                     menu_entry("Split horizontal", "split_h")
                     menu_entry("Split both", "split_vh")
+                    imgui.separator()
+                    if imgui.menu_item("Ortho grid +", None)[1]:
+                        self.set_ortho_grid_viewports()
+                    if imgui.menu_item("Ortho grid -", None)[1]:
+                        self.set_ortho_grid_viewports((True, True, True))
 
                     imgui.end_menu()
 
@@ -1430,7 +1484,8 @@ class Viewer(moderngl_window.WindowConfig):
         self.imgui.mouse_scroll_event(x_offset, y_offset)
 
         if not self.imgui_user_interacting:
-            if v := self.get_viewport_at_position(*self._mouse_position):
+            v = self.get_viewport_at_position(*self._mouse_position)
+            if v:
                 self.reset_camera(v)
                 v.camera.dolly_zoom(np.sign(y_offset), self.wnd.modifiers.shift, self.wnd.modifiers.ctrl)
 

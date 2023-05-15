@@ -196,6 +196,10 @@ class Scene(Node):
     def current_bounds(self):
         return compute_union_of_current_bounds([n for n in self.nodes if n not in self.lights])
 
+    @property
+    def bounds_without_floor(self):
+        return compute_union_of_current_bounds([n for n in self.nodes if n not in self.lights and n != self.floor])
+
     def auto_set_floor(self):
         """Finds the minimum lower bound in the y coordinate from all the children bounds and uses that as the floor"""
         if self.floor is not None and len(self.nodes) > 0:
