@@ -16,7 +16,16 @@ from aitviewer.shaders import load_program
 class Viewport:
     def __init__(self, extents: Tuple[int, int, int, int], camera: CameraInterface):
         self.extents = extents
-        self.camera = camera
+        self._camera = camera
+        self._using_temp_camera = not isinstance(camera, ViewerCamera)
+
+    @property
+    def camera(self):
+        return self._camera
+
+    @camera.setter
+    def camera(self, camera: CameraInterface):
+        self._camera = camera
         self._using_temp_camera = not isinstance(camera, ViewerCamera)
 
     def contains(self, x: int, y: int):
