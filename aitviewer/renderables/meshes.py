@@ -113,6 +113,11 @@ class Meshes(Node):
         self._vertices = vertices
         self._faces = faces.astype(np.int32)
 
+        # Create these first because other setters can call redraw() which uses this fields.
+        self._face_colors = None
+        self._vertex_colors = None
+        self._has_transparent_vertex_or_face_colors = False
+
         def _maybe_unsqueeze(x):
             return x[np.newaxis] if x is not None and x.ndim == 2 else x
 
@@ -436,7 +441,7 @@ class Meshes(Node):
             return self.get_bounds(np.vstack((mins[:, :3], maxs[:, :3])))
 
     def is_transparent(self):
-        return self.color[3] < 1.0
+        return self.color[3] < 1.0 or self._has_transparent_vertex_or_face_colors
 
     def on_frame_update(self):
         """Called whenever a new frame must be displayed."""
@@ -508,6 +513,14 @@ class Meshes(Node):
     @hooked
     def redraw(self, **kwargs):
         self._need_upload = True
+
+        transparent = False
+        if self._vertex_colors is not None:
+            transparent = transparent or np.any(self.vertex_colors[:, :, 3] < 1.0)
+        if self._face_colors is not None:
+            transparent = transparent or np.any(self.face_colors[:, :, 3] < 1.0)
+
+        self._has_transparent_vertex_or_face_colors = transparent
 
     def _load_programs(self, vs, positions_vs):
         instanced = 1 if self.instance_transforms is not None else 0
