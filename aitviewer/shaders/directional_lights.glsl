@@ -66,3 +66,13 @@ vec3 compute_lighting(vec3 base_color, vec3 vert, vec3 normal, vec4 vert_light[N
     color += ambient_strength * ambient_coeff * base_color;
     return color;
 }
+
+float compute_diffuse_shadows(vec3 vert, vec3 normal, vec4 vert_light[NR_DIR_LIGHTS]) {
+    float v = 0.0;
+    for(int i = 0; i < NR_DIR_LIGHTS; i++){
+        float shadow = dirLights[i].shadow_enabled ? shadow_calculation(shadow_maps[i], vert_light[i], -dirLights[i].direction, normal) : 0.0;
+        float diff = max(dot(normal, -dirLights[i].direction), 0.0);
+        v += diff * (1 - shadow);
+    }
+    return v;
+}
