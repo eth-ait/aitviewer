@@ -357,10 +357,10 @@ class Scene(Node):
             format="%.2f",
         )
 
-    def gui_editor(self, imgui):
+    def gui_editor(self, imgui, viewports, viewport_mode):
         """GUI to control scene settings."""
         # Also include the camera GUI in the scene node.
-        self.gui_camera(imgui)
+        self.gui_camera(imgui, viewports, viewport_mode)
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
@@ -371,27 +371,61 @@ class Scene(Node):
         imgui.spacing()
         self.gui_selected(imgui)
 
-    def gui_camera(self, imgui):
-        # Camera GUI
-        imgui.push_font(self.custom_font)
-        imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
-
-        flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
-        if self.is_selected(self.camera):
-            flags |= imgui.TREE_NODE_SELECTED
-
-        if isinstance(self.camera, ViewerCamera):
-            name = self.camera.name
+    def gui_camera(self, imgui, viewports, viewport_mode):
+        # Label for the viewport position, if using multiple viewports.
+        if viewport_mode == "single":
+            suffixes = [""]
+        elif viewport_mode == "split_v":
+            suffixes = ["(left)", "(right)"]
+        elif viewport_mode == "split_h":
+            suffixes = ["(top)", "(bottom)"]
         else:
-            name = f"Camera: {self.camera.name}"
-        camera_expanded = imgui.tree_node(f"{self.camera.icon} {name}##tree_node_r_camera", flags)
-        if imgui.is_item_clicked():
-            self.select(self.camera)
+            suffixes = [
+                "(top left)",
+                "(top right)",
+                "(bottom left)",
+                "(bottom right)",
+            ]
 
-        imgui.pop_style_var()
-        imgui.pop_font()
-        if camera_expanded:
-            imgui.tree_pop()
+        for suffix, v in zip(suffixes, viewports):
+            camera = v.camera
+
+            # Camera GUI
+            imgui.push_font(self.custom_font)
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
+
+            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
+            if self.is_selected(camera):
+                flags |= imgui.TREE_NODE_SELECTED
+
+            if isinstance(camera, ViewerCamera):
+                name = camera.name
+            else:
+                name = f"{name}: {camera.name}"
+
+            camera_expanded = imgui.tree_node(f"{camera.icon}  {name}##tree_node_r_camera", flags)
+            if imgui.is_item_clicked():
+                self.select(camera)
+
+            # Add a right justified label with the viewport position.
+            if suffix:
+                imgui.same_line()
+                pos = imgui.get_cursor_pos_x()
+                avail = imgui.get_content_region_available()[0] - 3
+                # Only put the label if enough space is available for it.
+                if avail > imgui.calc_text_size(suffix)[0]:
+                    imgui.same_line()
+                    avail -= imgui.calc_text_size(suffix)[0]
+                    imgui.set_cursor_pos_x(pos + avail)
+                    imgui.text(suffix)
+                else:
+                    # Put an empty label to go to the next line.
+                    imgui.text("")
+
+            imgui.pop_style_var()
+            imgui.pop_font()
+            if camera_expanded:
+                imgui.tree_pop()
 
     def gui_lights(self, imgui):
         # Lights GUI

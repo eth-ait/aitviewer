@@ -404,6 +404,13 @@ class Viewer(moderngl_window.WindowConfig):
             raise ValueError(f"Invalid viewport mode: {mode}")
 
         if num_viewports > new_num_viewports:
+            # If the camera of one of the viewports that we are removing is selected
+            # we just deselct it and remove it from the GUI, since it won't exist anymore.
+            for v in self.viewports[new_num_viewports:]:
+                if self.scene.selected_object == v.camera and isinstance(v.camera, ViewerCamera):
+                    self.scene.select(None)
+                    self.scene.gui_selected_object = None
+            # Remove extra viewports.
             self.viewports = self.viewports[:new_num_viewports]
         elif num_viewports < new_num_viewports:
             for _ in range(num_viewports, new_num_viewports):
@@ -646,7 +653,7 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.set_next_window_size(self.window_size[0] * 0.25, self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
         expanded, _ = imgui.begin("Editor", None)
         if expanded:
-            self.scene.gui_editor(imgui)
+            self.scene.gui_editor(imgui, self.viewports, self.viewport_mode)
         imgui.end()
 
     def gui_menu(self):
