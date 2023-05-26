@@ -17,6 +17,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 
 
+def normalize(x):
+    return x / np.linalg.norm(x)
+
+
 def look_at(position, target, up):
     """
     Create an affine transformation that locates the camera at `position`, s.t. it looks at `target`.
@@ -27,11 +31,8 @@ def look_at(position, target, up):
       it returns the inverse of the camera's 6D pose matrix. Assumes right-multiplication, i.e. x' = [R|t] * x.
     """
 
-    def _normalize(x):
-        return x / np.linalg.norm(x)
-
-    forward = _normalize(position - target)  # forward actually points in the other direction than `target` is.
-    right = _normalize(np.cross(up, forward))
+    forward = normalize(position - target)  # forward actually points in the other direction than `target` is.
+    right = normalize(np.cross(up, forward))
     camera_up = np.cross(forward, right)
 
     # We directly create the inverse matrix (i.e. world2cam) because this is typically how look-at is define.
