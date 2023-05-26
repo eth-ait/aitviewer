@@ -760,6 +760,19 @@ class Viewer(moderngl_window.WindowConfig):
                     self.reset_camera()
                 self.scene.camera.is_ortho = is_ortho
 
+                if imgui.begin_menu("Control modes"):
+
+                    def mode(name, mode):
+                        selected = imgui.menu_item(name, None, self.scene.camera.control_mode == mode)[1]
+                        if selected:
+                            self.reset_camera()
+                            self.scene.camera.control_mode = mode
+
+                    mode("Orbit", "orbit")
+                    mode("Trackball", "trackball")
+                    mode("First Person", "first_person")
+                    imgui.end_menu()
+
                 clicked_save_cam, selected_save_cam = imgui.menu_item(
                     "Save Camera", self._shortcut_names[self._save_cam_key], False, True
                 )
@@ -1254,6 +1267,12 @@ class Viewer(moderngl_window.WindowConfig):
     def _mouse_to_buffer(self, x: int, y: int):
         return int(x * self.wnd.pixel_ratio), int(self.wnd.buffer_height - (y * self.wnd.pixel_ratio))
 
+    def _mouse_to_viewport(self, x: int, y: int, viewport: Viewport):
+        x, y = self._mouse_to_buffer(x, y)
+        x = x - viewport.extents[0]
+        y = y - viewport.extents[1]
+        return x, viewport.extents[3] - y
+
     def mesh_mouse_intersection(self, x: int, y: int):
         """Given an x/y screen coordinate, get the intersected object, triangle id, and xyz point in camera space"""
         x, y = self._mouse_to_buffer(x, y)
@@ -1443,6 +1462,8 @@ class Viewer(moderngl_window.WindowConfig):
             if button == self._left_mouse_button:
                 self._rotate_camera = True
                 self._pan_camera = False
+                x, y = self._mouse_to_viewport(x, y, self._moving_camera_viewport)
+                self._moving_camera_viewport.camera.rotate_start(x, y, *self._moving_camera_viewport.extents[2:])
 
             if button == self._right_mouse_button:
                 self._pan_camera = True
@@ -1479,7 +1500,8 @@ class Viewer(moderngl_window.WindowConfig):
 
             if self._rotate_camera:
                 self.reset_camera(self._moving_camera_viewport)
-                self._moving_camera_viewport.camera.rotate_azimuth_elevation(dx, dy)
+                x, y = self._mouse_to_viewport(x, y, self._moving_camera_viewport)
+                self._moving_camera_viewport.camera.rotate(x, y, dx, dy, *self._moving_camera_viewport.extents[2:])
 
             if (
                 not self._mouse_moved
