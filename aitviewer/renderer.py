@@ -55,14 +55,14 @@ class Renderer:
         self.wnd = wnd
         self.window_type = window_type
 
-        # Shaders for mesh mouse intersection
+        # Shaders for mesh mouse intersection.
         self.frag_pick_prog = load_program("fragment_picking/frag_pick.glsl")
         self.frag_pick_prog["position_texture"].value = 0  # Read from texture channel 0
         self.frag_pick_prog["obj_info_texture"].value = 1  # Read from texture channel 0
         self.picker_output = self.ctx.buffer(reserve=6 * 4)  # 3 floats, 3 ints
         self.picker_vao = VAO(mode=moderngl.POINTS)
 
-        # Shaders for drawing outlines
+        # Shaders for drawing outlines.
         self.outline_draw_prog = load_program("outline/outline_draw.glsl")
         self.outline_quad = geometry.quad_2d(size=(2.0, 2.0), pos=(0.0, 0.0))
 
@@ -83,6 +83,7 @@ class Renderer:
         self.vis_quad = geometry.quad_2d(size=(0.9, 0.9), pos=(0.5, 0.5))
 
     def clear(self, scene: Scene, **kwargs):
+        """Clear the window framebuffer and the fragmap framebuffer."""
         # Clear picking buffer.
         self.offscreen_p.clear()
 
@@ -189,6 +190,7 @@ class Renderer:
         )
 
     def render_outline(self, nodes, color, camera: CameraInterface, viewport):
+        """A pass to render outlines of an object."""
         # Prepare the outline buffer, all objects rendered to this buffer will be outlined.
         self.outline_framebuffer.clear()
         self.outline_framebuffer.use()
@@ -209,7 +211,8 @@ class Renderer:
         self.outline_quad.render(self.outline_draw_prog)
         self.wnd.fbo.depth_mask = True
 
-    def render_viewport(self, scene: Scene, camera: CameraInterface, viewport, **kwargs):
+    def render_viewport(self, scene: Scene, camera: CameraInterface, viewport: Viewport, **kwargs):
+        """Render the scene for a viewport with the given camera."""
         # Parameters.
         export = kwargs["export"]
         outline_color = kwargs["outline_color"]
@@ -258,9 +261,11 @@ class Renderer:
                 self.render_outline([scene.selected_object], selected_outline_color, camera, viewport)
 
     def resize(self, _width: int, _height: int):
+        """Resize rendering resources on window resize."""
         self.create_framebuffers()
 
     def render(self, scene: Scene, **kwargs):
+        """Main rendering function."""
         viewports: List[Viewport] = kwargs["viewports"]
 
         # Viewport 0 always matches the scene camera for backwards compatitibility.
@@ -283,7 +288,7 @@ class Renderer:
                 self.vis_quad.render(self.vis_prog)
 
     def read_fragmap_at_pixel(self, x: int, y: int) -> Tuple[np.ndarray, int, int, int]:
-        """Given an x/y screen coordinate, get the intersected object, triangle id, and xyz point in camera space"""
+        """Given an x/y screen coordinate, get the intersected object, triangle id, and xyz point in camera space."""
 
         # Fragment picker uses already encoded position/object/triangle in the frag_pos program textures
         self.frag_pick_prog["texel_pos"].value = (x, y)

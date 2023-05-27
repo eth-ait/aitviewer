@@ -312,8 +312,11 @@ class Viewer(moderngl_window.WindowConfig):
         self._viewport_mode = None
         self.viewport_mode = "single"
 
-    def resize_viewports(self):
-        """TODO: docs"""
+    def _resize_viewports(self):
+        """
+        Computes the size of the viewports depending on the current mode.
+        Uses the window buffer size to update the extents of all existing viewports.
+        """
         mode = self.viewport_mode
 
         w, h = self.wnd.buffer_size
@@ -334,7 +337,14 @@ class Viewer(moderngl_window.WindowConfig):
             raise ValueError(f"Invalid viewport mode: {mode}")
 
     def set_ortho_grid_viewports(self, invert=(False, False, False)):
-        """TODO: docs"""
+        """
+        Sets the viewports in a 2x2 grid with a viewport looking at the scene with an
+        orthographic projection from each of the main axes.
+
+        :param invert: a tuple of 3 booleans, for the x, y and z axis respectively.
+        If False the camera for the respective axis is placed at the positive side looking
+        towards the negative direction, and opposite otherwise.
+        """
         self.viewport_mode = "split_vh"
 
         bounds = self.scene.bounds_without_floor
@@ -381,12 +391,15 @@ class Viewer(moderngl_window.WindowConfig):
 
     @property
     def viewport_mode(self):
-        """TODO: docs"""
+        """Getter for the current viewport mode"""
         return self._viewport_mode
 
     @viewport_mode.setter
     def viewport_mode(self, mode):
-        """TODO: docs"""
+        """
+        Setter for the current viewport mode, valid values are: "single", "split_v",  "split_h" and  "split_hv"
+        which split the window in a 1x1, 1x2, 2x1 and 2x2 grid respectively.
+        """
         if mode == self._viewport_mode:
             return
 
@@ -418,7 +431,7 @@ class Viewer(moderngl_window.WindowConfig):
                 if isinstance(self.scene.camera, ViewerCamera):
                     camera = camera.copy()
                 self.viewports.append(Viewport([], camera))
-        self.resize_viewports()
+        self._resize_viewports()
 
     def _init_scene(self):
         self.scene.make_renderable(self.ctx)
@@ -1328,7 +1341,7 @@ class Viewer(moderngl_window.WindowConfig):
 
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
-        self.resize_viewports()
+        self._resize_viewports()
         self.renderer.resize(width, height)
         self.imgui.resize(width, height)
 
