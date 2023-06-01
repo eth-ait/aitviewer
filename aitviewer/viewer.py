@@ -1473,6 +1473,7 @@ class Viewer(moderngl_window.WindowConfig):
 
             # Rotate camera on left click.
             if button == self._left_mouse_button:
+                self.reset_camera(self._moving_camera_viewport)
                 self._rotate_camera = True
                 self._pan_camera = False
                 x, y = self._mouse_to_viewport(x, y, self._moving_camera_viewport)

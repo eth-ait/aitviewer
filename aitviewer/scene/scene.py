@@ -401,7 +401,7 @@ class Scene(Node):
             if isinstance(camera, ViewerCamera):
                 name = camera.name
             else:
-                name = f"{name}: {camera.name}"
+                name = f"Camera: {camera.name}"
 
             camera_expanded = imgui.tree_node(f"{camera.icon}  {name}##tree_node_r_camera", flags)
             if imgui.is_item_clicked():
