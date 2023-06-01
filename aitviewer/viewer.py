@@ -305,12 +305,13 @@ class Viewer(moderngl_window.WindowConfig):
         self.screenshot_transparent = False
         self.screenshot_name = None
 
-        # Set the mode once the viewer has been completely initialized
-        self.selected_mode = "view"
-
+        # Setup viewports
         self.viewports: List[Viewport] = []
         self._viewport_mode = None
         self.viewport_mode = "single"
+
+        # Set the mode once the viewer has been completely initialized
+        self.selected_mode = "view"
 
     def _resize_viewports(self):
         """
@@ -1473,7 +1474,6 @@ class Viewer(moderngl_window.WindowConfig):
 
             # Rotate camera on left click.
             if button == self._left_mouse_button:
-                self.reset_camera(self._moving_camera_viewport)
                 self._rotate_camera = True
                 self._pan_camera = False
                 x, y = self._mouse_to_viewport(x, y, self._moving_camera_viewport)
