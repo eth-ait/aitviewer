@@ -69,7 +69,7 @@ class Light(Node):
             is_selectable=False,
             material=Material(diffuse=0.0, ambient=1.0, color=(*tuple(light_color), 1.0)),
         )
-        self.add(self.arrow, show_in_hierarchy=False)
+        self.add(self.arrow, show_in_hierarchy=False, enabled=False)
 
     @classmethod
     def facing_origin(cls, **kwargs):
@@ -187,7 +187,8 @@ class Light(Node):
             self._debug_lines.redraw()
 
     def render_outline(self, *args, **kwargs):
-        self.arrow.render_outline(*args, **kwargs)
+        if self.arrow.enabled:
+            self.arrow.render_outline(*args, **kwargs)
 
     @Node.position.setter
     def position(self, position):
@@ -279,6 +280,7 @@ class Light(Node):
             min_value=0.01,
             max_value=100.0,
         )
+        _, self.arrow.enabled = imgui.checkbox("Show light", self.arrow.enabled)
         u_show, self._show_debug_lines = imgui.checkbox("Show Frustum", self._show_debug_lines)
 
         if self._show_debug_lines:
