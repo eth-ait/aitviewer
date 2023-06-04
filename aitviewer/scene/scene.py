@@ -19,7 +19,7 @@ import numpy as np
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.coordinate_system import CoordinateSystem
-from aitviewer.renderables.lines import Lines
+from aitviewer.renderables.lines import Lines2D
 from aitviewer.renderables.plane import ChessboardPlane
 from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.light import Light
@@ -80,8 +80,8 @@ class Scene(Node):
         self.floor.material.diffuse = 0.1
         self.add(self.floor)
 
-        # Camera cursor rendered at the camera target when moving the camera
-        self.camera_target = Lines(
+        # Camera cursor rendered at the camera target.
+        self.camera_target = Lines2D(
             np.array(
                 [
                     [-1, 0, 0],
@@ -91,14 +91,41 @@ class Scene(Node):
                     [0, 0, -1],
                     [0, 0, 1],
                 ]
-            )
-            * 0.05,
-            r_base=0.002,
+            ),
             color=(0.2, 0.2, 0.2, 1),
             mode="lines",
-            cast_shadow=False,
         )
         self.add(self.camera_target, show_in_hierarchy=False, enabled=False)
+
+        # Camera trackball.
+        N = 50
+        t = np.empty(N * 2, dtype=np.float32)
+        t[0::2] = np.linspace(0, 2.0 * np.pi, N)
+        t[1::2] = np.roll(np.linspace(0, 2.0 * np.pi, N), 1)
+        z = np.zeros_like(t)
+        c = np.cos(t)
+        s = np.sin(t)
+        trackball_vertices = np.concatenate(
+            (
+                np.vstack((z, c, s)).T,
+                np.vstack((c, z, s)).T,
+                np.vstack((c, s, z)).T,
+            )
+        )
+        trackball_colors = np.concatenate(
+            (
+                np.tile((1, 0, 0, 1), (N, 1)),
+                np.tile((0, 1, 0, 1), (N, 1)),
+                np.tile((0, 0, 1, 1), (N, 1)),
+            )
+        )
+
+        self.trackball = Lines2D(
+            trackball_vertices,
+            trackball_colors,
+            mode="lines",
+        )
+        self.add(self.trackball, show_in_hierarchy=False, enabled=False)
 
         self.custom_font = None
         self.properties_icon = "\u0094"
@@ -115,8 +142,24 @@ class Scene(Node):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
 
         # Setup the camera target cursor for rendering.
-        if self.camera_target.enabled and isinstance(self.camera, ViewerCamera):
-            self.camera_target.position = self.camera.target
+        camera = kwargs["camera"]
+        if isinstance(camera, ViewerCamera):
+            # Scale target and trackball depending on distance from camera to target and fov.
+            if camera.is_ortho:
+                scale = camera.ortho_size * 0.8
+            else:
+                scale = np.radians(camera.fov) * 0.4 * np.linalg.norm(camera.target - camera.position)
+
+            if self.camera_target.enabled:
+                self.camera_target.position = camera.target
+                self.camera_target.scale = scale * 0.05
+            if self.trackball.enabled:
+                self.trackball.position = camera.target
+                self.trackball.scale = scale
+        else:
+            # If not a viewer camera, hide them.
+            self.camera_target.scale = 0
+            self.trackball.scale = 0
 
         # Collect all renderable nodes
         rs = self.collect_nodes()
@@ -146,7 +189,7 @@ class Scene(Node):
         # offset from their origin, but works in many cases.
         for r in sorted(
             transparent,
-            key=lambda x: np.linalg.norm(x.position - self.camera.position),
+            key=lambda x: np.linalg.norm(x.position - camera.position),
             reverse=True,
         ):
             # Turn off backface culling if enabled for the scene

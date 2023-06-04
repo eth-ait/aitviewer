@@ -72,6 +72,7 @@ SHORTCUTS = {
     "X": "Center view on the selected object.",
     "O": "Enable/disable orthographic camera.",
     "T": "Show the camera target in the scene.",
+    "B": "Show the camera trackball in the scene.",
     "C": "Save the camera position and orientation to disk.",
     "L": "Load the camera position and orientation from disk.",
     "K": "Lock the selection to the currently selected object.",
@@ -210,6 +211,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._save_cam_key = self.wnd.keys.C
         self._load_cam_key = self.wnd.keys.L
         self._show_camera_target_key = self.wnd.keys.T
+        self._show_camera_trackball_key = self.wnd.keys.B
         self._visualize_key = self.wnd.keys.Z
         self._lock_selection_key = self.wnd.keys.K
         self._mode_inspect_key = self.wnd.keys.I
@@ -217,6 +219,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._go_to_frame_key = self.wnd.keys.G
         self._shortcut_names = {
             self.wnd.keys.SPACE: "Space",
+            self.wnd.keys.B: "B",
             self.wnd.keys.C: "C",
             self.wnd.keys.D: "D",
             self.wnd.keys.I: "I",
@@ -582,7 +585,6 @@ class Viewer(moderngl_window.WindowConfig):
             self.scene.camera = self.viewports[0].camera
 
     def set_temp_camera(self, camera, viewport=None):
-        self.scene.camera_target.enabled = False
         if viewport is None:
             viewport = self.viewports[0]
         viewport.set_temp_camera(camera)
@@ -748,9 +750,16 @@ class Viewer(moderngl_window.WindowConfig):
 
             if imgui.begin_menu("Camera", True):
                 _, self.scene.camera_target.enabled = imgui.menu_item(
-                    "Show Camera Target",
+                    "Show camera target",
                     self._shortcut_names[self._show_camera_target_key],
                     self.scene.camera_target.enabled,
+                    True,
+                )
+
+                _, self.scene.trackball.enabled = imgui.menu_item(
+                    "Show camera trackball",
+                    self._shortcut_names[self._show_camera_trackball_key],
+                    self.scene.trackball.enabled,
                     True,
                 )
 
@@ -1412,6 +1421,9 @@ class Viewer(moderngl_window.WindowConfig):
 
             elif key == self._show_camera_target_key:
                 self.scene.camera_target.enabled = not self.scene.camera_target.enabled
+
+            elif key == self._show_camera_trackball_key:
+                self.scene.trackball.enabled = not self.scene.trackball.enabled
 
             elif key == self._orthographic_camera_key:
                 self.reset_camera()
