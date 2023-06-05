@@ -460,7 +460,6 @@ class Lines2D(Node):
         """
         Initializer.
         :param lines: Set of 3D coordinates as a np array of shape (F, L, 3) or (L, 3).
-        :param line_width: Width of the lines in pixels.
         :param color: Color of the line (4-tuple) or array of color (N_LINES, 4), one for each line.
         :param mode: 'lines' or 'line_strip'.
             'lines': a line is drawn from point 0 to 1, from 2 to 3, and so on, number of lines is L / 2.

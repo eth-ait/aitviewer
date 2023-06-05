@@ -924,6 +924,8 @@ class ViewerCamera(CameraInterface):
     def control_mode(self, mode):
         if mode not in self._control_modes:
             raise ValueError(f"Invalid camera mode: {mode}")
+        if mode == "first_person" or mode == "orbit":
+            self.up = (0, 1, 0)
         self._control_mode = mode
 
     def copy(self):
