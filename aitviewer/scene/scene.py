@@ -115,7 +115,7 @@ class Scene(Node):
         trackball_colors = np.concatenate(
             (
                 np.tile((1, 0, 0, 1), (N, 1)),
-                np.tile((0, 1, 0, 1), (N, 1)),
+                np.tile((0, 0.8, 0, 1), (N, 1)),
                 np.tile((0, 0, 1, 1), (N, 1)),
             )
         )
