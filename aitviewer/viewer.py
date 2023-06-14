@@ -791,7 +791,7 @@ class Viewer(moderngl_window.WindowConfig):
                             self.reset_camera()
                             self.scene.camera.control_mode = mode
 
-                    mode("Orbit", "orbit")
+                    mode("Turntable", "turntable")
                     mode("Trackball", "trackball")
                     mode("First Person", "first_person")
                     imgui.end_menu()

@@ -896,8 +896,8 @@ class ViewerCamera(CameraInterface):
 
         # Controls options.
         self.constant_speed = 1.0
-        self._control_modes = ["orbit", "trackball", "first_person"]
-        self._control_mode = "orbit"
+        self._control_modes = ["turntable", "trackball", "first_person"]
+        self._control_mode = "turntable"
         self._trackball_start_view_inverse = None
         self._trackball_start_hit = None
         self._trackball_start_position = None
@@ -924,7 +924,7 @@ class ViewerCamera(CameraInterface):
     def control_mode(self, mode):
         if mode not in self._control_modes:
             raise ValueError(f"Invalid camera mode: {mode}")
-        if mode == "first_person" or mode == "orbit":
+        if mode == "first_person" or mode == "turntable":
             self.up = (0, 1, 0)
         self._control_mode = mode
 
@@ -1165,7 +1165,7 @@ class ViewerCamera(CameraInterface):
 
     def rotate(self, x: int, y: int, mouse_dx: int, mouse_dy: int, width: int, height: int):
         """Rotate the camera. Called on mouse movement."""
-        if self.control_mode == "orbit":
+        if self.control_mode == "turntable":
             self.rotate_azimuth_elevation(mouse_dx, mouse_dy)
         elif self.control_mode == "trackball":
             self.rotate_trackball(x, y, width, height)
@@ -1233,7 +1233,7 @@ class ViewerCamera(CameraInterface):
 
         imgui.spacing()
         # Note: must be kept in sync with self._control_modes.
-        control_modes_labels = ["Orbit", "Trackball", "First Person"]
+        control_modes_labels = ["Turntable", "Trackball", "First Person"]
         u, idx = imgui.combo("Control mode", self._control_modes.index(self.control_mode), control_modes_labels)
         if u and idx >= 0 and idx <= len(self._control_modes):
             self.control_mode = self._control_modes[idx]
