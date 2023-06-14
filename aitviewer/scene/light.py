@@ -18,9 +18,8 @@ from functools import lru_cache
 
 import numpy as np
 
-from aitviewer.renderables.arrows import Arrows
 from aitviewer.renderables.lines import Lines
-from aitviewer.renderables.spheres import Spheres
+from aitviewer.renderables.rigid_bodies import RigidBodies
 from aitviewer.scene.camera_utils import look_at, orthographic_projection
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
@@ -62,14 +61,19 @@ class Light(Node):
         self._debug_lines = None
         self._show_debug_lines = False
 
-        self.arrow = Lines(
-            np.array([[[0.0, 0.0, 0.0], [0, 0, -0.6]]]),
-            0.15,
-            0,
+        rot = np.eye(3)
+        rot[2, 2] = -1
+        self.mesh = RigidBodies(
+            np.array([[0, 0, 0]], dtype=np.float32),
+            np.array([rot], dtype=np.float32),
+            radius=0.08,
+            length=0.4,
             is_selectable=False,
-            material=Material(diffuse=0.0, ambient=1.0, color=(*tuple(light_color), 1.0)),
         )
-        self.add(self.arrow, show_in_hierarchy=False)
+        self.mesh.spheres.material.diffuse = 0.0
+        self.mesh.spheres.material.ambient = 1.0
+        self.mesh.spheres.color = (*tuple(light_color), 1.0)
+        self.add(self.mesh, show_in_hierarchy=False, enabled=False)
 
     @classmethod
     def facing_origin(cls, **kwargs):
@@ -103,7 +107,7 @@ class Light(Node):
     @light_color.setter
     def light_color(self, light_color):
         self._light_color = light_color
-        self.arrow.color = (*tuple(light_color), 1.0)
+        self.mesh.spheres.color = (*tuple(light_color), 1.0)
 
     def update_rotation(self):
         self.rotation = look_at(np.array([0, 0, 0]), self.direction, np.array([0.0, 1.0, 0.0]))[:3, :3].T
@@ -187,7 +191,8 @@ class Light(Node):
             self._debug_lines.redraw()
 
     def render_outline(self, *args, **kwargs):
-        self.arrow.render_outline(*args, **kwargs)
+        if self.mesh.enabled:
+            self.mesh.spheres.render_outline(*args, **kwargs)
 
     @Node.position.setter
     def position(self, position):
@@ -196,11 +201,11 @@ class Light(Node):
 
     @property
     def bounds(self):
-        return self.arrow.bounds
+        return self.mesh.bounds
 
     @property
     def current_bounds(self):
-        return self.arrow.current_bounds
+        return self.mesh.current_bounds
 
     @property
     def direction(self):
@@ -279,6 +284,7 @@ class Light(Node):
             min_value=0.01,
             max_value=100.0,
         )
+        _, self.mesh.enabled = imgui.checkbox("Show light", self.mesh.enabled)
         u_show, self._show_debug_lines = imgui.checkbox("Show Frustum", self._show_debug_lines)
 
         if self._show_debug_lines:

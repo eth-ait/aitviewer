@@ -234,7 +234,7 @@ class Renderer:
 
             # Disable lights.
             for l in scene.lights:
-                disable_for_export(l.arrow)
+                disable_for_export(l.mesh)
 
             # Disable camera target.
             disable_for_export(scene.camera_target)

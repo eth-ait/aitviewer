@@ -51,7 +51,8 @@ if __name__ == '__main__':
 
 
 ## Projects using the aitviewer
-A sampling of projects using the aitviewer. Let us know if you want to add you!
+A sampling of projects using the aitviewer. Let us know if you want to be added to this list!
+- Sun et al., [TRACE: 5D Temporal Regression of Avatars with Dynamic Cameras in 3D Environments](https://www.yusun.work/TRACE/TRACE.html), CVPR 2023
 - Fan et al., [ARCTIC: A Dataset for Dexterous Bimanual Hand-Object Manipulation](https://arctic.is.tue.mpg.de/), CVPR 2023
 - Dong et al., [Shape-aware Multi-Person Pose Estimation from Multi-view Images](https://ait.ethz.ch/projects/2021/multi-human-pose/), ICCV 2021
 - Kaufmann et al., [EM-POSE: 3D Human Pose Estimation from Sparse Electromagnetic Trackers](https://ait.ethz.ch/projects/2021/em-pose/), ICCV 2021
