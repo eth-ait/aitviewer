@@ -61,6 +61,35 @@ class Plane(Node):
 
         self.backface_culling = False
 
+    @classmethod
+    def from_normal(cls, center: np.ndarray, normal: np.ndarray, tangent: np.ndarray = None, **kwargs) -> "Plane":
+        """
+        Create a plane given a normal vector and optionally a tangent vector.
+
+        :param center: Center of the plane.
+        :param normal: Vector normal to the plane (doesn't have to be normalized)
+        :param tangent: Optional vector tangent to the plane used to compute the plane orientation,
+            must not be parallel to the normal vector, if None an axis not parallel to the normal
+            will be used instead.
+        :param **kwargs: arguments forwarded to the Plane constructor.
+        """
+
+        # Normalize the normal vector
+        normal = normal / np.linalg.norm(normal)
+
+        # If no tangent is given use an axis that is not perpendicular to the plane
+        if tangent is None:
+            if abs(np.dot(normal, np.array([1.0, 0.0, 0.0]))) < 1e-3:
+                tangent = np.array([1.0, 0.0, 0.0])
+            else:
+                tangent = np.array([0.0, 0.0, 1.0])
+        elif abs(np.dot(normal, tangent)) > 0.999:
+            raise ValueError("normal and tangent are parallel")
+
+        v1 = np.cross(normal, tangent)
+        v2 = np.cross(normal, v1)
+        return cls(center, v1, v2, **kwargs)
+
     def _get_renderable_data(self):
         p0 = self.plane_center + self.v1 * self.size - self.v2 * self.size
         p1 = self.plane_center + self.v1 * self.size + self.v2 * self.size
@@ -80,7 +109,7 @@ class Plane(Node):
     # noinspection PyAttributeOutsideInit
     @Node.once
     def make_renderable(self, ctx):
-        self.prog = get_smooth_lit_with_edges_program()
+        self.prog = get_smooth_lit_with_edges_program("lit_with_edges.glsl")
         self.vbo_vertices = ctx.buffer(self.vertices.astype("f4").tobytes())
         self.vbo_normals = ctx.buffer(self.normals.astype("f4").tobytes())
         self.vbo_colors = ctx.buffer(self.colors.astype("f4").tobytes())

@@ -234,9 +234,12 @@
 
 #if !TEXTURE
         if (norm_coloring) {
-            f_color = vec4(.5 + .5 * normal, base_color.w);
+            float v = compute_diffuse_shadows(g_vert, normal, g_vert_light);
+            vec3 c = .5 + .5 * normal;
+            f_color = vec4(c * (v * 0.3 + 0.7), base_color.a);
         }
 #endif
+
 
         f_color = ei * edge_color + (1.0 - ei) * f_color;
     }

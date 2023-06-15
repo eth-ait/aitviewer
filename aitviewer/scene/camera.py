@@ -27,6 +27,7 @@ from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.rigid_bodies import RigidBodies
 from aitviewer.scene.camera_utils import (
     look_at,
+    normalize,
     orthographic_projection,
     perspective_projection,
 )
@@ -37,6 +38,11 @@ from aitviewer.utils.decorators import hooked
 def _transform_vector(transform, vector):
     """Apply affine transformation (4-by-4 matrix) to a 3D vector."""
     return (transform @ np.concatenate([vector, np.array([1])]))[:3]
+
+
+def _transform_direction(transform, vector):
+    """Apply affine transformation (4-by-4 matrix) to a 3D directon."""
+    return (transform @ np.concatenate([vector, np.array([0])]))[:3]
 
 
 class CameraInterface(ABC):
@@ -354,17 +360,17 @@ class Camera(Node, CameraInterface):
         # the frustum and coordinate system visualization.
         self.mesh.render_outline(*args, **kwargs)
 
-    def view_from_camera(self):
+    def view_from_camera(self, viewport):
         """If the viewer is specified for this camera, change the current view to view from this camera"""
         if self.viewer:
             self.hide_path()
             self.hide_frustum()
-            self.viewer.set_temp_camera(self)
+            self.viewer.set_temp_camera(self, viewport)
 
     def gui(self, imgui):
         if self.viewer:
             if imgui.button("View from camera"):
-                self.view_from_camera()
+                self.view_from_camera(self.viewer.viewports[0])
 
         u, show = imgui.checkbox("Show path", self.path is not None)
         if u:
@@ -373,10 +379,10 @@ class Camera(Node, CameraInterface):
             else:
                 self.hide_path()
 
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         if self.viewer:
             if imgui.menu_item("View from camera", shortcut=None, selected=False, enabled=True)[1]:
-                self.view_from_camera()
+                self.view_from_camera(self.viewer.get_viewport_at_position(x, y))
 
         u, show = imgui.checkbox("Show path", self.path is not None)
         if u:
@@ -492,7 +498,7 @@ class WeakPerspectiveCamera(Camera):
                 self.hide_frustum()
 
     @hooked
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
         if u:
             if show:
@@ -503,7 +509,7 @@ class WeakPerspectiveCamera(Camera):
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-        super(Camera, self).gui_context_menu(imgui)
+        super(Camera, self).gui_context_menu(imgui, x, y)
 
 
 class OpenCVCamera(Camera):
@@ -701,7 +707,7 @@ class OpenCVCamera(Camera):
                 self.hide_frustum()
 
     @hooked
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
         if u:
             if show:
@@ -712,7 +718,7 @@ class OpenCVCamera(Camera):
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-        super(Camera, self).gui_context_menu(imgui)
+        super(Camera, self).gui_context_menu(imgui, x, y)
 
 
 class PinholeCamera(Camera):
@@ -850,7 +856,7 @@ class PinholeCamera(Camera):
                 self.hide_frustum()
 
     @hooked
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         u, show = imgui.checkbox("Show frustum", self.frustum is not None)
         if u:
             if show:
@@ -861,7 +867,7 @@ class PinholeCamera(Camera):
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
-        super(Camera, self).gui_context_menu(imgui)
+        super(Camera, self).gui_context_menu(imgui, x, y)
 
 
 class ViewerCamera(CameraInterface):
@@ -875,7 +881,6 @@ class ViewerCamera(CameraInterface):
         self.fov = fov
         self.is_ortho = orthographic is not None
         self.ortho_size = 1.0 if orthographic is None else orthographic
-        self.constant_speed = 1.0
 
         # Default camera settings.
         self._position = np.array([0.0, 0.0, 2.5])
@@ -889,10 +894,20 @@ class ViewerCamera(CameraInterface):
         self.near = znear if znear is not None else C.znear
         self.far = zfar if zfar is not None else C.zfar
 
-        # GUI options
+        # Controls options.
+        self.constant_speed = 1.0
+        self._control_modes = ["turntable", "trackball", "first_person"]
+        self._control_mode = "turntable"
+        self._trackball_start_view_inverse = None
+        self._trackball_start_hit = None
+        self._trackball_start_position = None
+        self._trackball_start_up = None
+
+        # GUI options.
         self.name = "Camera"
         self.icon = "\u0084"
 
+        # Animation.
         self.animating = False
         self._animation_t = 0.0
         self._animation_time = 0.0
@@ -900,6 +915,28 @@ class ViewerCamera(CameraInterface):
         self._animation_end_position = None
         self._animation_start_target = None
         self._animation_end_target = None
+
+    @property
+    def control_mode(self):
+        return self._control_mode
+
+    @control_mode.setter
+    def control_mode(self, mode):
+        if mode not in self._control_modes:
+            raise ValueError(f"Invalid camera mode: {mode}")
+        if mode == "first_person" or mode == "turntable":
+            self.up = (0, 1, 0)
+        self._control_mode = mode
+
+    def copy(self):
+        camera = ViewerCamera(self.fov, self.ortho_size, self.near, self.far)
+        camera.is_ortho = self.is_ortho
+        camera.position = self.position
+        camera.target = self.target
+        camera.up = self.up
+        camera.constant_speed = self.constant_speed
+        camera.control_mode = self.control_mode
+        return camera
 
     @property
     def position(self):
@@ -911,8 +948,7 @@ class ViewerCamera(CameraInterface):
 
     @property
     def forward(self):
-        forward = self.target - self.position
-        return forward / np.linalg.norm(forward)
+        return normalize(self.target - self.position)
 
     @property
     def up(self):
@@ -920,12 +956,11 @@ class ViewerCamera(CameraInterface):
 
     @up.setter
     def up(self, up):
-        self._up = up
+        self._up = np.array(up, dtype=np.float32).copy()
 
     @property
     def right(self):
-        right = np.cross(self.up, self.forward)
-        return right / np.linalg.norm(right)
+        return normalize(np.cross(self.up, self.forward))
 
     @property
     def target(self):
@@ -1018,7 +1053,7 @@ class ViewerCamera(CameraInterface):
 
     def pan(self, mouse_dx, mouse_dy):
         """Move the camera in the image plane."""
-        sideways = np.cross(self.forward, self.up)
+        sideways = normalize(np.cross(self.forward, self.up))
         up = np.cross(sideways, self.forward)
 
         # scale speed according to distance from target
@@ -1033,8 +1068,16 @@ class ViewerCamera(CameraInterface):
         self.position += up * speed_y
         self.target += up * speed_y
 
-    def rotate_azimuth_elevation(self, mouse_dx, mouse_dy):
-        """Rotate the camera left-right and up-down (roll is not allowed)."""
+    def rotate_azimuth(self, angle):
+        """Rotate around camera's up-axis by given angle (in radians)."""
+        if np.abs(angle) < 1e-8:
+            return
+        cam_pose = np.linalg.inv(self.view_matrix)
+        y_axis = cam_pose[:3, 1]
+        rot = rotation_matrix(angle, y_axis, self.target)
+        self.position = _transform_vector(rot, self.position)
+
+    def _rotation_from_mouse_delta(self, mouse_dx: int, mouse_dy: int):
         z_axis = -self.forward
         dot = np.dot(z_axis, self.up)
         rot = np.eye(4)
@@ -1050,17 +1093,84 @@ class ViewerCamera(CameraInterface):
         y_axis = np.cross(self.forward, self.right)
         x_speed = self.ROT_FACTOR / 10 if 1 - np.abs(dot) < 0.01 else self.ROT_FACTOR
         rot = rotation_matrix(x_speed * -mouse_dx, y_axis, self.target) @ rot
+        return rot
 
+    def rotate_azimuth_elevation(self, mouse_dx: int, mouse_dy: int):
+        """Rotate the camera position left-right and up-down orbiting around the target (roll is not allowed)."""
+        rot = self._rotation_from_mouse_delta(mouse_dx, mouse_dy)
         self.position = _transform_vector(rot, self.position)
 
-    def rotate_azimuth(self, angle):
-        """Rotate around camera's up-axis by given angle (in radians)."""
-        if np.abs(angle) < 1e-8:
+    def rotate_first_person(self, mouse_dx: int, mouse_dy: int):
+        """Rotate the camera target left-right and up-down (roll is not allowed)."""
+        rot = self._rotation_from_mouse_delta(mouse_dx, mouse_dy)
+        self.target = _transform_direction(rot, self.target - self.position) + self.position
+
+    def intersect_trackball(self, x: int, y: int, width: int, height: int):
+        """
+        Return intersection of a line passing through the mouse position at pixel coordinates x, y
+        and the trackball as a point in world coordinates.
+        """
+        # Transform mouse coordinates from -1 to 1
+        nx = 2 * (x + 0.5) / width - 1
+        ny = 1 - 2 * (y + 0.5) / height
+
+        # Adjust coordinates for the larger side of the viewport rectangle.
+        if width > height:
+            nx *= width / height
+        else:
+            ny *= height / width
+
+        s = nx * nx + ny * ny
+        if s <= 0.5:
+            # Sphere intersection
+            nz = np.sqrt(1 - s)
+        else:
+            # Hyperboloid intersection.
+            nz = 1 / (2 * np.sqrt(s))
+
+        # Return intersection position in world coordinates.
+        return self._trackball_start_view_inverse @ np.array((nx, ny, nz))
+
+    def rotate_trackball(self, x: int, y: int, width: int, height: int):
+        """Rotate the camera with trackball controls. Must be called after rotate_start()."""
+        # Compute points on trackball.
+        start = self._trackball_start_hit
+        current = self.intersect_trackball(x, y, width, height)
+        dist = np.linalg.norm(current - start)
+
+        # Skip if starting and current point are too close.
+        if dist < 1e-6:
             return
-        cam_pose = np.linalg.inv(self.view_matrix)
-        y_axis = cam_pose[:3, 1]
-        rot = rotation_matrix(angle, y_axis, self.target)
-        self.position = _transform_vector(rot, self.position)
+
+        # Compute axis of rotation as the vector perpendicular to the plane spanned by the
+        # vectors connecting the origin to the two points.
+        axis = normalize(np.cross(current, start))
+
+        # Compute angle as the angle between the two vectors, if they are too far away we use the distance
+        # between them instead, this makes it continue to rotate when dragging the mouse further away.
+        angle = max(np.arccos(np.dot(normalize(current), normalize(start))), dist)
+
+        # Compute resulting rotation and apply it to the starting position and up vector.
+        rot = rotation_matrix(angle, axis, self.target)
+        self.position = _transform_vector(rot, self._trackball_start_position)
+        self.up = _transform_direction(rot, self._trackball_start_up)
+
+    def rotate_start(self, x: int, y: int, width: int, height: int):
+        """Start rotating the camera. Called on mouse button press."""
+        if self.control_mode == "trackball":
+            self._trackball_start_view_inverse = look_at(self.position, self.target, self.up)[:3, :3].T
+            self._trackball_start_hit = self.intersect_trackball(x, y, width, height)
+            self._trackball_start_position = self.position
+            self._trackball_start_up = self.up
+
+    def rotate(self, x: int, y: int, mouse_dx: int, mouse_dy: int, width: int, height: int):
+        """Rotate the camera. Called on mouse movement."""
+        if self.control_mode == "turntable":
+            self.rotate_azimuth_elevation(mouse_dx, mouse_dy)
+        elif self.control_mode == "trackball":
+            self.rotate_trackball(x, y, width, height)
+        elif self.control_mode == "first_person":
+            self.rotate_first_person(mouse_dx, mouse_dy)
 
     def get_ray(self, x, y, width, height):
         """Construct a ray going through the middle of the given pixel."""
@@ -1117,7 +1227,13 @@ class ViewerCamera(CameraInterface):
     def gui(self, imgui):
         _, self.is_ortho = imgui.checkbox("Orthographic Camera", self.is_ortho)
         _, self.fov = imgui.slider_float("Camera FOV##fov", self.fov, 0.1, 180.0, "%.1f")
-        _, position = imgui.drag_float3("Position", *self.position)
-        _, target = imgui.drag_float3("Target", *self.target)
-        self.position = np.array(position)
-        self.target = np.array(target)
+        _, self.position = imgui.drag_float3("Position", *self.position)
+        _, self.target = imgui.drag_float3("Target", *self.target)
+        _, self.up = imgui.drag_float3("Up", *self.up)
+
+        imgui.spacing()
+        # Note: must be kept in sync with self._control_modes.
+        control_modes_labels = ["Turntable", "Trackball", "First Person"]
+        u, idx = imgui.combo("Control mode", self._control_modes.index(self.control_mode), control_modes_labels)
+        if u and idx >= 0 and idx <= len(self._control_modes):
+            self.control_mode = self._control_modes[idx]

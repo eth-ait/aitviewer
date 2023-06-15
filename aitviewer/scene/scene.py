@@ -19,7 +19,7 @@ import numpy as np
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.coordinate_system import CoordinateSystem
-from aitviewer.renderables.lines import Lines
+from aitviewer.renderables.lines import Lines2D
 from aitviewer.renderables.plane import ChessboardPlane
 from aitviewer.scene.camera import ViewerCamera
 from aitviewer.scene.light import Light
@@ -80,8 +80,8 @@ class Scene(Node):
         self.floor.material.diffuse = 0.1
         self.add(self.floor)
 
-        # Camera cursor rendered at the camera target when moving the camera
-        self.camera_target = Lines(
+        # Camera cursor rendered at the camera target.
+        self.camera_target = Lines2D(
             np.array(
                 [
                     [-1, 0, 0],
@@ -91,14 +91,41 @@ class Scene(Node):
                     [0, 0, -1],
                     [0, 0, 1],
                 ]
-            )
-            * 0.05,
-            r_base=0.002,
+            ),
             color=(0.2, 0.2, 0.2, 1),
             mode="lines",
-            cast_shadow=False,
         )
         self.add(self.camera_target, show_in_hierarchy=False, enabled=False)
+
+        # Camera trackball.
+        N = 50
+        t = np.empty(N * 2, dtype=np.float32)
+        t[0::2] = np.linspace(0, 2.0 * np.pi, N)
+        t[1::2] = np.roll(np.linspace(0, 2.0 * np.pi, N), 1)
+        z = np.zeros_like(t)
+        c = np.cos(t)
+        s = np.sin(t)
+        trackball_vertices = np.concatenate(
+            (
+                np.vstack((z, c, s)).T,
+                np.vstack((c, z, s)).T,
+                np.vstack((c, s, z)).T,
+            )
+        )
+        trackball_colors = np.concatenate(
+            (
+                np.tile((1, 0, 0, 1), (N, 1)),
+                np.tile((0, 0.8, 0, 1), (N, 1)),
+                np.tile((0, 0, 1, 1), (N, 1)),
+            )
+        )
+
+        self.trackball = Lines2D(
+            trackball_vertices,
+            trackball_colors,
+            mode="lines",
+        )
+        self.add(self.trackball, show_in_hierarchy=False, enabled=False)
 
         self.custom_font = None
         self.properties_icon = "\u0094"
@@ -115,8 +142,24 @@ class Scene(Node):
         # As per https://learnopengl.com/Advanced-OpenGL/Blending
 
         # Setup the camera target cursor for rendering.
-        if self.camera_target.enabled and isinstance(self.camera, ViewerCamera):
-            self.camera_target.position = self.camera.target
+        camera = kwargs["camera"]
+        if isinstance(camera, ViewerCamera):
+            # Scale target and trackball depending on distance from camera to target and fov.
+            if camera.is_ortho:
+                scale = camera.ortho_size * 0.8
+            else:
+                scale = np.radians(camera.fov) * 0.4 * np.linalg.norm(camera.target - camera.position)
+
+            if self.camera_target.enabled:
+                self.camera_target.position = camera.target
+                self.camera_target.scale = scale * 0.05
+            if self.trackball.enabled:
+                self.trackball.position = camera.target
+                self.trackball.scale = scale
+        else:
+            # If not a viewer camera, hide them.
+            self.camera_target.scale = 0
+            self.trackball.scale = 0
 
         # Collect all renderable nodes
         rs = self.collect_nodes()
@@ -146,22 +189,22 @@ class Scene(Node):
         # offset from their origin, but works in many cases.
         for r in sorted(
             transparent,
-            key=lambda x: np.linalg.norm(x.position - self.camera.position),
+            key=lambda x: np.linalg.norm(x.position - camera.position),
             reverse=True,
         ):
-            # Render to depth buffer only
-            self.ctx.depth_func = "<"
-
-            fbo.color_mask = (False, False, False, False)
-            self.safe_render_depth_prepass(r, **kwargs)
-            fbo.color_mask = (True, True, True, True)
-
             # Turn off backface culling if enabled for the scene
             # and requested by the current object
             if self.backface_culling and r.backface_culling:
                 self.ctx.enable(moderngl.CULL_FACE)
             else:
                 self.ctx.disable(moderngl.CULL_FACE)
+
+            # Render to depth buffer only
+            self.ctx.depth_func = "<"
+
+            fbo.color_mask = (False, False, False, False)
+            self.safe_render_depth_prepass(r, **kwargs)
+            fbo.color_mask = (True, True, True, True)
 
             # Render normally with less equal depth comparison function,
             # drawing only the pixels closer to the camera to avoid
@@ -175,12 +218,12 @@ class Scene(Node):
     def safe_render_depth_prepass(self, r, **kwargs):
         if not r.is_renderable:
             r.make_renderable(self.ctx)
-        r.render_depth_prepass(self.camera, **kwargs)
+        r.render_depth_prepass(**kwargs)
 
     def safe_render(self, r, **kwargs):
         if not r.is_renderable:
             r.make_renderable(self.ctx)
-        r.render(self.camera, **kwargs)
+        r.render(**kwargs)
 
     def make_renderable(self, ctx):
         self.ctx = ctx
@@ -195,6 +238,10 @@ class Scene(Node):
     @property
     def current_bounds(self):
         return compute_union_of_current_bounds([n for n in self.nodes if n not in self.lights])
+
+    @property
+    def bounds_without_floor(self):
+        return compute_union_of_current_bounds([n for n in self.nodes if n not in self.lights and n != self.floor])
 
     def auto_set_floor(self):
         """Finds the minimum lower bound in the y coordinate from all the children bounds and uses that as the floor"""
@@ -353,10 +400,10 @@ class Scene(Node):
             format="%.2f",
         )
 
-    def gui_editor(self, imgui):
+    def gui_editor(self, imgui, viewports, viewport_mode):
         """GUI to control scene settings."""
         # Also include the camera GUI in the scene node.
-        self.gui_camera(imgui)
+        self.gui_camera(imgui, viewports, viewport_mode)
         imgui.spacing()
         imgui.separator()
         imgui.spacing()
@@ -367,27 +414,61 @@ class Scene(Node):
         imgui.spacing()
         self.gui_selected(imgui)
 
-    def gui_camera(self, imgui):
-        # Camera GUI
-        imgui.push_font(self.custom_font)
-        imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
-
-        flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
-        if self.is_selected(self.camera):
-            flags |= imgui.TREE_NODE_SELECTED
-
-        if isinstance(self.camera, ViewerCamera):
-            name = self.camera.name
+    def gui_camera(self, imgui, viewports, viewport_mode):
+        # Label for the viewport position, if using multiple viewports.
+        if viewport_mode == "single":
+            suffixes = [""]
+        elif viewport_mode == "split_v":
+            suffixes = ["(left)", "(right)"]
+        elif viewport_mode == "split_h":
+            suffixes = ["(top)", "(bottom)"]
         else:
-            name = f"Camera: {self.camera.name}"
-        camera_expanded = imgui.tree_node(f"{self.camera.icon} {name}##tree_node_r_camera", flags)
-        if imgui.is_item_clicked():
-            self.select(self.camera)
+            suffixes = [
+                "(top left)",
+                "(top right)",
+                "(bottom left)",
+                "(bottom right)",
+            ]
 
-        imgui.pop_style_var()
-        imgui.pop_font()
-        if camera_expanded:
-            imgui.tree_pop()
+        for suffix, v in zip(suffixes, viewports):
+            camera = v.camera
+
+            # Camera GUI
+            imgui.push_font(self.custom_font)
+            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
+
+            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
+            if self.is_selected(camera):
+                flags |= imgui.TREE_NODE_SELECTED
+
+            if isinstance(camera, ViewerCamera):
+                name = camera.name
+            else:
+                name = f"Camera: {camera.name}"
+
+            camera_expanded = imgui.tree_node(f"{camera.icon}  {name}##tree_node_r_camera", flags)
+            if imgui.is_item_clicked():
+                self.select(camera)
+
+            # Add a right justified label with the viewport position.
+            if suffix:
+                imgui.same_line()
+                pos = imgui.get_cursor_pos_x()
+                avail = imgui.get_content_region_available()[0] - 3
+                # Only put the label if enough space is available for it.
+                if avail > imgui.calc_text_size(suffix)[0]:
+                    imgui.same_line()
+                    avail -= imgui.calc_text_size(suffix)[0]
+                    imgui.set_cursor_pos_x(pos + avail)
+                    imgui.text(suffix)
+                else:
+                    # Put an empty label to go to the next line.
+                    imgui.text("")
+
+            imgui.pop_style_var()
+            imgui.pop_font()
+            if camera_expanded:
+                imgui.tree_pop()
 
     def gui_lights(self, imgui):
         # Lights GUI
