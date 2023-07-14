@@ -14,6 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+import os
 import pickle
 from typing import List, Union
 
@@ -21,6 +22,7 @@ import cv2
 import moderngl
 import numpy as np
 from moderngl_window.opengl.vao import VAO
+from pxr import Gf, Sdf, UsdGeom
 from trimesh.triangles import points_to_barycentric
 
 from aitviewer.scene.camera import Camera, OpenCVCamera
@@ -30,6 +32,7 @@ from aitviewer.shaders import (
     get_outline_program,
     get_screen_texture_program,
 )
+from aitviewer.utils import usd
 from aitviewer.utils.decorators import hooked
 
 
@@ -298,3 +301,59 @@ class Billboard(Node):
             1.0,
             "%.2f",
         )
+
+    def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):
+        name = f"{self.name}_{self.uid:03}".replace(" ", "_")
+        usd_path = f"{usd_path}/{name}"
+
+        if not directory:
+            if isinstance(self.textures, list) and isinstance(self.textures[0], str):
+                if self.textures[0].endswith((".pickle", ".pkl")):
+                    print(
+                        f"Failed to export billboard: {self.name}. Textures must not be pickle files when not exporting to a directory."
+                    )
+                    return
+            else:
+                print(
+                    f"Failed to export billboard: {self.name}. Textures must be paths to image files when not exporting to a directory."
+                )
+                return
+
+        # Transform.
+        xform = UsdGeom.Xform.Define(stage, usd_path)
+        a_xform = xform.AddTransformOp()
+        a_xform.Set(Gf.Matrix4d(self.get_local_transform().astype(np.float64).T))
+
+        # Geometry.
+        mesh = UsdGeom.Mesh.Define(stage, usd_path + "/" + self.name.replace(" ", "_"))
+        a_vertices = mesh.CreatePointsAttr()
+        for i in range(self.vertices.shape[0]):
+            a_vertices.Set(time=i + 1, value=self.vertices[i])
+        mesh.CreateFaceVertexCountsAttr(np.array([4]))
+        mesh.CreateFaceVertexIndicesAttr([0, 1, 3, 2])
+        a_uv = UsdGeom.PrimvarsAPI(mesh).CreatePrimvar(
+            "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.faceVarying
+        )
+        a_uv.Set(time=1, value=np.array([[1.0, 1.0], [1.0, 0.0], [0.0, 0.0], [0.0, 1.0]]))
+
+        # Textures.
+        if not directory:
+            usd.add_texture(stage, mesh, usd_path, os.path.abspath(self.textures[0]))
+        else:
+            if isinstance(self.textures, list) and isinstance(self.textures[0], str):
+                for i, path in enumerate(self.textures):
+                    if path.endswith((".pickle", "pkl")):
+                        img = pickle.load(open(path, "rb"))
+                        texture_path = usd.save_image_as_texture(img, f"img_{i:03}.png", name, directory)
+                    else:
+                        texture_path = usd.copy_texture(path, name, directory)
+                    if i == 0:
+                        usd.add_texture(stage, mesh, usd_path, texture_path)
+            else:
+                for i in range(len(self.textures)):
+                    img = self.textures[i]
+                    texture_path = usd.save_image_as_texture(img, f"img_{i:03}.png", name, directory)
+                    if i == 0:
+                        usd.add_texture(stage, mesh, usd_path, texture_path)
+
+        self._export_usd_recursively(stage, usd_path, directory, verbose)

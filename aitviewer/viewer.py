@@ -242,11 +242,13 @@ class Viewer(moderngl_window.WindowConfig):
         self._exit_popup_open = False
         self._screenshot_popup_open = False
         self._screenshot_popup_just_opened = False
-        self._screenshot_focus_count = 0
+        self._export_usd_popup_open = False
+        self._export_usd_popup_just_opened = False
         self._go_to_frame_popup_open = False
         self._go_to_frame_string = ""
         self._show_shortcuts_window = False
         self._mouse_position = (0, 0)
+        self._modal_focus_count = 0
 
         self.server = None
         if C.server_enabled:
@@ -307,6 +309,10 @@ class Viewer(moderngl_window.WindowConfig):
         # Screenshot settings
         self.screenshot_transparent = False
         self.screenshot_name = None
+
+        # Export usd settings
+        self.export_usd_name = None
+        self.export_usd_directory = False
 
         # Setup viewports
         self.viewports: List[Viewport] = []
@@ -675,6 +681,7 @@ class Viewer(moderngl_window.WindowConfig):
     def gui_menu(self):
         clicked_export = False
         clicked_screenshot = False
+        clicked_export_usd = False
 
         if imgui.begin_main_menu_bar():
             if imgui.begin_menu("File", True):
@@ -691,6 +698,7 @@ class Viewer(moderngl_window.WindowConfig):
                     True,
                 )
 
+                clicked_export_usd, _ = imgui.menu_item("Save as USD", None, False, True)
                 imgui.end_menu()
 
             if imgui.begin_menu("View", True):
@@ -854,10 +862,14 @@ class Viewer(moderngl_window.WindowConfig):
         if clicked_screenshot:
             self._screenshot_popup_just_opened = True
 
-        self.gui_export()
-        self.gui_screenshot()
+        if clicked_export_usd:
+            self._export_usd_popup_just_opened = True
 
-    def gui_export(self):
+        self.gui_export_video()
+        self.gui_screenshot()
+        self.gui_export_usd()
+
+    def gui_export_video(self):
         imgui.set_next_window_size(570, 0)
         if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
             if self.scene.n_frames == 1:
@@ -1203,7 +1215,7 @@ class Viewer(moderngl_window.WindowConfig):
             self._screenshot_popup_just_opened = False
             self._screenshot_popup_open = True
             self.screenshot_name = None
-            self._screenshot_focus_count = 2
+            self._modal_focus_count = 2
             self.toggle_animation(False)
             imgui.open_popup("Screenshot##screenshot-popup")
 
@@ -1218,8 +1230,8 @@ class Viewer(moderngl_window.WindowConfig):
                     self.screenshot_name = "frame_{:0>6}.png".format(self.scene.current_frame_id)
 
                 # HACK: we need to set the focus twice when the modal is first opened for it to take effect
-                if self._screenshot_focus_count > 0:
-                    self._screenshot_focus_count -= 1
+                if self._modal_focus_count > 0:
+                    self._modal_focus_count -= 1
                     imgui.set_keyboard_focus_here()
                 _, self.screenshot_name = imgui.input_text(
                     "File name",
@@ -1250,6 +1262,122 @@ class Viewer(moderngl_window.WindowConfig):
                         self.take_screenshot(self.screenshot_name, self.screenshot_transparent)
                     imgui.close_current_popup()
                     self._screenshot_popup_open = False
+
+            else:
+                imgui.close_current_popup()
+            imgui.end_popup()
+
+    def gui_export_usd(self):
+        if self._export_usd_popup_just_opened:
+            self._export_usd_popup_just_opened = False
+            self._export_usd_popup_open = True
+            self.export_usd_name = None
+            self._modal_focus_count = 2
+            self.toggle_animation(False)
+            imgui.open_popup("Export USD##export-usd-popup")
+
+        imgui.set_next_window_size(570, 0)
+        if imgui.begin_popup_modal(
+            "Export USD##export-usd-popup",
+            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE,
+        )[0]:
+            if self._export_usd_popup_open:
+                # Export selection tree.
+                def tree(nodes):
+                    # Nodes GUI
+                    for r in nodes:
+                        # Skip nodes that shouldn't appear in the hierarchy.
+                        if not r.show_in_hierarchy:
+                            continue
+
+                        # Visibility
+                        curr_enabled = r.export_usd_enabled
+                        if not curr_enabled:
+                            imgui.push_style_color(imgui.COLOR_TEXT, 1.0, 1.0, 1.0, 0.4)
+
+                        # Title
+                        imgui.push_font(self.custom_font)
+                        imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
+
+                        flags = imgui.TREE_NODE_OPEN_ON_ARROW | imgui.TREE_NODE_FRAME_PADDING
+                        if r.export_usd_expanded:
+                            flags |= imgui.TREE_NODE_DEFAULT_OPEN
+                        if not any(c.show_in_hierarchy for c in r.nodes):
+                            flags |= imgui.TREE_NODE_LEAF
+                        r.export_usd_expanded = imgui.tree_node(
+                            "{} {}##tree_node_{}".format(r.icon, r.name, r.unique_name), flags
+                        )
+
+                        imgui.pop_style_var()
+                        imgui.pop_font()
+
+                        if r != self:
+                            # Aligns checkbox to the right side of the window
+                            # https://github.com/ocornut/imgui/issues/196
+                            imgui.same_line(position=imgui.get_window_content_region_max().x - 25)
+                            eu, enabled = imgui.checkbox("##enabled_r_{}".format(r.unique_name), r.export_usd_enabled)
+                            if eu:
+                                r.export_usd_enabled = enabled
+
+                        if r.export_usd_expanded:
+                            # Recursively render children nodes
+                            tree(r.nodes)
+                            imgui.tree_pop()
+
+                        if not curr_enabled:
+                            imgui.pop_style_color(1)
+
+                imgui.begin_child(
+                    "export_select", height=300, border=True, flags=imgui.WINDOW_ALWAYS_VERTICAL_SCROLLBAR
+                )
+                tree(self.scene.nodes)
+                imgui.end_child()
+
+                if self.export_usd_name is None:
+                    self.export_usd_name = "frame_{:0>6}".format(self.scene.current_frame_id)
+
+                # HACK: we need to set the focus twice when the modal is first opened for it to take effect.
+                if self._modal_focus_count > 0:
+                    self._modal_focus_count -= 1
+                    imgui.set_keyboard_focus_here()
+                _, self.export_usd_name = imgui.input_text(
+                    "File name",
+                    self.export_usd_name,
+                    64,
+                    imgui.INPUT_TEXT_AUTO_SELECT_ALL,
+                )
+
+                _, self.export_usd_directory = imgui.checkbox(
+                    "Export as directory with textures", self.export_usd_directory
+                )
+
+                imgui.spacing()
+
+                button_width = (imgui.get_content_region_available()[0] - imgui.get_style().item_spacing[0]) * 0.5
+
+                # Style the cancel with a grey color
+                imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.5, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.6, 0.6, 0.6, 1.0)
+                imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.7, 0.7, 0.7, 1.0)
+
+                if imgui.button("cancel", width=button_width):
+                    imgui.close_current_popup()
+                    self._export_usd_popup_open = False
+
+                imgui.pop_style_color()
+                imgui.pop_style_color()
+                imgui.pop_style_color()
+
+                imgui.same_line()
+                if imgui.button("save", button_width):
+                    if self.export_usd_name:
+                        self.export_usd(
+                            os.path.join(C.export_dir, "usd", f"{self.export_usd_name}"),
+                            self.export_usd_directory,
+                            True,
+                        )
+                    imgui.close_current_popup()
+                    self._export_usd_popup_open = False
 
             else:
                 imgui.close_current_popup()
@@ -1376,13 +1504,19 @@ class Viewer(moderngl_window.WindowConfig):
                 self._exit_popup_open = False
             return
 
-        if action == self.wnd.keys.ACTION_PRESS and self._screenshot_popup_open:
+        if action == self.wnd.keys.ACTION_PRESS and (self._screenshot_popup_open or self._export_usd_popup_open):
             if key == self.wnd.keys.ENTER:
                 if self.screenshot_name:
                     self.take_screenshot(self.screenshot_name, self.screenshot_transparent)
                     self._screenshot_popup_open = False
+                if self.export_usd_name:
+                    self.export_usd(
+                        os.path.join(C.export_dir, "usd", f"{self.export_usd_name}"), self.export_usd_directory, True
+                    )
+                    self._export_usd_popup_open = False
             elif key == self._exit_key:
                 self._screenshot_popup_open = False
+                self._export_usd_popup_open = False
             return
 
         if action == self.wnd.keys.ACTION_PRESS and self._go_to_frame_popup_open:
@@ -1617,6 +1751,33 @@ class Viewer(moderngl_window.WindowConfig):
         # Restore run animation and update last frame rendered time.
         self.run_animations = run_animations
         self._last_frame_rendered_at = self.timer.time
+
+    def export_usd(self, path: str, export_as_directory=False, verbose=False):
+        from pxr import Usd, UsdGeom
+
+        if export_as_directory:
+            if path.endswith(".usd"):
+                directory = path[:-4]
+            else:
+                directory = path
+            os.makedirs(directory, exist_ok=True)
+            path = os.path.join(directory, os.path.basename(directory) + ".usd")
+        else:
+            directory = None
+            if not path.endswith(".usd"):
+                path += ".usd"
+
+        # Create a new file and setup scene parameters.
+        stage = Usd.Stage.CreateNew(path)
+        stage.SetStartTimeCode(1)
+        stage.SetEndTimeCode(self.scene.n_frames)
+        UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.y)
+
+        # Recursively export the scene.
+        self.scene.export_usd(stage, "", directory, verbose)
+
+        # Save file.
+        stage.Save()
 
     def export_video(
         self,

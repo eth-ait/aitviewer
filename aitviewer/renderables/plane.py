@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import moderngl
 import numpy as np
+from pxr import Gf, UsdGeom
 
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.scene.node import Node
@@ -257,6 +258,21 @@ class ChessboardPlane(Node):
         _, self.c2 = imgui.color_edit4("Color 2##color{}'".format(self.unique_name), *self.c2)
         _, self.tiling = imgui.checkbox("Toggle Tiling", self.tiling)
         _, self.n_tiles = imgui.drag_int("Number of tiles", self.n_tiles, 1.0, 1, 200)
+
+    def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):
+        usd_path = f"{usd_path}/{self.name}_{self.uid:03}".replace(" ", "_")
+
+        # Transform.
+        xform = UsdGeom.Xform.Define(stage, usd_path)
+        a_xform = xform.AddTransformOp()
+        a_xform.Set(Gf.Matrix4d(self.get_local_transform().astype(np.float64).T))
+
+        # Geometry.
+        mesh = UsdGeom.Mesh.Define(stage, usd_path + "/" + self.name.replace(" ", "_"))
+        mesh.CreatePointsAttr(self.vertices)
+        mesh.CreateFaceVertexCountsAttr(np.array([4]))
+        mesh.CreateFaceVertexIndicesAttr([0, 1, 3, 2])
+        self._export_usd_recursively(stage, usd_path, directory, verbose)
 
 
 class Chessboard(Node):

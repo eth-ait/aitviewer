@@ -45,5 +45,6 @@ setup(
         "scikit-video",
         "Pillow",
         "websockets",
+        "usd-core>=23.5",
     ],
 )
