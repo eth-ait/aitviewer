@@ -470,24 +470,6 @@ class Scene(Node):
             if camera_expanded:
                 imgui.tree_pop()
 
-    def gui_lights(self, imgui):
-        # Lights GUI
-        for _, light in enumerate(self.lights):
-            imgui.push_font(self.custom_font)
-            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
-
-            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
-            if self.is_selected(light):
-                flags |= imgui.TREE_NODE_SELECTED
-            light_expanded = imgui.tree_node(f"{light.icon} {light.name}##tree_node_r", flags)
-            if imgui.is_item_clicked():
-                self.select(light)
-
-            imgui.pop_style_var()
-            imgui.pop_font()
-            if light_expanded:
-                imgui.tree_pop()
-
     def gui_hierarchy(self, imgui, rs):
         # Nodes GUI
         for r in rs:
