@@ -20,6 +20,7 @@ from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.spheres import Spheres
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
+from aitviewer.utils.bvh import Bvh
 
 
 class Skeletons(Node):
@@ -70,6 +71,40 @@ class Skeletons(Node):
             is_selectable=False,
         )
         self._add_nodes(self.spheres, self.lines, show_in_hierarchy=False)
+
+    @classmethod
+    def from_bvh(cls, path: str, z_up=False, **kwargs):
+        """
+        Load an animated skeleton from a BVH (Biovision hierarchical data) mocap file.
+        :param path: path to the BVH file.
+        :param z_up: if True transform data from Z up to Y up.
+        :param kwargs: arguments forwarded to the Skeleton constructor.
+        """
+        # Parse BVH file
+        bvh = Bvh()
+        bvh.parse_string(open(path).read())
+
+        # Get positions for all frames.
+        positions, rotations = bvh.all_frame_poses()
+
+        # Recursively add connections.
+        connections = []
+        joints = list(bvh.joints.values())
+
+        def add_connections(node, index):
+            for c in node.children:
+                child_index = joints.index(c)
+                connections.append((index, child_index))
+                add_connections(c, child_index)
+
+        add_connections(bvh.root, 0)
+
+        # Transform to y up if data is z up.
+        rotation = kwargs.get("rotation", np.eye(3))
+        if z_up:
+            rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), rotation)
+
+        return cls(positions * 1e-2, np.array(connections), rotation=rotation)
 
     @property
     def joint_positions(self):
