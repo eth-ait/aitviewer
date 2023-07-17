@@ -237,7 +237,9 @@ class Scene(Node):
 
     @property
     def current_bounds(self):
-        return compute_union_of_current_bounds([n for n in self.nodes if n not in self.lights])
+        return compute_union_of_current_bounds(
+            [n for n in self.nodes if n not in self.lights and n != self.camera_target and n != self.trackball]
+        )
 
     @property
     def bounds_without_floor(self):
