@@ -18,19 +18,20 @@ import os
 import subprocess
 
 import numpy as np
-import torch
+
+# import torch
 from scipy.interpolate import CubicSpline
 
-from aitviewer.utils.so3 import aa2rot_torch as aa2rot
-from aitviewer.utils.so3 import rot2aa_torch as rot2aa
+# from aitviewer.utils.so3 import aa2rot_torch as aa2rot
+# from aitviewer.utils.so3 import rot2aa_torch as rot2aa
 
 
-def to_torch(x, dtype, device):
-    if x is None:
-        return None
-    if isinstance(x, np.ndarray):
-        return torch.from_numpy(x).to(dtype=dtype, device=device)
-    return x.to(dtype=dtype, device=device)
+# def to_torch(x, dtype, device):
+#     if x is None:
+#         return None
+#     if isinstance(x, np.ndarray):
+#         return torch.from_numpy(x).to(dtype=dtype, device=device)
+#     return x.to(dtype=dtype, device=device)
 
 
 def to_numpy(x):
@@ -166,28 +167,28 @@ def resample_positions(positions, fps_in, fps_out):
     return interpolate_positions(positions, ts_in, ts_out)
 
 
-def compute_vertex_and_face_normals_torch(vertices, faces, vertex_faces, normalize=False):
-    """
-    Compute (unnormalized) vertex normals for the given vertices.
-    :param vertices: A tensor of shape (N, V, 3).
-    :param faces: A tensor of shape (F, 3) indexing into `vertices`.
-    :param vertex_faces: A tensor of shape (V, MAX_VERTEX_DEGREE) that lists the face IDs each vertex is a part of.
-    :param normalize: Whether to make the normals unit length or not.
-    :return: The vertex and face normals as tensors of shape (N, V, 3) and (N, F, 3) respectively.
-    """
-    vs = vertices[:, faces.to(dtype=torch.long)]
-    face_normals = torch.cross(vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], dim=-1)  # (N, F, 3)
+# def compute_vertex_and_face_normals_torch(vertices, faces, vertex_faces, normalize=False):
+#     """
+#     Compute (unnormalized) vertex normals for the given vertices.
+#     :param vertices: A tensor of shape (N, V, 3).
+#     :param faces: A tensor of shape (F, 3) indexing into `vertices`.
+#     :param vertex_faces: A tensor of shape (V, MAX_VERTEX_DEGREE) that lists the face IDs each vertex is a part of.
+#     :param normalize: Whether to make the normals unit length or not.
+#     :return: The vertex and face normals as tensors of shape (N, V, 3) and (N, F, 3) respectively.
+#     """
+#     vs = vertices[:, faces.to(dtype=torch.long)]
+#     face_normals = torch.cross(vs[:, :, 1] - vs[:, :, 0], vs[:, :, 2] - vs[:, :, 0], dim=-1)  # (N, F, 3)
 
-    ns_all_faces = face_normals[:, vertex_faces]  # (N, V, MAX_VERTEX_DEGREE, 3)
-    ns_all_faces[:, vertex_faces == -1] = 0.0
-    vertex_degrees = (vertex_faces > -1).sum(dim=-1).to(dtype=ns_all_faces.dtype)
-    vertex_normals = ns_all_faces.sum(dim=-2) / vertex_degrees[None, :, None]  # (N, V, 3)
+#     ns_all_faces = face_normals[:, vertex_faces]  # (N, V, MAX_VERTEX_DEGREE, 3)
+#     ns_all_faces[:, vertex_faces == -1] = 0.0
+#     vertex_degrees = (vertex_faces > -1).sum(dim=-1).to(dtype=ns_all_faces.dtype)
+#     vertex_normals = ns_all_faces.sum(dim=-2) / vertex_degrees[None, :, None]  # (N, V, 3)
 
-    if normalize:
-        face_normals = face_normals / torch.norm(face_normals, dim=-1).unsqueeze(-1)
-        vertex_normals = vertex_normals / torch.norm(vertex_normals, dim=-1).unsqueeze(-1)
+#     if normalize:
+#         face_normals = face_normals / torch.norm(face_normals, dim=-1).unsqueeze(-1)
+#         vertex_normals = vertex_normals / torch.norm(vertex_normals, dim=-1).unsqueeze(-1)
 
-    return vertex_normals, face_normals
+#     return vertex_normals, face_normals
 
 
 def compute_vertex_and_face_normals(vertices, faces, vertex_faces, normalize=False):
@@ -329,38 +330,38 @@ def compute_union_of_current_bounds(nodes):
     return bounds
 
 
-def local_to_global(poses, parents, output_format="aa", input_format="aa"):
-    """
-    Convert relative joint angles to global ones by unrolling the kinematic chain.
-    :param poses: A tensor of shape (N, N_JOINTS*3) defining the relative poses in angle-axis format.
-    :param parents: A list of parents for each joint j, i.e. parent[j] is the parent of joint j.
-    :param output_format: 'aa' or 'rotmat'.
-    :param input_format: 'aa' or 'rotmat'
-    :return: The global joint angles as a tensor of shape (N, N_JOINTS*DOF).
-    """
-    assert output_format in ["aa", "rotmat"]
-    assert input_format in ["aa", "rotmat"]
-    dof = 3 if input_format == "aa" else 9
-    n_joints = poses.shape[-1] // dof
-    if input_format == "aa":
-        local_oris = aa2rot(poses.reshape((-1, 3)))
-    else:
-        local_oris = poses
-    local_oris = local_oris.reshape((-1, n_joints, 3, 3))
-    global_oris = torch.zeros_like(local_oris)
+# def local_to_global(poses, parents, output_format="aa", input_format="aa"):
+#     """
+#     Convert relative joint angles to global ones by unrolling the kinematic chain.
+#     :param poses: A tensor of shape (N, N_JOINTS*3) defining the relative poses in angle-axis format.
+#     :param parents: A list of parents for each joint j, i.e. parent[j] is the parent of joint j.
+#     :param output_format: 'aa' or 'rotmat'.
+#     :param input_format: 'aa' or 'rotmat'
+#     :return: The global joint angles as a tensor of shape (N, N_JOINTS*DOF).
+#     """
+#     assert output_format in ["aa", "rotmat"]
+#     assert input_format in ["aa", "rotmat"]
+#     dof = 3 if input_format == "aa" else 9
+#     n_joints = poses.shape[-1] // dof
+#     if input_format == "aa":
+#         local_oris = aa2rot(poses.reshape((-1, 3)))
+#     else:
+#         local_oris = poses
+#     local_oris = local_oris.reshape((-1, n_joints, 3, 3))
+#     global_oris = torch.zeros_like(local_oris)
 
-    for j in range(n_joints):
-        if parents[j] < 0:
-            # root rotation
-            global_oris[..., j, :, :] = local_oris[..., j, :, :]
-        else:
-            parent_rot = global_oris[..., parents[j], :, :]
-            local_rot = local_oris[..., j, :, :]
-            global_oris[..., j, :, :] = torch.matmul(parent_rot, local_rot)
+#     for j in range(n_joints):
+#         if parents[j] < 0:
+#             # root rotation
+#             global_oris[..., j, :, :] = local_oris[..., j, :, :]
+#         else:
+#             parent_rot = global_oris[..., parents[j], :, :]
+#             local_rot = local_oris[..., j, :, :]
+#             global_oris[..., j, :, :] = torch.matmul(parent_rot, local_rot)
 
-    if output_format == "aa":
-        global_oris = rot2aa(global_oris.reshape((-1, 3, 3)))
-        res = global_oris.reshape((-1, n_joints * 3))
-    else:
-        res = global_oris.reshape((-1, n_joints * 3 * 3))
-    return res
+#     if output_format == "aa":
+#         global_oris = rot2aa(global_oris.reshape((-1, 3, 3)))
+#         res = global_oris.reshape((-1, n_joints * 3))
+#     else:
+#         res = global_oris.reshape((-1, n_joints * 3 * 3))
+#     return res

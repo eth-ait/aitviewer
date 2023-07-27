@@ -16,13 +16,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import moderngl
 import numpy as np
-from pxr import Gf, UsdGeom
 
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.scene.node import Node
 from aitviewer.shaders import get_chessboard_program, get_smooth_lit_with_edges_program
 from aitviewer.utils import set_lights_in_program, set_material_properties
 from aitviewer.utils.decorators import hooked
+
+# from pxr import Gf, UsdGeom
 
 
 class Plane(Node):

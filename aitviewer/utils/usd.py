@@ -3,7 +3,8 @@ import shutil
 
 import numpy as np
 from PIL import Image
-from pxr import Sdf, UsdShade
+
+# from pxr import Sdf, UsdShade
 
 
 def _get_texture_paths(path, name, directory):

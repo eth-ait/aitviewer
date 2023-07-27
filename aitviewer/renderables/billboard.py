@@ -18,11 +18,12 @@ import os
 import pickle
 from typing import List, Union
 
-import cv2
+# import cv2
 import moderngl
 import numpy as np
 from moderngl_window.opengl.vao import VAO
-from pxr import Gf, Sdf, UsdGeom
+
+# from pxr import Gf, Sdf, UsdGeom
 from trimesh.triangles import points_to_barycentric
 
 from aitviewer.scene.camera import Camera, OpenCVCamera

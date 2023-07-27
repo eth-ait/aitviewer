@@ -38,7 +38,8 @@ from aitviewer.renderer import Renderer, Viewport
 from aitviewer.scene.camera import PinholeCamera, ViewerCamera
 from aitviewer.scene.node import Node
 from aitviewer.scene.scene import Scene
-from aitviewer.server import ViewerServer
+
+# from aitviewer.server import ViewerServer
 from aitviewer.shaders import clear_shader_cache
 from aitviewer.streamables.streamable import Streamable
 from aitviewer.utils import path
@@ -1753,7 +1754,7 @@ class Viewer(moderngl_window.WindowConfig):
         self._last_frame_rendered_at = self.timer.time
 
     def export_usd(self, path: str, export_as_directory=False, verbose=False):
-        from pxr import Usd, UsdGeom
+        # from pxr import Usd, UsdGeom
 
         if export_as_directory:
             if path.endswith(".usd"):

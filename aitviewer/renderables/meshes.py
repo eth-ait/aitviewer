@@ -26,7 +26,8 @@ import trimesh
 import trimesh.geometry
 from moderngl_window.opengl.vao import VAO
 from PIL import Image
-from pxr import Gf, Sdf, UsdGeom
+
+# from pxr import Gf, Sdf, UsdGeom
 from trimesh.triangles import points_to_barycentric
 
 from aitviewer.scene.node import Node

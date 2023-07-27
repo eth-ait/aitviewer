@@ -738,7 +738,7 @@ class Node(object):
         :param stage: an object of type Usd.Stage into which to export the node
         :param usd_path: the path of the parent object in the USD file scene hierarchy.
         """
-        from pxr import Gf, UsdGeom
+        # from pxr import Gf, UsdGeom
 
         usd_path = f"{usd_path}/{self.name.replace(' ', '_')}_{self.uid:03}"
 

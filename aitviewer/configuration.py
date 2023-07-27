@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import os
 
-import torch
+# import torch
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
@@ -47,7 +47,7 @@ class Configuration(object):
                 self._conf.merge_with(conf)
 
             self._gui_counter = 0
-            self._gpu_available = torch.cuda.is_available()
+            # self._gpu_available = torch.cuda.is_available()
 
         def update_conf(self, conf_obj):
             """Update the configuration with another configuration file or another OmegaConf configuration object."""
@@ -59,15 +59,15 @@ class Configuration(object):
 
         def __getattr__(self, item):
             if hasattr(self._conf, item):
-                # Some attributes of the config are converted to torch objects automatically.
-                if item == "device":
-                    return torch.device(self._conf.get("device", "cuda:0") if self._gpu_available else "cpu")
-                elif item == "f_precision":
-                    return getattr(torch, "float{}".format(self._conf.get("f_precision", 32)))
-                elif item == "i_precision":
-                    return getattr(torch, "int{}".format(self._conf.get("i_precision", 64)))
-                else:
-                    return getattr(self._conf, item)
+                # # Some attributes of the config are converted to torch objects automatically.
+                # if item == "device":
+                #     return torch.device(self._conf.get("device", "cuda:0") if self._gpu_available else "cpu")
+                # elif item == "f_precision":
+                #     return getattr(torch, "float{}".format(self._conf.get("f_precision", 32)))
+                # elif item == "i_precision":
+                #     return getattr(torch, "int{}".format(self._conf.get("i_precision", 64)))
+                # else:
+                return getattr(self._conf, item)
             else:
                 # Default behavior.
                 return self.__getattribute__(item)

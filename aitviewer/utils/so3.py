@@ -15,30 +15,30 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
-import roma
-import torch
+
+# import roma
+# import torch
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import RotationSpline
 
+# def rot2aa_torch(rotation_matrices):
+#     """
+#     Convert rotation matrices to rotation vectors (angle-axis representation).
+#     :param rotation_matrices: A torch tensor of shape (..., 3, 3).
+#     :return: A torch tensor of shape (..., 3).
+#     """
+#     assert isinstance(rotation_matrices, torch.Tensor)
+#     return roma.rotmat_to_rotvec(rotation_matrices)
 
-def rot2aa_torch(rotation_matrices):
-    """
-    Convert rotation matrices to rotation vectors (angle-axis representation).
-    :param rotation_matrices: A torch tensor of shape (..., 3, 3).
-    :return: A torch tensor of shape (..., 3).
-    """
-    assert isinstance(rotation_matrices, torch.Tensor)
-    return roma.rotmat_to_rotvec(rotation_matrices)
 
-
-def aa2rot_torch(rotation_vectors):
-    """
-    Convert rotation vectors (angle-axis representation) to rotation matrices.
-    :param rotation_vectors: A torch tensor of shape (..., 3).
-    :return: A torch tensor of shape (..., 3, 3).
-    """
-    assert isinstance(rotation_vectors, torch.Tensor)
-    return roma.rotvec_to_rotmat(rotation_vectors)
+# def aa2rot_torch(rotation_vectors):
+#     """
+#     Convert rotation vectors (angle-axis representation) to rotation matrices.
+#     :param rotation_vectors: A torch tensor of shape (..., 3).
+#     :return: A torch tensor of shape (..., 3, 3).
+#     """
+#     assert isinstance(rotation_vectors, torch.Tensor)
+#     return roma.rotvec_to_rotmat(rotation_vectors)
 
 
 def rot2aa_numpy(rotation_matrices):
