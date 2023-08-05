@@ -267,6 +267,7 @@ class Viewer(moderngl_window.WindowConfig):
         # Settings
         self.run_animations = C.run_animations
         self.playback_fps = C.playback_fps
+        self.playback_without_skipping = False
         self.shadows_enabled = C.shadows_enabled
         self.auto_set_floor = C.auto_set_floor
         self.auto_set_camera_target = C.auto_set_camera_target
@@ -531,10 +532,13 @@ class Viewer(moderngl_window.WindowConfig):
 
     def render(self, time, frame_time, export=False, transparent_background=False):
         """The main drawing function."""
+
         if self.run_animations:
             # Compute number of frames to advance by.
             frames = (int)((time - self._last_frame_rendered_at) * self.playback_fps)
             if frames > 0:
+                if self.playback_without_skipping:
+                    frames = 1
                 self.scene.current_frame_id = (self.scene.current_frame_id + frames) % self.scene.n_frames
                 self._last_frame_rendered_at += frames * (1.0 / self.playback_fps)
 
