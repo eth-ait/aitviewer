@@ -1479,15 +1479,19 @@ class Viewer(moderngl_window.WindowConfig):
         return False
 
     def center_view_on_selection(self):
-        if isinstance(self.scene.selected_object, Node):
+        self.center_view_on_node(self.scene.selected_object, with_animation=True)
+
+    def center_view_on_node(self, node, with_animation=False):
+        if isinstance(node, Node):
             self.reset_camera()
             forward = self.scene.camera.forward
-            bounds = self.scene.selected_object.current_bounds
+            bounds = node.current_bounds
             diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
             dist = max(0.01, diag * 1.3)
 
             center = bounds.mean(-1)
-            self.scene.camera.move_with_animation(center - forward * dist, center)
+            anim_time = 0.25 if with_animation else 0.0
+            self.scene.camera.move_with_animation(center - forward * dist, center, anim_time)
 
     def resize(self, width: int, height: int):
         self.window_size = (width, height)

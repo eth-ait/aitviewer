@@ -333,15 +333,10 @@ class Camera(Node, CameraInterface):
             all_oris[i] = self.rotation @ np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])
 
         path_spheres = RigidBodies(all_points, all_oris, radius=0.01, length=0.1, color=(0.92, 0.68, 0.2, 1.0))
+
         # Create lines only if there is more than one frame in the sequence.
         if self.n_frames > 1:
-            path_lines = Lines(
-                all_points,
-                color=(0, 0, 0, 1),
-                r_base=0.003,
-                mode="line_strip",
-                cast_shadow=False,
-            )
+            path_lines = Lines(all_points, color=(0, 0, 0, 1), r_base=0.003, mode="line_strip", cast_shadow=False)
         else:
             path_lines = None
 
@@ -351,7 +346,6 @@ class Camera(Node, CameraInterface):
         self.parent.add(path_spheres, show_in_hierarchy=False, enabled=self.enabled)
         if path_lines is not None:
             self.parent.add(path_lines, show_in_hierarchy=False, enabled=self.enabled)
-
         self.path = (path_spheres, path_lines)
         self.current_frame_id = frame_id
 

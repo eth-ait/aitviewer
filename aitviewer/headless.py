@@ -51,8 +51,12 @@ class HeadlessRenderer(Viewer):
         """
         self._init_scene()
         self.export_video(
-            output_path=video_dir, frame_dir=frame_dir, animation=True, output_fps=output_fps, transparent=transparent,
-            **export_video_kwargs
+            output_path=video_dir,
+            frame_dir=frame_dir,
+            animation=True,
+            output_fps=output_fps,
+            transparent=transparent,
+            **export_video_kwargs,
         )
 
     def save_frame(self, file_path, scale_factor: float = None):
