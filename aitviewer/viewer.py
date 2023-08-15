@@ -323,6 +323,14 @@ class Viewer(moderngl_window.WindowConfig):
         # Set the mode once the viewer has been completely initialized
         self.selected_mode = "view"
 
+    @property
+    def render_gui(self):
+        return self._render_gui
+
+    @render_gui.setter
+    def render_gui(self, value):
+        self._render_gui = value
+
     def _resize_viewports(self):
         """
         Computes the size of the viewports depending on the current mode.
@@ -657,7 +665,7 @@ class Viewer(moderngl_window.WindowConfig):
         # Reset user interacting state.
         self.imgui_user_interacting = False
 
-        if self._render_gui:
+        if self.render_gui:
             # Render user controls.
             for gc in self.gui_controls.values():
                 gc()
@@ -756,7 +764,7 @@ class Viewer(moderngl_window.WindowConfig):
 
                     imgui.end_menu()
 
-                _, self._render_gui = imgui.menu_item("Render GUI", None, self._render_gui, True)
+                _, self.render_gui = imgui.menu_item("Render GUI", None, self.render_gui, True)
 
                 imgui.end_menu()
 
@@ -1528,9 +1536,9 @@ class Viewer(moderngl_window.WindowConfig):
                 self._go_to_frame_popup_open = False
             return
 
-        if action == self.wnd.keys.ACTION_PRESS and not self._render_gui:
+        if action == self.wnd.keys.ACTION_PRESS and not self.render_gui:
             if key == self._exit_key:
-                self._render_gui = True
+                self.render_gui = True
                 return
 
         if self.imgui.io.want_capture_keyboard:
@@ -1797,6 +1805,7 @@ class Viewer(moderngl_window.WindowConfig):
         scale_factor=None,
         transparent=False,
         quality="medium",
+        ensure_no_overwrite=True,
     ):
         # Load this module to reduce load time.
         import skvideo.io
@@ -1811,6 +1820,8 @@ class Viewer(moderngl_window.WindowConfig):
 
         if frame_dir is not None:
             # We want to avoid overriding anything in an existing directory, so add suffixes.
+            # We always do this, even if `ensure_no_overwrite` is False, because this might lead to unexpected videos
+            # if data already exists in this directory.
             format_str = "{:0>4}"
             counter = 0
             candidate_dir = os.path.join(frame_dir, format_str.format(counter))
@@ -1869,7 +1880,7 @@ class Viewer(moderngl_window.WindowConfig):
 
         # Initialize video writer.
         if output_path is not None:
-            path_video, path_gif, is_gif = get_video_paths(output_path)
+            path_video, path_gif, is_gif = get_video_paths(output_path, ensure_no_overwrite)
             pix_fmt = "yuva420p" if transparent else "yuv420p"
             outputdict = {
                 "-pix_fmt": pix_fmt,
