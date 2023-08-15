@@ -278,7 +278,6 @@ class Viewer(moderngl_window.WindowConfig):
 
         self._pan_camera = False
         self._rotate_camera = False
-        self._using_temp_camera = False
         self._past_frametimes = np.zeros([60]) - 1.0
         self._last_frame_rendered_at = 0
 
@@ -792,18 +791,21 @@ class Viewer(moderngl_window.WindowConfig):
                 if clicked:
                     self.center_view_on_selection()
 
-                is_ortho = False if self._using_temp_camera else self.scene.camera.is_ortho
+                # TODO (@Dario): correct to only use self.viewports[0] here?
+                is_ortho = False if self.viewports[0].using_temp_camera else self.scene.camera.is_ortho
                 _, is_ortho = imgui.menu_item(
                     "Orthographic Camera",
                     self._shortcut_names[self._orthographic_camera_key],
                     is_ortho,
                     True,
                 )
-                if is_ortho and self._using_temp_camera:
+                # TODO (@Dario): correct to only use self.viewports[0] here?
+                if is_ortho and self.viewports[0].using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.is_ortho = is_ortho
 
-                if imgui.begin_menu("Control modes"):
+                # TODO (@Dario)
+                if not self.viewports[0].using_temp_camera and imgui.begin_menu("Control modes"):
 
                     def mode(name, mode):
                         selected = imgui.menu_item(name, None, self.scene.camera.control_mode == mode)[1]

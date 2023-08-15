@@ -28,6 +28,10 @@ class Viewport:
         self._camera = camera
         self._using_temp_camera = not isinstance(camera, ViewerCamera)
 
+    @property
+    def using_temp_camera(self):
+        return self._using_temp_camera
+
     def contains(self, x: int, y: int):
         e = self.extents
         return x >= e[0] and x < e[0] + e[2] and y >= e[1] and y < e[1] + e[3]
