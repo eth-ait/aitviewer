@@ -26,6 +26,7 @@ import trimesh
 import trimesh.geometry
 from moderngl_window.opengl.vao import VAO
 from PIL import Image
+from pxr import Gf, Sdf, UsdGeom
 from trimesh.triangles import points_to_barycentric
 
 from aitviewer.scene.node import Node
@@ -39,7 +40,7 @@ from aitviewer.shaders import (
     get_smooth_lit_with_edges_face_color_program,
     get_smooth_lit_with_edges_program,
 )
-from aitviewer.utils import set_lights_in_program, set_material_properties
+from aitviewer.utils import set_lights_in_program, set_material_properties, usd
 from aitviewer.utils.decorators import hooked
 from aitviewer.utils.so3 import euler2rot_numpy, rot2euler_numpy
 from aitviewer.utils.utils import compute_vertex_and_face_normals_sparse
@@ -129,6 +130,7 @@ class Meshes(Node):
         # Texture handling.
         self.has_texture = uv_coords is not None
         self.uv_coords = uv_coords
+        self.texture_path = path_to_texture
 
         if self.has_texture:
             self.use_pickle_texture = path_to_texture.endswith((".pickle", "pkl"))
@@ -725,6 +727,38 @@ class Meshes(Node):
         self.vertices = np.delete(self.vertices, frames, axis=0)
         self.redraw()
 
+    def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):
+        name = f"{self.name}_{self.uid:03}".replace(" ", "_")
+        usd_path = f"{usd_path}/{name}"
+
+        # Transform.
+        xform = UsdGeom.Xform.Define(stage, usd_path)
+        a_xform = xform.AddTransformOp()
+        a_xform.Set(Gf.Matrix4d(self.get_local_transform().astype(np.float64).T))
+
+        # Geometry.
+        mesh = UsdGeom.Mesh.Define(stage, usd_path + "/" + self.name.replace(" ", "_"))
+        a_vertices = mesh.CreatePointsAttr()
+        for i in range(self.n_frames):
+            a_vertices.Set(time=i + 1, value=self.vertices[i])
+        mesh.CreateFaceVertexCountsAttr(np.full(self.faces.shape[0], 3))
+        mesh.CreateFaceVertexIndicesAttr(self.faces)
+
+        if self.has_texture and not self.use_pickle_texture:
+            # UVs.
+            a_uv = UsdGeom.PrimvarsAPI(mesh).CreatePrimvar(
+                "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.faceVarying
+            )
+            a_uv.Set(time=1, value=self.uv_coords[self.faces.flatten()])
+
+            if not directory:
+                texture_path = os.path.abspath(self.texture_path)
+            else:
+                texture_path = usd.copy_texture(self.texture_path, name, directory)
+            usd.add_texture(stage, mesh, usd_path, texture_path)
+
+        self._export_usd_recursively(stage, usd_path, directory, verbose)
+
 
 class VariableTopologyMeshes(Node):
     """
@@ -1148,3 +1182,41 @@ class VariableTopologyMeshes(Node):
             m = self._current_mesh.get(self.current_frame_id, None)
             if m is not None:
                 m.release()
+
+    def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):
+        name = f"{self.name}_{self.uid:03}".replace(" ", "_")
+        usd_path = f"{usd_path}/{name}"
+
+        # Transform.
+        xform = UsdGeom.Xform.Define(stage, usd_path)
+        a_xform = xform.AddTransformOp()
+        a_xform.Set(Gf.Matrix4d(self.get_local_transform().astype(np.float64).T))
+
+        # Geometry.
+        mesh = UsdGeom.Mesh.Define(stage, usd_path + "/" + self.name.replace(" ", "_"))
+        a_vertices = mesh.CreatePointsAttr()
+        a_faces = mesh.CreateFaceVertexIndicesAttr()
+        a_vertex_counts = mesh.CreateFaceVertexCountsAttr()
+        if self.uv_coords is not None:
+            a_uv = UsdGeom.PrimvarsAPI(mesh).CreatePrimvar(
+                "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.faceVarying
+            )
+
+        for i in range(self.n_frames):
+            a_vertices.Set(time=i + 1, value=self.vertices[i])
+            a_faces.Set(time=i + 1, value=self.faces[i])
+            a_vertex_counts.Set(time=i + 1, value=np.full(self.faces[i].shape[0], 3))
+            if self.uv_coords is not None:
+                a_uv.Set(time=i + 1, value=self.uv_coords[i][self.faces[i].flatten()])
+
+                # Texture.
+                if directory:
+                    texture_path = usd.copy_texture(self.texture_paths[i].replace(".pkl", ".jpeg"), name, directory)
+                else:
+                    texture_path = os.path.abspath(self.texture_paths[i].replace(".pkl", ".jpeg"))
+
+                if i == 0:
+                    print(directory, texture_path)
+                    usd.add_texture(stage, mesh, usd_path, texture_path)
+
+        self._export_usd_recursively(stage, usd_path, directory, verbose)

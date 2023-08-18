@@ -39,7 +39,7 @@ def to_numpy(x):
     return x.detach().cpu().numpy()
 
 
-def get_video_paths(video_path):
+def get_video_paths(video_path, ensure_no_overwrite=True):
     is_webm = video_path.endswith(".webm")
     is_mp4 = video_path.endswith(".mp4")
     is_gif = video_path.endswith(".gif")
@@ -54,11 +54,14 @@ def get_video_paths(video_path):
         os.makedirs(dir_of_file)
 
     # Make sure we don't override an existing video.
-    counter = 0
-    video_path_candidate = video_path.replace(suffix, f"_{counter}{suffix}")
-    while os.path.exists(video_path_candidate):
-        counter += 1
+    if ensure_no_overwrite:
+        counter = 0
         video_path_candidate = video_path.replace(suffix, f"_{counter}{suffix}")
+        while os.path.exists(video_path_candidate):
+            counter += 1
+            video_path_candidate = video_path.replace(suffix, f"_{counter}{suffix}")
+    else:
+        video_path_candidate = video_path
 
     if is_mp4 or is_webm:
         return video_path_candidate, None, is_gif

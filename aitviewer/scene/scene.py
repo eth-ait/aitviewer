@@ -237,7 +237,9 @@ class Scene(Node):
 
     @property
     def current_bounds(self):
-        return compute_union_of_current_bounds([n for n in self.nodes if n not in self.lights])
+        return compute_union_of_current_bounds(
+            [n for n in self.nodes if n not in self.lights and n != self.camera_target and n != self.trackball]
+        )
 
     @property
     def bounds_without_floor(self):
@@ -468,24 +470,6 @@ class Scene(Node):
             imgui.pop_style_var()
             imgui.pop_font()
             if camera_expanded:
-                imgui.tree_pop()
-
-    def gui_lights(self, imgui):
-        # Lights GUI
-        for _, light in enumerate(self.lights):
-            imgui.push_font(self.custom_font)
-            imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 2))
-
-            flags = imgui.TREE_NODE_LEAF | imgui.TREE_NODE_FRAME_PADDING
-            if self.is_selected(light):
-                flags |= imgui.TREE_NODE_SELECTED
-            light_expanded = imgui.tree_node(f"{light.icon} {light.name}##tree_node_r", flags)
-            if imgui.is_item_clicked():
-                self.select(light)
-
-            imgui.pop_style_var()
-            imgui.pop_font()
-            if light_expanded:
                 imgui.tree_pop()
 
     def gui_hierarchy(self, imgui, rs):

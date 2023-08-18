@@ -1,6 +1,7 @@
 # Access SMPL models.
 smplx_models: "../data/smplx_models"
 star_models: "../data/star_models"
+supr_models: "../data/supr_models"
 
 # Access to datasets.
 datasets:

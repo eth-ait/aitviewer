@@ -19,6 +19,7 @@ import numpy as np
 import trimesh
 from moderngl_window.opengl.vao import VAO
 
+from aitviewer.renderables.spheres import SpheresTrail
 from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
 from aitviewer.shaders import (
@@ -588,3 +589,25 @@ class Lines2D(Node):
     def release(self):
         if self.is_renderable:
             self.vao.release()
+
+
+class LinesTrail(Lines):
+    """A sequence of lines that leave a trail, i.e. the past lines keep being rendered."""
+
+    def __init__(self, lines, with_spheres=True, r_base=0.01, r_tip=None, color=(0.0, 0.0, 1.0, 1.0), **kwargs):
+        if "mode" not in kwargs:
+            kwargs["mode"] = "line_strip"
+        super().__init__(lines, r_base, r_tip, color, **kwargs)
+        self.n_frames = lines.shape[0]
+
+        if with_spheres:
+            spheres_trail = SpheresTrail(lines, radius=r_base * 4.0, color=color)
+            self._add_node(spheres_trail, enabled=True, show_in_hierarchy=True)
+
+    def on_frame_update(self):
+        self.n_lines = self.current_frame_id
+        super().on_frame_update()
+
+    def make_renderable(self, ctx):
+        super().make_renderable(ctx)
+        self.on_frame_update()

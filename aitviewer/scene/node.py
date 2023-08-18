@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from functools import lru_cache
+from typing import List
 
 import moderngl
 import numpy as np
@@ -162,9 +163,11 @@ class Node(object):
         self._selected_mode = "view"
         self._show_in_hierarchy = True
         self.is_selectable = is_selectable
+        self.export_usd_enabled = True
+        self.export_usd_expanded = True
 
-        self.nodes = []
-        self.parent = None
+        self.nodes: List[Node] = []
+        self.parent: Node = None
 
     # Selected Mode
     @property
@@ -719,3 +722,29 @@ class Node(object):
 
     def remove_frames(self, *args, **kwargs):
         pass
+
+    def _export_usd_recursively(self, stage, usd_path, directory, verbose):
+        if verbose:
+            print(usd_path)
+        for n in self.nodes:
+            if n.export_usd_enabled and n.show_in_hierarchy:
+                n.export_usd(stage, usd_path, directory, verbose)
+
+    def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):
+        """
+        Export the node into an USD file. Nodes that implement this method should use
+        recursively call this for every children that should also be exported.
+
+        :param stage: an object of type Usd.Stage into which to export the node
+        :param usd_path: the path of the parent object in the USD file scene hierarchy.
+        """
+        from pxr import Gf, UsdGeom
+
+        usd_path = f"{usd_path}/{self.name.replace(' ', '_')}_{self.uid:03}"
+
+        # Transform.
+        xform = UsdGeom.Xform.Define(stage, usd_path)
+        a_xform = xform.AddTransformOp()
+        a_xform.Set(Gf.Matrix4d(self.get_local_transform().astype(np.float64).T))
+
+        self._export_usd_recursively(stage, usd_path, directory, verbose)

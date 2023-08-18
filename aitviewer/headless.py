@@ -35,11 +35,11 @@ class HeadlessRenderer(Viewer):
         """
         super().__init__(**kwargs)
 
-    def run(self, frame_dir=None, video_dir=None, output_fps=60):
+    def run(self, frame_dir=None, video_dir=None, output_fps=60, **export_video_kwargs):
         """Same as self.save_video, kept for backward compatibility."""
         return self.save_video(frame_dir, video_dir, output_fps)
 
-    def save_video(self, frame_dir=None, video_dir=None, output_fps=60, transparent=False):
+    def save_video(self, frame_dir=None, video_dir=None, output_fps=60, transparent=False, **export_video_kwargs):
         """
         Convenience method to run the headless rendering.
         :param frame_dir: Where to store the individual frames or None if you don't care.
@@ -51,7 +51,12 @@ class HeadlessRenderer(Viewer):
         """
         self._init_scene()
         self.export_video(
-            output_path=video_dir, frame_dir=frame_dir, animation=True, output_fps=output_fps, transparent=transparent
+            output_path=video_dir,
+            frame_dir=frame_dir,
+            animation=True,
+            output_fps=output_fps,
+            transparent=transparent,
+            **export_video_kwargs,
         )
 
     def save_frame(self, file_path, scale_factor: float = None):

@@ -278,3 +278,19 @@ class Spheres(Node):
     def remove_frames(self, frames):
         self.sphere_positions = np.delete(self.sphere_positions, frames, axis=0)
         self.redraw()
+
+
+class SpheresTrail(Spheres):
+    """A sequence of spheres that leaves a trail, i.e. the past spheres keep being rendered."""
+
+    def __init__(self, positions, **kwargs):
+        super().__init__(positions, **kwargs)
+        self.n_frames = positions.shape[0]
+
+    def on_frame_update(self):
+        self.n_spheres = self.current_frame_id + 1
+        super().on_frame_update()
+
+    def make_renderable(self, ctx):
+        super().make_renderable(ctx)
+        self.on_frame_update()

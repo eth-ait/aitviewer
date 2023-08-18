@@ -93,7 +93,7 @@ class PointClouds(Node):
             self._colors = [self.color]
         elif isinstance(colors, tuple) and len(colors) == 4:
             self._colors = [colors]
-        elif isinstance(colors, list):
+        elif isinstance(colors, list) or isinstance(colors, np.ndarray):
             assert len(colors) == self.n_frames
             assert colors[0].shape[-1] == 4
             self._colors = colors
