@@ -1115,7 +1115,7 @@ class Viewer(moderngl_window.WindowConfig):
     def gui_playback(self):
         """GUI to control playback settings."""
         imgui.set_next_window_position(50, 100 + self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
-        imgui.set_next_window_size(self.window_size[0] * 0.4, self.window_size[1] * 0.15, imgui.FIRST_USE_EVER)
+        imgui.set_next_window_size(self.window_size[0] * 0.4, self.window_size[1] * 0.175, imgui.FIRST_USE_EVER)
         expanded, _ = imgui.begin("Playback", None)
         if expanded:
             u, run_animations = imgui.checkbox(
@@ -1162,6 +1162,10 @@ class Viewer(moderngl_window.WindowConfig):
                 max_value=n_frames - 1,
             )
             self.prevent_background_interactions()
+        if imgui.collapsing_header("Advanced options")[0]:
+            _, self.playback_without_skipping = imgui.checkbox(
+                "Playback without skipping", self.playback_without_skipping
+            )
         imgui.end()
 
     def gui_shortcuts(self):
