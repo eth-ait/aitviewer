@@ -791,7 +791,6 @@ class Viewer(moderngl_window.WindowConfig):
                 if clicked:
                     self.center_view_on_selection()
 
-                # TODO (@Dario): correct to only use self.viewports[0] here?
                 is_ortho = False if self.viewports[0].using_temp_camera else self.scene.camera.is_ortho
                 _, is_ortho = imgui.menu_item(
                     "Orthographic Camera",
@@ -799,13 +798,12 @@ class Viewer(moderngl_window.WindowConfig):
                     is_ortho,
                     True,
                 )
-                # TODO (@Dario): correct to only use self.viewports[0] here?
+
                 if is_ortho and self.viewports[0].using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.is_ortho = is_ortho
 
-                # TODO (@Dario)
-                if not self.viewports[0].using_temp_camera and imgui.begin_menu("Control modes"):
+                if imgui.begin_menu("Control modes", enabled=not self.viewports[0].using_temp_camera):
 
                     def mode(name, mode):
                         selected = imgui.menu_item(name, None, self.scene.camera.control_mode == mode)[1]
@@ -1491,9 +1489,13 @@ class Viewer(moderngl_window.WindowConfig):
             diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
             dist = max(0.01, diag * 1.3)
 
-            center = bounds.mean(-1)
-            anim_time = 0.25 if with_animation else 0.0
-            self.scene.camera.move_with_animation(center - forward * dist, center, anim_time)
+            target = bounds.mean(-1)
+            position = target - forward * dist
+            if with_animation:
+                self.scene.camera.move_with_animation(position, target, 0.25)
+            else:
+                self.scene.camera.position = position
+                self.scene.camera.target = target
 
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
