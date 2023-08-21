@@ -1,3 +1,4 @@
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 from setuptools import find_packages, setup
 
 from aitviewer import __version__

@@ -1,4 +1,4 @@
-/* Copyright (C) 2023 Dario Mylonopoulos */
+// Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 const uvec4 table_edge_mapping[12] =
 {
