@@ -872,7 +872,9 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_export_video(self):
         imgui.set_next_window_size(570, 0)
-        if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
+        if imgui.begin_popup_modal(
+            "Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_SAVED_SETTINGS
+        )[0]:
             if self.scene.n_frames == 1:
                 imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
                 self.export_animation = False
@@ -1189,7 +1191,10 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.set_next_window_size(300, 0)
         if imgui.begin_popup_modal(
             "Go to frame##go-to-frame-popup",
-            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_TITLE_BAR,
+            flags=imgui.WINDOW_NO_RESIZE
+            | imgui.WINDOW_NO_MOVE
+            | imgui.WINDOW_NO_TITLE_BAR
+            | imgui.WINDOW_NO_SAVED_SETTINGS,
         )[0]:
             if self._go_to_frame_popup_open:
                 imgui.set_keyboard_focus_here()
@@ -1227,7 +1232,7 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.set_next_window_size(250, 0)
         if imgui.begin_popup_modal(
             "Screenshot##screenshot-popup",
-            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE,
+            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_SAVED_SETTINGS,
         )[0]:
             if self._screenshot_popup_open:
                 _, self.screenshot_transparent = imgui.checkbox("Transparent background", self.screenshot_transparent)
@@ -1284,7 +1289,7 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.set_next_window_size(570, 0)
         if imgui.begin_popup_modal(
             "Export USD##export-usd-popup",
-            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE,
+            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_SAVED_SETTINGS,
         )[0]:
             if self._export_usd_popup_open:
                 # Export selection tree.
@@ -1392,7 +1397,9 @@ class Viewer(moderngl_window.WindowConfig):
         if self._exit_popup_open:
             imgui.open_popup("Exit##exit-popup")
 
-        if imgui.begin_popup_modal("Exit##exit-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
+        if imgui.begin_popup_modal(
+            "Exit##exit-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_SAVED_SETTINGS
+        )[0]:
             if self._exit_popup_open:
                 imgui.text("Are you sure you want to exit?")
                 imgui.spacing()
