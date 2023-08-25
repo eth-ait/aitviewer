@@ -106,7 +106,7 @@ class Viewer(moderngl_window.WindowConfig):
             from aitviewer.utils.pyqt5_window import PyQt5Window
 
             base_window_cls = PyQt5Window
-        if self.window_type == "pyqt6":
+        elif self.window_type == "pyqt6":
             from aitviewer.utils.pyqt6_window import PyQt6Window
 
             base_window_cls = PyQt6Window
