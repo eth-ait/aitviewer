@@ -294,10 +294,10 @@ class PyQt6Window(BaseWindow):
         if self.is_closing:
             return
 
-        self._width = width // self._widget.devicePixelRatio()
-        self._height = height // self._widget.devicePixelRatio()
-        self._buffer_width = width
-        self._buffer_height = height
+        self._width = width
+        self._height = height
+        self._buffer_width = width * self._widget.devicePixelRatio()
+        self._buffer_height = height * self._widget.devicePixelRatio()
 
         if self._ctx:
             self.set_default_viewport()
