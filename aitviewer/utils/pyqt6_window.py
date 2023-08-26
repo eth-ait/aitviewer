@@ -240,7 +240,9 @@ class PyQt6Window(BaseWindow):
 
     def swap_buffers(self) -> None:
         """Swap buffers, set viewport, trigger events and increment frame counter"""
-        self._widget.update()
+
+        # Trigger a redraw, equivalent to self._widget.swapBuffers for Qt5.
+        self._widget.event(QtGui.QPaintEvent(QtGui.QRegion()))
         self.set_default_viewport()
         QtWidgets.QApplication.processEvents()
         self._frames += 1
@@ -296,8 +298,8 @@ class PyQt6Window(BaseWindow):
 
         self._width = width
         self._height = height
-        self._buffer_width = width * self._widget.devicePixelRatio()
-        self._buffer_height = height * self._widget.devicePixelRatio()
+        self._buffer_width = int(width * self._widget.devicePixelRatio())
+        self._buffer_height = int(height * self._widget.devicePixelRatio())
 
         if self._ctx:
             self.set_default_viewport()
