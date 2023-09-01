@@ -26,7 +26,7 @@ setup(
         "visualization",
     ],
     platforms=["any"],
-    python_requires=">=3.7",
+    python_requires=">=3.7,<3.11",
     install_requires=[
         "torch>=1.6.0",
         "numpy>=1.18,<2",
@@ -38,7 +38,7 @@ setup(
         "imgui==2.0.0",
         "tqdm>=4.60.0",
         "trimesh>=3.9.15,<4",
-        "scipy>=1.5.2,<1.8",
+        "scipy>=1.5.2",
         "omegaconf>=2.1.1",
         "roma>=1.2.3",
         "joblib",
