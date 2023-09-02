@@ -9,6 +9,7 @@ import numpy as np
 import tqdm
 import trimesh
 import trimesh.geometry
+import trimesh.visual
 from moderngl_window.opengl.vao import VAO
 from PIL import Image
 from pxr import Gf, Sdf, UsdGeom
@@ -113,7 +114,7 @@ class Meshes(Node):
         self.face_colors = _maybe_unsqueeze(face_colors)
 
         # Texture handling.
-        self.has_texture = uv_coords is not None
+        self.has_texture = (uv_coords is not None) and (path_to_texture is not None)
         self.uv_coords = uv_coords
         self.texture_path = path_to_texture
 
@@ -190,6 +191,35 @@ class Meshes(Node):
         transforms[:, :, :3, 3] = positions
         transforms[:, :, 3, 3] = 1.0
         return cls(*args, **kwargs, instance_transforms=transforms)
+
+    @classmethod
+    def from_file(cls, file, **kwargs):
+        """
+        Loads a mesh from a file that can be loaded by trimesh (e.g. ".obj", ".ply", ...)
+        See trimesh.available_formats() for a complete list.
+        """
+        mesh = trimesh.load(file)
+
+        uvs = None
+        vertex_colors = None
+        face_colors = None
+        if isinstance(mesh.visual, trimesh.visual.ColorVisuals):
+            if mesh.visual.kind == "vertex_colors":
+                vertex_colors = mesh.visual.vertex_colors
+            elif mesh.visual.kind == "face_colors":
+                face_colors = mesh.visual.vertex_colors
+        elif isinstance(mesh.visual, trimesh.visual.TextureVisuals):
+            uvs = mesh.visual.uv
+
+        return Meshes(
+            mesh.vertices,
+            mesh.faces,
+            vertex_normals=mesh.vertex_normals,
+            face_colors=face_colors,
+            vertex_colors=vertex_colors,
+            uv_coords=uvs,
+            **kwargs,
+        )
 
     @property
     def vertices(self):
