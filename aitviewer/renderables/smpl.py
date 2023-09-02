@@ -166,7 +166,7 @@ class SMPLSequence(Node):
         else:
             global_oris = np.tile(np.eye(3), self.joints.shape[:-1])[np.newaxis]
 
-        if self._z_up:
+        if self._z_up and not C.z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
         self.rbs = RigidBodies(self.joints, global_oris, length=0.1, gui_affine=False, name="Joint Angles")

@@ -3,6 +3,7 @@ import moderngl
 import numpy as np
 from moderngl_window.opengl.vao import VAO
 
+from aitviewer.configuration import CONFIG as C
 from aitviewer.scene.node import Node
 from aitviewer.shaders import (
     get_fragmap_program,
@@ -54,7 +55,7 @@ class PointClouds(Node):
 
         self.vao = VAO("points", mode=moderngl.POINTS)
 
-        if z_up:
+        if z_up and not C.z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
     @property

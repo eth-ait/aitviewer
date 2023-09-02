@@ -172,8 +172,8 @@ class ChessboardPlane(Node):
             v1 = np.array([1, 0, 0], dtype=np.float32)
             v2 = np.array([0, 0, 1], dtype=np.float32)
         elif plane == "xy":
-            v1 = np.array([1, 0, 0], dtype=np.float32)
-            v2 = np.array([0, 1, 0], dtype=np.float32)
+            v1 = np.array([0, 1, 0], dtype=np.float32)
+            v2 = np.array([1, 0, 0], dtype=np.float32)
         else:
             # plane == "yz"
             v1 = np.array([0, 1, 0], dtype=np.float32)

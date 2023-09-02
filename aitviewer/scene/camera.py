@@ -712,6 +712,7 @@ class PinholeCamera(Camera):
         cols,
         rows,
         fov=45,
+        world_up=None,
         near=None,
         far=None,
         viewer=None,
@@ -723,7 +724,11 @@ class PinholeCamera(Camera):
             positions.shape[0] == 1 or targets.shape[0] == 1 or positions.shape[0] == targets.shape[0]
         ), f"position and target array shape mismatch: {positions.shape} and {targets.shape}"
 
-        self._world_up = np.array([0.0, 1.0, 0.0])
+        if world_up:
+            self._world_up = world_up
+        else:
+            self._world_up = np.array([0.0, 0.0, 1.0]) if C.z_up else np.array([0.0, 1.0, 0.0])
+
         self._targets = targets
         super(PinholeCamera, self).__init__(position=position, n_frames=targets.shape[0], viewer=viewer, **kwargs)
 
@@ -862,9 +867,9 @@ class ViewerCamera(CameraInterface):
         self.ortho_size = 1.0 if orthographic is None else orthographic
 
         # Default camera settings.
-        self._position = np.array([0.0, 0.0, 2.5])
+        self._position = np.array([0.0, 2.5, 0.0]) if C.z_up else np.array([0.0, 0.0, 2.5])
         self._target = np.array([0.0, 0.0, 0.0])
-        self._up = np.array([0.0, 1.0, 0.0])
+        self._up = np.array([0.0, 0.0, 1.0]) if C.z_up else np.array([0.0, 1.0, 0.0])
 
         self.ZOOM_FACTOR = 4
         self.ROT_FACTOR = 0.0025
@@ -904,7 +909,7 @@ class ViewerCamera(CameraInterface):
         if mode not in self._control_modes:
             raise ValueError(f"Invalid camera mode: {mode}")
         if mode == "first_person" or mode == "turntable":
-            self.up = (0, 1, 0)
+            self.up = (0, 0, 1) if C.z_up else (0, 1, 0)
         self._control_mode = mode
 
     def copy(self):
@@ -1052,8 +1057,8 @@ class ViewerCamera(CameraInterface):
         if np.abs(angle) < 1e-8:
             return
         cam_pose = np.linalg.inv(self.view_matrix)
-        y_axis = cam_pose[:3, 1]
-        rot = rotation_matrix(angle, y_axis, self.target)
+        up_axis = cam_pose[:3, 1]
+        rot = rotation_matrix(angle, up_axis, self.target)
         self.position = _transform_vector(rot, self.position)
 
     def _rotation_from_mouse_delta(self, mouse_dx: int, mouse_dy: int):
