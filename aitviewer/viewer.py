@@ -1344,7 +1344,7 @@ class Viewer(moderngl_window.WindowConfig):
                 imgui.end_child()
 
                 if self.export_usd_name is None:
-                    self.export_usd_name = "frame_{:0>6}".format(self.scene.current_frame_id)
+                    self.export_usd_name = "scene"
 
                 # HACK: we need to set the focus twice when the modal is first opened for it to take effect.
                 if self._modal_focus_count > 0:
@@ -1384,7 +1384,8 @@ class Viewer(moderngl_window.WindowConfig):
                         self.export_usd(
                             os.path.join(C.export_dir, "usd", f"{self.export_usd_name}"),
                             self.export_usd_directory,
-                            True,
+                            False,
+                            False,
                         )
                     imgui.close_current_popup()
                     self._export_usd_popup_open = False
@@ -1772,20 +1773,21 @@ class Viewer(moderngl_window.WindowConfig):
         self.run_animations = run_animations
         self._last_frame_rendered_at = self.timer.time
 
-    def export_usd(self, path: str, export_as_directory=False, verbose=False):
+    def export_usd(self, path: str, export_as_directory=False, verbose=False, ascii=False):
         from pxr import Usd, UsdGeom
 
+        extension = ".usd" if not ascii else ".usda"
         if export_as_directory:
-            if path.endswith(".usd"):
+            if path.endswith(extension):
                 directory = path[:-4]
             else:
                 directory = path
             os.makedirs(directory, exist_ok=True)
-            path = os.path.join(directory, os.path.basename(directory) + ".usd")
+            path = os.path.join(directory, os.path.basename(directory) + extension)
         else:
             directory = None
-            if not path.endswith(".usd"):
-                path += ".usd"
+            if not path.endswith(extension):
+                path += extension
 
         # Create a new file and setup scene parameters.
         stage = Usd.Stage.CreateNew(path)

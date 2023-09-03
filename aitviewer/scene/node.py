@@ -712,7 +712,7 @@ class Node(object):
         if verbose:
             print(usd_path)
         for n in self.nodes:
-            if n.export_usd_enabled and n.show_in_hierarchy:
+            if n.export_usd_enabled:
                 n.export_usd(stage, usd_path, directory, verbose)
 
     def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):

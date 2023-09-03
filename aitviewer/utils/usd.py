@@ -4,7 +4,7 @@ import shutil
 
 import numpy as np
 from PIL import Image
-from pxr import Sdf, UsdShade
+from pxr import Gf, Sdf, UsdGeom, UsdShade
 
 
 def _get_texture_paths(path, name, directory):
@@ -26,6 +26,26 @@ def save_image_as_texture(img, img_name, name, directory):
         img = Image.fromarray(img)
     img.save(fs_path)
     return usd_path
+
+
+def add_color(stage, mesh, usd_path, color):
+    # Material.
+    mat_path = usd_path + "/material"
+    material = UsdShade.Material.Define(stage, mat_path)
+
+    # Shader.
+    shader = UsdShade.Shader.Define(stage, mat_path + "/shader")
+    shader.CreateIdAttr("UsdPreviewSurface")
+
+    # Connect the material to the shader.
+    material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
+
+    # Create a uniform color.np.
+    shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(tuple(color))
+
+    # Bind the Material to the mesh.
+    mesh.GetPrim().ApplyAPI(UsdShade.MaterialBindingAPI)
+    UsdShade.MaterialBindingAPI(mesh).Bind(material)
 
 
 def add_texture(stage, mesh, usd_path, texture_path):
@@ -58,3 +78,20 @@ def add_texture(stage, mesh, usd_path, texture_path):
     # Bind the Material to the mesh.
     mesh.GetPrim().ApplyAPI(UsdShade.MaterialBindingAPI)
     UsdShade.MaterialBindingAPI(mesh).Bind(material)
+
+
+def add_mesh(stage, usd_path, name, vertices, faces, transform):
+    # Transform.
+    xform = UsdGeom.Xform.Define(stage, usd_path)
+    a_xform = xform.AddTransformOp()
+    a_xform.Set(Gf.Matrix4d(transform.astype(np.float64).T))
+
+    # Geometry.
+    mesh = UsdGeom.Mesh.Define(stage, usd_path + "/" + name.replace(" ", "_"))
+    a_vertices = mesh.CreatePointsAttr()
+    for i in range(vertices.shape[0]):
+        a_vertices.Set(time=i + 1, value=vertices[i])
+    mesh.CreateFaceVertexCountsAttr(np.full(faces.shape[0], 3))
+    mesh.CreateFaceVertexIndicesAttr(faces)
+
+    return mesh

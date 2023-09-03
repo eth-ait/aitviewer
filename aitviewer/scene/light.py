@@ -2,11 +2,11 @@
 from functools import lru_cache
 
 import numpy as np
+from pxr import Gf, UsdGeom, UsdLux
 
 from aitviewer.renderables.lines import Lines
 from aitviewer.renderables.rigid_bodies import RigidBodies
 from aitviewer.scene.camera_utils import look_at, orthographic_projection
-from aitviewer.scene.material import Material
 from aitviewer.scene.node import Node
 from aitviewer.utils.utils import (
     direction_from_spherical_coordinates,
@@ -58,6 +58,7 @@ class Light(Node):
         self.mesh.spheres.material.diffuse = 0.0
         self.mesh.spheres.material.ambient = 1.0
         self.mesh.spheres.color = (*tuple(light_color), 1.0)
+        self.mesh.export_usd_enabled = False
         self.add(self.mesh, show_in_hierarchy=False, enabled=False)
 
     @classmethod
@@ -170,6 +171,7 @@ class Light(Node):
 
         if self._debug_lines is None:
             self._debug_lines = Lines(lines, r_base=0.05, mode="lines", cast_shadow=False, is_selectable=False)
+            self._debug_lines.export_usd_enabled = False
             self.add(self._debug_lines, show_in_hierarchy=False)
         else:
             self._debug_lines.lines = lines
@@ -281,3 +283,20 @@ class Light(Node):
         else:
             if self._debug_lines:
                 self._debug_lines.enabled = False
+
+    def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):
+        name = f"{self.name}_{self.uid:03}".replace(" ", "_")
+        usd_path = f"{usd_path}/{name}"
+
+        # Transform.
+        xform = UsdGeom.Xform.Define(stage, usd_path)
+        a_xform = xform.AddTransformOp()
+        a_xform.Set(Gf.Matrix4d(self.get_local_transform().astype(np.float64).T))
+
+        # Light.
+        light = UsdLux.DistantLight.Define(stage, usd_path + "/" + name.replace(" ", "_"))
+        lightAPI = light.LightAPI()
+        lightAPI.GetInput("color").Set(self.light_color[:3])
+        lightAPI.GetInput("intensity").Set(self.strength)
+
+        self._export_usd_recursively(stage, usd_path, directory, verbose)

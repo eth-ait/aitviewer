@@ -82,6 +82,7 @@ class Scene(Node):
             color=(0.2, 0.2, 0.2, 1),
             mode="lines",
         )
+        self.camera_target.export_usd_enabled = False
         self.add(self.camera_target, show_in_hierarchy=False, enabled=False)
 
         # Camera trackball.
@@ -112,6 +113,7 @@ class Scene(Node):
             trackball_colors,
             mode="lines",
         )
+        self.trackball.export_usd_enabled = False
         self.add(self.trackball, show_in_hierarchy=False, enabled=False)
 
         self.custom_font = None

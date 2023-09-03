@@ -18,6 +18,7 @@ from aitviewer.utils import (
     compute_vertex_and_face_normals,
     set_lights_in_program,
     set_material_properties,
+    usd,
 )
 from aitviewer.utils.decorators import hooked
 from aitviewer.utils.so3 import aa2rot_numpy as aa2rot
@@ -431,6 +432,47 @@ class Lines(Node):
     def remove_frames(self, frames):
         self.lines = np.delete(self.lines, frames, axis=0)
         self.redraw()
+
+    def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):
+        name = f"{self.name}_{self.uid:03}".replace(" ", "_")
+        usd_path = f"{usd_path}/{name}"
+
+        if self.mode == "lines":
+            v0s = self.lines[:, ::2]
+            v1s = self.lines[:, 1::2]
+        else:
+            v0s = self.lines[:, :-1]
+            v1s = self.lines[:, 1:]
+
+        print(self.lines.shape)
+        print(v0s.shape)
+
+        # Data is in the form of (F, N_LINES, 3), convert it to (F*N_LINES, 3)
+        v0s = np.reshape(v0s, (-1, 3))
+        v1s = np.reshape(v1s, (-1, 3))
+
+        self.r_tip = self.r_base if self.r_tip is None else self.r_tip
+
+        # If r_tip is below a certain threshold, we create a proper cone, i.e. with just a single vertex at the top.
+        if self.r_tip < 10e-6:
+            data = _create_cone_from_to(v0s, v1s, radius=self.r_base)
+        else:
+            data = _create_cylinder_from_to(v0s, v1s, radius1=self.r_base, radius2=self.r_tip)
+
+        L = self.n_lines
+        V = data["vertices"].shape[1]
+
+        vertices = data["vertices"].reshape((self.n_frames, -1, 3))
+        faces = data["faces"]
+
+        fs = faces[np.newaxis].repeat(L, 0).reshape((L, -1))
+        offsets = (np.arange(L) * V).reshape((L, 1))
+        faces = (fs + offsets).reshape((-1, 3))
+
+        mesh = usd.add_mesh(stage, usd_path, self.name, vertices, faces, self.get_local_transform())
+        usd.add_color(stage, mesh, usd_path, self.color[:3])
+
+        self._export_usd_recursively(stage, usd_path, directory, verbose)
 
 
 class Lines2D(Node):
