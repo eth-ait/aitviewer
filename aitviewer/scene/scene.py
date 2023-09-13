@@ -1,19 +1,4 @@
-"""
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 import moderngl
 import numpy as np
 
@@ -57,7 +42,7 @@ class Scene(Node):
             Light.facing_origin(
                 light_color=(1.0, 1.0, 1.0),
                 name="Back Light",
-                position=(0.0, 10.0, -15.0),
+                position=(0.0, -15.0, 10.0) if C.z_up else (0.0, 10.0, -15.0),
                 shadow_enabled=False,
             )
         )
@@ -65,7 +50,7 @@ class Scene(Node):
             Light.facing_origin(
                 light_color=(1.0, 1.0, 1.0),
                 name="Front Light",
-                position=(0.0, 10.0, 15.0),
+                position=(0.0, 15.0, 10.0) if C.z_up else (0.0, 10.0, 15.0),
             )
         )
         self.add(*self.lights)
@@ -76,7 +61,9 @@ class Scene(Node):
         self.origin = CoordinateSystem(name="Origin", length=0.1, gui_affine=False, gui_material=False)
         self.add(self.origin)
 
-        self.floor = ChessboardPlane(100.0, 200, (0.9, 0.9, 0.9, 1.0), (0.82, 0.82, 0.82, 1.0), name="Floor")
+        self.floor = ChessboardPlane(
+            100.0, 200, (0.9, 0.9, 0.9, 1.0), (0.82, 0.82, 0.82, 1.0), "xy" if C.z_up else "xz", name="Floor"
+        )
         self.floor.material.diffuse = 0.1
         self.add(self.floor)
 
@@ -95,6 +82,7 @@ class Scene(Node):
             color=(0.2, 0.2, 0.2, 1),
             mode="lines",
         )
+        self.camera_target.export_usd_enabled = False
         self.add(self.camera_target, show_in_hierarchy=False, enabled=False)
 
         # Camera trackball.
@@ -125,6 +113,7 @@ class Scene(Node):
             trackball_colors,
             mode="lines",
         )
+        self.trackball.export_usd_enabled = False
         self.add(self.trackball, show_in_hierarchy=False, enabled=False)
 
         self.custom_font = None
@@ -248,8 +237,9 @@ class Scene(Node):
     def auto_set_floor(self):
         """Finds the minimum lower bound in the y coordinate from all the children bounds and uses that as the floor"""
         if self.floor is not None and len(self.nodes) > 0:
-            self.floor.position[1] = self.current_bounds[1, 0]
-            self.floor.update_transform()
+            axis = 2 if C.z_up else 1
+            self.floor.position[axis] = self.current_bounds[axis, 0]
+            self.floor.update_transform(parent_transform=self.model_matrix)
 
     def auto_set_camera_target(self):
         """Sets the camera target to the average of the center of all objects in the scene"""

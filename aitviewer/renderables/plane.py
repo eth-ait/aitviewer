@@ -1,19 +1,4 @@
-"""
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 import moderngl
 import numpy as np
 from pxr import Gf, UsdGeom
@@ -187,8 +172,8 @@ class ChessboardPlane(Node):
             v1 = np.array([1, 0, 0], dtype=np.float32)
             v2 = np.array([0, 0, 1], dtype=np.float32)
         elif plane == "xy":
-            v1 = np.array([1, 0, 0], dtype=np.float32)
-            v2 = np.array([0, 1, 0], dtype=np.float32)
+            v1 = np.array([0, 1, 0], dtype=np.float32)
+            v2 = np.array([1, 0, 0], dtype=np.float32)
         else:
             # plane == "yz"
             v1 = np.array([0, 1, 0], dtype=np.float32)

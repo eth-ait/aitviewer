@@ -36,6 +36,9 @@ backface_culling: True
 background_color: [1.0, 1.0, 1.0, 1.0]
 window_type: "pyqt5"
 
+# Viewer defaults to Y up, set to true for Z up.
+z_up: False
+
 # Server for remote connections.
 server_enabled: False
 server_port: 8417

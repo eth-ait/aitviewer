@@ -22,7 +22,7 @@ For more advanced installation and for installing SMPL body models, please refer
 
 ## Features
 * Native Python interface, easy to use and hack.
-* Load [SMPL[-H/-X]](https://smpl.is.tue.mpg.de/) / [MANO](https://mano.is.tue.mpg.de/) / [FLAME](https://flame.is.tue.mpg.de/) / [STAR](https://github.com/ahmedosman/STAR) sequences and display them in an interactive viewer.
+* Load [SMPL[-H/-X]](https://smpl.is.tue.mpg.de/) / [MANO](https://mano.is.tue.mpg.de/) / [FLAME](https://flame.is.tue.mpg.de/) / [STAR](https://github.com/ahmedosman/STAR) / [SUPR](https://github.com/ahmedosman/SUPR) sequences and display them in an interactive viewer.
 * Headless mode for server rendering of videos/images.
 * Remote mode for non-blocking integration of visualization code.
 * Render 3D data on top of images via weak-perspective or OpenCV camera models.

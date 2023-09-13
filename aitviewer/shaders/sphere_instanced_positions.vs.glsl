@@ -1,5 +1,7 @@
 #version 400
 
+// Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
+
 #if defined VERTEX_SHADER
     uniform mat4 view_projection_matrix;
     uniform mat4 model_matrix;

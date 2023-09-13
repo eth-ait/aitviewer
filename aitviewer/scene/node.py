@@ -1,19 +1,4 @@
-"""
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 from functools import lru_cache
 from typing import List
 
@@ -727,7 +712,7 @@ class Node(object):
         if verbose:
             print(usd_path)
         for n in self.nodes:
-            if n.export_usd_enabled and n.show_in_hierarchy:
+            if n.export_usd_enabled:
                 n.export_usd(stage, usd_path, directory, verbose)
 
     def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):

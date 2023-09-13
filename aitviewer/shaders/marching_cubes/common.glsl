@@ -1,4 +1,4 @@
-/* Copyright (C) 2023 Dario Mylonopoulos */
+// Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 #define BLOCK_SIZE_X 8
 #define BLOCK_SIZE_Y 8

@@ -1,5 +1,7 @@
 #version 400
 
+// Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
+
 #if defined FRAGMENT_SHADER
 
 layout(location=0) out vec4 out_position;

@@ -1,5 +1,7 @@
 #version 400
 
+// Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
+
 #include directional_lights.glsl
 
 #if defined VERTEX_SHADER
