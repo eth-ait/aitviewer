@@ -1,19 +1,4 @@
-"""
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 import copy
 import os
 import sys
@@ -121,6 +106,10 @@ class Viewer(moderngl_window.WindowConfig):
             from aitviewer.utils.pyqt5_window import PyQt5Window
 
             base_window_cls = PyQt5Window
+        elif self.window_type == "pyqt6":
+            from aitviewer.utils.pyqt6_window import PyQt6Window
+
+            base_window_cls = PyQt6Window
         else:
             base_window_cls = get_local_window_cls(self.window_type)
 
@@ -791,7 +780,6 @@ class Viewer(moderngl_window.WindowConfig):
                 if clicked:
                     self.center_view_on_selection()
 
-                # TODO (@Dario): correct to only use self.viewports[0] here?
                 is_ortho = False if self.viewports[0].using_temp_camera else self.scene.camera.is_ortho
                 _, is_ortho = imgui.menu_item(
                     "Orthographic Camera",
@@ -799,13 +787,12 @@ class Viewer(moderngl_window.WindowConfig):
                     is_ortho,
                     True,
                 )
-                # TODO (@Dario): correct to only use self.viewports[0] here?
+
                 if is_ortho and self.viewports[0].using_temp_camera:
                     self.reset_camera()
                 self.scene.camera.is_ortho = is_ortho
 
-                # TODO (@Dario)
-                if not self.viewports[0].using_temp_camera and imgui.begin_menu("Control modes"):
+                if imgui.begin_menu("Control modes", enabled=not self.viewports[0].using_temp_camera):
 
                     def mode(name, mode):
                         selected = imgui.menu_item(name, None, self.scene.camera.control_mode == mode)[1]
@@ -885,7 +872,9 @@ class Viewer(moderngl_window.WindowConfig):
 
     def gui_export_video(self):
         imgui.set_next_window_size(570, 0)
-        if imgui.begin_popup_modal("Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
+        if imgui.begin_popup_modal(
+            "Export Video", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_SAVED_SETTINGS
+        )[0]:
             if self.scene.n_frames == 1:
                 imgui.push_style_var(imgui.STYLE_ALPHA, 0.2)
                 self.export_animation = False
@@ -1117,7 +1106,7 @@ class Viewer(moderngl_window.WindowConfig):
     def gui_playback(self):
         """GUI to control playback settings."""
         imgui.set_next_window_position(50, 100 + self.window_size[1] * 0.7, imgui.FIRST_USE_EVER)
-        imgui.set_next_window_size(self.window_size[0] * 0.4, self.window_size[1] * 0.15, imgui.FIRST_USE_EVER)
+        imgui.set_next_window_size(self.window_size[0] * 0.4, self.window_size[1] * 0.175, imgui.FIRST_USE_EVER)
         expanded, _ = imgui.begin("Playback", None)
         if expanded:
             u, run_animations = imgui.checkbox(
@@ -1164,6 +1153,10 @@ class Viewer(moderngl_window.WindowConfig):
                 max_value=n_frames - 1,
             )
             self.prevent_background_interactions()
+        if imgui.collapsing_header("Advanced options")[0]:
+            _, self.playback_without_skipping = imgui.checkbox(
+                "Playback without skipping", self.playback_without_skipping
+            )
         imgui.end()
 
     def gui_shortcuts(self):
@@ -1198,7 +1191,10 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.set_next_window_size(300, 0)
         if imgui.begin_popup_modal(
             "Go to frame##go-to-frame-popup",
-            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_TITLE_BAR,
+            flags=imgui.WINDOW_NO_RESIZE
+            | imgui.WINDOW_NO_MOVE
+            | imgui.WINDOW_NO_TITLE_BAR
+            | imgui.WINDOW_NO_SAVED_SETTINGS,
         )[0]:
             if self._go_to_frame_popup_open:
                 imgui.set_keyboard_focus_here()
@@ -1236,7 +1232,7 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.set_next_window_size(250, 0)
         if imgui.begin_popup_modal(
             "Screenshot##screenshot-popup",
-            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE,
+            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_SAVED_SETTINGS,
         )[0]:
             if self._screenshot_popup_open:
                 _, self.screenshot_transparent = imgui.checkbox("Transparent background", self.screenshot_transparent)
@@ -1293,7 +1289,7 @@ class Viewer(moderngl_window.WindowConfig):
         imgui.set_next_window_size(570, 0)
         if imgui.begin_popup_modal(
             "Export USD##export-usd-popup",
-            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE,
+            flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_SAVED_SETTINGS,
         )[0]:
             if self._export_usd_popup_open:
                 # Export selection tree.
@@ -1348,7 +1344,7 @@ class Viewer(moderngl_window.WindowConfig):
                 imgui.end_child()
 
                 if self.export_usd_name is None:
-                    self.export_usd_name = "frame_{:0>6}".format(self.scene.current_frame_id)
+                    self.export_usd_name = "scene"
 
                 # HACK: we need to set the focus twice when the modal is first opened for it to take effect.
                 if self._modal_focus_count > 0:
@@ -1388,7 +1384,8 @@ class Viewer(moderngl_window.WindowConfig):
                         self.export_usd(
                             os.path.join(C.export_dir, "usd", f"{self.export_usd_name}"),
                             self.export_usd_directory,
-                            True,
+                            False,
+                            False,
                         )
                     imgui.close_current_popup()
                     self._export_usd_popup_open = False
@@ -1401,7 +1398,9 @@ class Viewer(moderngl_window.WindowConfig):
         if self._exit_popup_open:
             imgui.open_popup("Exit##exit-popup")
 
-        if imgui.begin_popup_modal("Exit##exit-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)[0]:
+        if imgui.begin_popup_modal(
+            "Exit##exit-popup", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_SAVED_SETTINGS
+        )[0]:
             if self._exit_popup_open:
                 imgui.text("Are you sure you want to exit?")
                 imgui.spacing()
@@ -1491,9 +1490,13 @@ class Viewer(moderngl_window.WindowConfig):
             diag = np.linalg.norm(bounds[:, 0] - bounds[:, 1])
             dist = max(0.01, diag * 1.3)
 
-            center = bounds.mean(-1)
-            anim_time = 0.25 if with_animation else 0.0
-            self.scene.camera.move_with_animation(center - forward * dist, center, anim_time)
+            target = bounds.mean(-1)
+            position = target - forward * dist
+            if with_animation:
+                self.scene.camera.move_with_animation(position, target, 0.25)
+            else:
+                self.scene.camera.position = position
+                self.scene.camera.target = target
 
     def resize(self, width: int, height: int):
         self.window_size = (width, height)
@@ -1770,20 +1773,21 @@ class Viewer(moderngl_window.WindowConfig):
         self.run_animations = run_animations
         self._last_frame_rendered_at = self.timer.time
 
-    def export_usd(self, path: str, export_as_directory=False, verbose=False):
+    def export_usd(self, path: str, export_as_directory=False, verbose=False, ascii=False):
         from pxr import Usd, UsdGeom
 
+        extension = ".usd" if not ascii else ".usda"
         if export_as_directory:
-            if path.endswith(".usd"):
+            if path.endswith(extension):
                 directory = path[:-4]
             else:
                 directory = path
             os.makedirs(directory, exist_ok=True)
-            path = os.path.join(directory, os.path.basename(directory) + ".usd")
+            path = os.path.join(directory, os.path.basename(directory) + extension)
         else:
             directory = None
-            if not path.endswith(".usd"):
-                path += ".usd"
+            if not path.endswith(extension):
+                path += extension
 
         # Create a new file and setup scene parameters.
         stage = Usd.Stage.CreateNew(path)

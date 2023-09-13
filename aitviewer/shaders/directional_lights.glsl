@@ -1,3 +1,5 @@
+// Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
+
 struct DirLight {
     vec3 direction;
     vec3 color;

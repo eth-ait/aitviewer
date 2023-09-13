@@ -1,19 +1,4 @@
-"""
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 import moderngl
 import numpy as np
 from moderngl_window.opengl.vao import VAO
@@ -26,6 +11,7 @@ from aitviewer.shaders import (
     get_outline_program,
     get_sphere_instanced_program,
 )
+from aitviewer.utils import usd
 from aitviewer.utils.decorators import hooked
 from aitviewer.utils.utils import set_lights_in_program, set_material_properties
 
@@ -55,7 +41,7 @@ def _create_sphere(radius=1.0, rings=16, sectors=32):
             v += 1
             n += 1
 
-    faces = np.zeros([rings * sectors * 2, 3], dtype=np.int32)
+    faces = np.zeros([(rings - 1) * (sectors - 1) * 2, 3], dtype=np.int32)
     i = 0
     for r in range(rings - 1):
         for s in range(sectors - 1):
@@ -278,6 +264,28 @@ class Spheres(Node):
     def remove_frames(self, frames):
         self.sphere_positions = np.delete(self.sphere_positions, frames, axis=0)
         self.redraw()
+
+    def export_usd(self, stage, usd_path: str, directory: str = None, verbose=False):
+        name = f"{self.name}_{self.uid:03}".replace(" ", "_")
+        usd_path = f"{usd_path}/{name}"
+
+        V = self.vertices.shape[0]
+        N = self.sphere_positions.shape[0]
+        M = self.n_spheres
+
+        vertices = np.empty((N, V * M, 3), np.float32)
+        for i in range(N):
+            vs = self.vertices[np.newaxis].repeat(M, 0)
+            vertices[i] = (vs * self.radius + self.sphere_positions[i].reshape(M, 1, 3)).reshape((-1, 3))
+
+        fs = self.faces[np.newaxis].repeat(M, 0).reshape((M, -1))
+        offsets = (np.arange(M) * V).reshape((M, 1))
+        faces = (fs + offsets).reshape((-1, 3))
+
+        mesh = usd.add_mesh(stage, usd_path, self.name, vertices, faces, self.get_local_transform())
+        usd.add_color(stage, mesh, usd_path, self.color[:3])
+
+        self._export_usd_recursively(stage, usd_path, directory, verbose)
 
 
 class SpheresTrail(Spheres):

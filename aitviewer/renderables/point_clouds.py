@@ -1,23 +1,9 @@
-"""
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 import moderngl
 import numpy as np
 from moderngl_window.opengl.vao import VAO
 
+from aitviewer.configuration import CONFIG as C
 from aitviewer.scene.node import Node
 from aitviewer.shaders import (
     get_fragmap_program,
@@ -69,7 +55,7 @@ class PointClouds(Node):
 
         self.vao = VAO("points", mode=moderngl.POINTS)
 
-        if z_up:
+        if z_up and not C.z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
     @property

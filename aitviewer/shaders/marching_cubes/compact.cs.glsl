@@ -2,7 +2,7 @@
 #extension GL_KHR_shader_subgroup_ballot : enable
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
-/* Copyright (C) 2023 Dario Mylonopoulos */
+// Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 
 
 #define COMPACT_GROUP_SIZE 128

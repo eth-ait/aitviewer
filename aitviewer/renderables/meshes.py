@@ -1,19 +1,4 @@
-"""
-Copyright (C) 2022  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 import os
 import pickle
 import re
@@ -24,6 +9,7 @@ import numpy as np
 import tqdm
 import trimesh
 import trimesh.geometry
+import trimesh.visual
 from moderngl_window.opengl.vao import VAO
 from PIL import Image
 from pxr import Gf, Sdf, UsdGeom
@@ -128,7 +114,7 @@ class Meshes(Node):
         self.face_colors = _maybe_unsqueeze(face_colors)
 
         # Texture handling.
-        self.has_texture = uv_coords is not None
+        self.has_texture = (uv_coords is not None) and (path_to_texture is not None)
         self.uv_coords = uv_coords
         self.texture_path = path_to_texture
 
@@ -205,6 +191,35 @@ class Meshes(Node):
         transforms[:, :, :3, 3] = positions
         transforms[:, :, 3, 3] = 1.0
         return cls(*args, **kwargs, instance_transforms=transforms)
+
+    @classmethod
+    def from_file(cls, file, **kwargs):
+        """
+        Loads a mesh from a file that can be loaded by trimesh (e.g. ".obj", ".ply", ...)
+        See trimesh.available_formats() for a complete list.
+        """
+        mesh = trimesh.load(file)
+
+        uvs = None
+        vertex_colors = None
+        face_colors = None
+        if isinstance(mesh.visual, trimesh.visual.ColorVisuals):
+            if mesh.visual.kind == "vertex_colors":
+                vertex_colors = mesh.visual.vertex_colors
+            elif mesh.visual.kind == "face_colors":
+                face_colors = mesh.visual.vertex_colors
+        elif isinstance(mesh.visual, trimesh.visual.TextureVisuals):
+            uvs = mesh.visual.uv
+
+        return Meshes(
+            mesh.vertices,
+            mesh.faces,
+            vertex_normals=mesh.vertex_normals,
+            face_colors=face_colors,
+            vertex_colors=vertex_colors,
+            uv_coords=uvs,
+            **kwargs,
+        )
 
     @property
     def vertices(self):
@@ -731,19 +746,7 @@ class Meshes(Node):
         name = f"{self.name}_{self.uid:03}".replace(" ", "_")
         usd_path = f"{usd_path}/{name}"
 
-        # Transform.
-        xform = UsdGeom.Xform.Define(stage, usd_path)
-        a_xform = xform.AddTransformOp()
-        a_xform.Set(Gf.Matrix4d(self.get_local_transform().astype(np.float64).T))
-
-        # Geometry.
-        mesh = UsdGeom.Mesh.Define(stage, usd_path + "/" + self.name.replace(" ", "_"))
-        a_vertices = mesh.CreatePointsAttr()
-        for i in range(self.n_frames):
-            a_vertices.Set(time=i + 1, value=self.vertices[i])
-        mesh.CreateFaceVertexCountsAttr(np.full(self.faces.shape[0], 3))
-        mesh.CreateFaceVertexIndicesAttr(self.faces)
-
+        mesh = usd.add_mesh(stage, usd_path, self.name, self.vertices, self.faces, self.get_local_transform())
         if self.has_texture and not self.use_pickle_texture:
             # UVs.
             a_uv = UsdGeom.PrimvarsAPI(mesh).CreatePrimvar(
@@ -756,6 +759,30 @@ class Meshes(Node):
             else:
                 texture_path = usd.copy_texture(self.texture_path, name, directory)
             usd.add_texture(stage, mesh, usd_path, texture_path)
+        else:
+            # NOTE: Per vertex and per face colors using usd displayColor are not currently
+            # loaded by Blender. This code path can be enabled once support is there.
+            if False:
+                a_colors = mesh.GetDisplayColorAttr()
+                if self._face_colors is not None:
+                    # Per face colors.
+                    if self._face_colors.shape[0] == 1:
+                        a_colors.Set(self._face_colors[0, :, :3].astype(np.float32))
+                    else:
+                        for i in range(self.n_frames):
+                            a_colors.Set(time=i + 1, value=self._face_colors[i, :, :3].astype(np.float32))
+                elif self._vertex_colors is not None:
+                    # Per vertex colors.
+                    if self._vertex_colors.shape[0] == 1:
+                        a_colors.Set(self._vertex_colors[0, :, :3].astype(np.float32))
+                    else:
+                        for i in range(self.n_frames):
+                            a_colors.Set(time=i + 1, value=self._vertex_colors[i, :, :3].astype(np.float32))
+                else:
+                    # Uniform color.
+                    a_colors.Set(np.array(self.color, np.float32)[:3])
+            else:
+                usd.add_color(stage, mesh, usd_path, self.color[:3])
 
         self._export_usd_recursively(stage, usd_path, directory, verbose)
 

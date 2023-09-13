@@ -1,3 +1,4 @@
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 from .message import Message
 from .viewer import RemoteViewer
 
