@@ -52,6 +52,7 @@ if __name__ == '__main__':
 
 ## Projects using the aitviewer
 A sampling of projects using the aitviewer. Let us know if you want to be added to this list!
+- Kaufmann et al., [EMDB: The Electromagnetic Database of Global 3D Human Pose and Shape in the Wild](https://ait.ethz.ch/emdb), ICCV 2023
 - Shen and Guo et al., [X-Avatar: Expressive Human Avatars](https://skype-line.github.io/projects/X-Avatar/), CVPR 2023
 - Sun et al., [TRACE: 5D Temporal Regression of Avatars with Dynamic Cameras in 3D Environments](https://www.yusun.work/TRACE/TRACE.html), CVPR 2023
 - Fan et al., [ARCTIC: A Dataset for Dexterous Bimanual Hand-Object Manipulation](https://arctic.is.tue.mpg.de/), CVPR 2023
