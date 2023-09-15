@@ -443,6 +443,15 @@ class Node(object):
         """
         pass
 
+    def gui_stats(self, imgui):
+        """
+        Render GUI for stats about the node, rendered at the bottom of the scene hierarchy.
+        Should be implemented with @hooked decorator to print stats from parent classes.
+        :param imgui: imgui context.
+        See https://pyimgui.readthedocs.io/en/latest/reference/imgui.core.html for available elements to render
+        """
+        imgui.text(f"Frames: {self.n_frames}")
+
     def gui_modes(self, imgui):
         """Render GUI with toolbar (tools) for this particular node"""
 
