@@ -5,6 +5,7 @@ import subprocess
 import numpy as np
 import torch
 from scipy.interpolate import CubicSpline
+from trimesh.visual.texture import unmerge_faces
 
 from aitviewer.utils.so3 import aa2rot_torch as aa2rot
 from aitviewer.utils.so3 import rot2aa_torch as rot2aa
@@ -352,3 +353,34 @@ def local_to_global(poses, parents, output_format="aa", input_format="aa"):
     else:
         res = global_oris.reshape((-1, n_joints * 3 * 3))
     return res
+
+
+def expand_vertex_attributes(attributes, faces):
+    """
+    Expands vertex attributes that have different faces into a common set of faces duplicating vertices where required.
+    The returned faces and attributes can be used directly to create a mesh.
+
+    Example:
+        new_faces, (new_vertices, new_uvs) = expand_vertex_attributes((vertices, uvs), (faces, uv_faces))
+        mesh = Meshes(new_vertices, new_faces, uv_coords=new_uvs, path_to_texture="mytexture.png")
+
+    :param attributes: list of vertex attributes, each element is a numpy array of shapes (V_i, D_i)
+    :param faces: list of face arrays corresponding to respective the attribute in the attributes array.
+                  All arrays must have the same number of faces F and be of shape (F, 3).
+    :return: (new_faces, new_attributes) pair, of shape (F, 3) and (V_f, D_i) respectively.
+             new_ttributes is a list of vertex attributes in the same order as they were passed to this function,
+             all with the same final number of vertices V_f.
+    """
+    # Use trimesh to unmerge faces.
+    res = unmerge_faces(faces[0], *faces[1:])
+
+    # Extract new faces.
+    new_faces = res[0]
+
+    # Apply mask to all vertex attributes.
+    new_attrs = []
+    for old_a, new_f in zip(attributes, res[1:]):
+        new_attrs.append(old_a[new_f])
+
+    # Return new faces and new expanded attributes.
+    return new_faces, new_attrs
