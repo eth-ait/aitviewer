@@ -18,6 +18,8 @@ cd aitviewer
 pip install -e .
 ```
 
+On macOS with Apple Silicon it is recommended to use PyQt6. Please check [this issue](https://github.com/eth-ait/aitviewer/issues/22) for installation instructions.
+
 For more advanced installation and for installing SMPL body models, please refer to the [documentation](https://eth-ait.github.io/aitviewer/parametric_human_models/supported_models.html) .
 
 ## Features
