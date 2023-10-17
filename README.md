@@ -69,7 +69,7 @@ If you use this software, please cite it as below.
 ```commandline
 @software{Kaufmann_Vechev_aitviewer_2022,
   author = {Kaufmann, Manuel and Vechev, Velko and Mylonopoulos, Dario},
-  doi = {10.5281/zenodo.1234},
+  doi = {10.5281/zenodo.10013305},
   month = {7},
   title = {{aitviewer}},
   url = {https://github.com/eth-ait/aitviewer},
