@@ -129,6 +129,29 @@ def get_marching_cubes_shader(name, BX, BY, BZ, COMPACT_GROUP_SIZE) -> moderngl.
     return resources.programs.load(ProgramDescription(compute_shader=path, defines=defines))
 
 
+@functools.lru_cache()
+def get_sort_program(name):
+    defines = {
+        "ENTRY_PARALLEL_SORT_" + name: 1,
+    }
+    path = os.path.join("gaussian_splatting", "sort.glsl")
+    return resources.programs.load(ProgramDescription(compute_shader=path, defines=defines))
+
+
+@functools.lru_cache()
+def get_gaussian_splat_prepare_program(PREPARE_GROUP_SIZE):
+    defines = {
+        "PREPARE_GROUP_SIZE": PREPARE_GROUP_SIZE,
+    }
+    path = os.path.join("gaussian_splatting", "prepare.glsl")
+    return resources.programs.load(ProgramDescription(compute_shader=path, defines=defines))
+
+
+@functools.lru_cache()
+def get_gaussian_splat_draw_program():
+    return load_program(os.path.join("gaussian_splatting", "draw.glsl"))
+
+
 def clear_shader_cache():
     """Clear all cached shaders."""
     funcs = [
@@ -141,6 +164,9 @@ def clear_shader_cache():
         get_screen_texture_program,
         get_chessboard_program,
         get_marching_cubes_shader,
+        get_gaussian_splat_draw_program,
+        get_gaussian_splat_prepare_program,
+        get_sort_program,
     ]
     for f in funcs:
         f.cache_clear()
