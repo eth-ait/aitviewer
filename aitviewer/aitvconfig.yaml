@@ -1,15 +1,17 @@
 # Access SMPL models.
-smplx_models: "../data/smplx_models"
+smplx_models: "/ps/project/rib_cage_breathing/TML/Data/smplx_models"
 star_models: "../data/star_models"
 supr_models: "../data/supr_models"
 
 # Access to datasets.
 datasets:
   amass:
-    "../data/amass"
+    "/is/cluster/work/mkeller2/Data/TML/AMASS"
+  mocap:
+    "/is/cluster/work/mkeller2/Data/TML/AMASS_mocap" 
 
 # Pytorch configuration.
-device: "cuda:0"
+device: "cpu"
 f_precision: 32
 i_precision: 64
 
@@ -34,11 +36,12 @@ auto_set_floor: True
 auto_set_camera_target: True
 backface_culling: True
 background_color: [1.0, 1.0, 1.0, 1.0]
-window_type: "pyqt5"
+window_type: "pyglet" # window_type: "pyqt5" 
+
 
 # Viewer defaults to Y up, set to true for Z up.
 z_up: False
 
 # Server for remote connections.
-server_enabled: False
+server_enabled: True
 server_port: 8417

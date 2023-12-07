@@ -26,6 +26,8 @@ requirements = [
     "Pillow",
     "websockets",
     "usd-core>=23.5",
+    "pyvista",
+    "nimblephysics"
 ]
 
 # Choose PyQt version depending on environment variable.
