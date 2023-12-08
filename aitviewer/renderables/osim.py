@@ -3,6 +3,7 @@
 # Do not share or distribute without permission of the author
 
 import os
+import shutil
 import numpy as np
 import tqdm
 import trimesh
@@ -21,9 +22,25 @@ from aitviewer.utils.colors import vertex_colors_from_weights
 from aitviewer.renderables.markers import Markers
 import pickle as pkl
 
-HARD_CODED_OFFSETS_ON = False
-# If true, artificially add a translation to the joint for the body parts whose meshes are not centered, like the skull
-
+def load_osim(osim_path, geometry_path=C.osim_geometry):
+    """Load an osim file"""
+    # Check that there is a Geometry folder at the same level as the osim file
+    file_geometry_path = os.path.join(os.path.dirname(osim_path), 'Geometry')
+    
+    if not os.path.exists(file_geometry_path):
+        print(f'WARNING: No Geometry folder found at {file_geometry_path}, using {geometry_path} instead')
+        # Create a copy of the osim file at the same level as the geometry folder
+        tmp_osim_file = os.path.join(geometry_path, '..', 'tmp.osim')
+        if os.path.exists(tmp_osim_file):
+            #remove the old file
+            os.remove(tmp_osim_file)
+        shutil.copyfile(osim_path, tmp_osim_file)
+        print(f'Copied {osim_path} to {tmp_osim_file}')
+        osim_path = tmp_osim_file 
+    
+    osim : nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(osim_path)
+    assert osim is not None, "Could not load osim file: {}".format(osim_path)
+    return osim
 
 class OSIMSequence(Node):
     """
@@ -50,10 +67,13 @@ class OSIMSequence(Node):
         :osim_path: Path the osim model was loaded from (optional)
         :param kwargs: Remaining arguments for rendering.
         """
+        self.osim_path = osim_path
+        
+        
+        
         self.osim = osim
         self.motion = motion
 
-        self.osim_path = osim_path
         assert self.osim_path, "No osim path given"
 
         self.fps = fps
@@ -286,7 +306,7 @@ class OSIMSequence(Node):
             osim : nimble.biomechanics.OpenSimFile = nimble.models.RajagopalHumanBodyModel()
             osim_path = "RajagopalHumanBodyModel.osim" # This is not a real path, but it is needed to instantiate the sequence object
         else:
-            osim = nimble.biomechanics.OpenSimParser.parseOsim(osim_path)
+            osim = load_osim(osim_path)
             
         assert osim is not None, "Could not load osim file: {}".format(osim_path)
 
@@ -342,7 +362,7 @@ class OSIMSequence(Node):
 
 
     @classmethod
-    def from_files(cls, osim_path, mot_file, start_frame=None, end_frame=None, fps_out=None, mask_params=None, ignore_fps=False, **kwargs):
+    def from_files(cls, osim_path, mot_file, start_frame=None, end_frame=None, fps_out: int=None, ignore_fps=False, **kwargs):
         """Creates a OSIM sequence from addbiomechanics return data
         osim_path: .osim file path
         mot_file : .mot file path
@@ -353,21 +373,13 @@ class OSIMSequence(Node):
         """
 
         # Load osim file
-        osim = nimble.biomechanics.OpenSimParser.parseOsim(osim_path)
+        osim = load_osim(osim_path)
 
         # Load the .mot file
         mot: nimble.biomechanics.OpenSimMot = nimble.biomechanics.OpenSimParser.loadMot(
                     osim.skeleton, mot_file)
 
         motion = np.array(mot.poses.T)    
-
-        if mask_params is not None:
-            # Set all the params not in the mask to zero
-            motion_0 = motion.copy()
-            motion[:, np.logical_not(mask_params)] = 0
-            motion[:,0:3] = motion_0[:, 0:3]
-            motion[:,3:6] = motion_0[0,3:6]
-
 
         # Crop and sample
         sf = start_frame or 0

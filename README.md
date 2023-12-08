@@ -4,6 +4,7 @@ This fork of AitViewer enables the vizualization of Marker sequences, OpenSim mo
 
 aitviewer is a set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS. See the official page at [https://eth-ait.github.io/aitviewer](https://eth-ait.github.io/aitviewer/) for all the details.
 
+![aitviewer osim vizu](assets/bioamass_screenshot.png)
 
 ## Installation
 
@@ -26,6 +27,17 @@ To visualize an OpenSim motion sequence:
 ## SKEL model
 
 (Coming soon)
+
+## BioAmass Dataset
+
+First download the models and dataset from [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de) 
+To visualize a sequence from the BioAmass dataset, in `aitconfig.yaml` set the following paths:
+
+```
+osim_geometry : /path/to/skel_models_v1.0/Geometry
+bioamass : /path/to/bioamass_v1.0
+```
+
 
 ## Mocap data
     
