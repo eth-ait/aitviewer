@@ -9,7 +9,14 @@ aitviewer is a set of tools to visualize and interact with sequences of 3D data 
 
 ## Installation
 
-Please refer to the [aitviewer instructions](https://eth-ait.github.io/aitviewer/frontend.html#configure-the-viewer) to set up the paths to SMPLX and AMASS. 
+Clone this repository and install it using:
+```
+git clone https://github.com/MarilynKeller/aitviewer-skel.git
+cd aitviewer-skel
+pip install -e .
+```
+
+To set up the paths to SMPLX and AMASS, please refer to the [aitviewer instructions](https://eth-ait.github.io/aitviewer/frontend.html#configure-the-viewer)
 
 ## BSM model
 
