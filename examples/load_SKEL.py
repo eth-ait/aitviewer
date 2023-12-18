@@ -1,17 +1,25 @@
-# Copyright (C) 2023  MPI, Marilyn Keller
+"""
+Copyright©2023 Max-Planck-Gesellschaft zur Förderung
+der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
+for Intelligent Systems. All rights reserved.
 
+Author: Marilyn Keller
+See https://skel.is.tue.mpg.de/license.html for licensing and contact information.
+"""
 import torch
 from aitviewer.viewer import Viewer
 from aitviewer.renderables.skel import SKELSequence
+from aitviewer.configuration import CONFIG as C
 
 try:
     from skel.skel_model import SKEL
-except:
+except Exception as e:
     print("Could not import SKEL, make sure you installed the skel repository.")
+    raise e
 
 if __name__ == "__main__":
     
-    skel_model = SKEL()
+    skel_model = SKEL(model_path=C.skel_models)
 
     F = 120
     pose = torch.zeros(F, 46)
@@ -27,11 +35,9 @@ if __name__ == "__main__":
     skel_seq = SKELSequence(skel_layer=skel_model, betas=betas, poses_body=pose, poses_type='skel', 
                             trans=trans, is_rigged=True, show_joint_angles=True, name='SKEL', z_up=False,
                             skinning_weights_color=False,
-                            # position=[0,-0.94,0],
                             )
     
     v = Viewer()
     v.playback_fps = 30
-    # v.scene.add(SKELSequence.t_pose(skel_layer=skel_model))
     v.scene.add(skel_seq)
     v.run()
