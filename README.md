@@ -20,7 +20,7 @@ To set up the paths to SMPLX and AMASS, please refer to the [aitviewer instructi
 
 ## BSM model
 
-You can download bsm.osim from the dowload page at [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de). Then run:
+You can download the BSM model `bsm.osim` from the dowload page at [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de). To visualize it, run:
 
 ```python load_osim.py --osim /path/to/bsm.osim```
 
@@ -28,7 +28,9 @@ You can find motion sequences in the BioAmass dataset at [https://skel.is.tue.mp
 
 To visualize an OpenSim motion sequence:
 
-```python load_osim.py --osim /path/to/bsm.osim --mot /path/to/trial.mot```
+```
+python load_osim.py --osim /path/to/bsm.osim --mot /path/to/trial.mot
+```
 
 ![aitviewer osim vizu](assets/osim_apose.png)
 
@@ -38,18 +40,16 @@ To visualize an OpenSim motion sequence:
 
 ## BioAmass Dataset
 
-First download the models and dataset from [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de) 
-To visualize a sequence from the BioAmass dataset, in `aitconfig.yaml` set the following paths:
+First download the models and dataset from [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de) and in `aitconfig.yaml` set the following paths:
 
 ```
 osim_geometry : /path/to/skel_models_v1.0/Geometry
 bioamass : /path/to/bioamass_v1.0
 ```
 
-Then run:
+To visualize a sequence from the BioAmass dataset, run:
 
 ```
-cd examples
 python load_bioamass.py
 ```
 
