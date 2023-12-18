@@ -10,7 +10,7 @@ aitviewer is a set of tools to visualize and interact with sequences of 3D data 
 
 Please refer to the [aitviewer instructions](https://eth-ait.github.io/aitviewer/frontend.html#configure-the-viewer) to set up the paths to SMPLX and AMASS. 
 
-## OSIM model
+## BSM model
 
 You can download bsm.osim from the dowload page at [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de). Then run:
 
@@ -38,6 +38,12 @@ osim_geometry : /path/to/skel_models_v1.0/Geometry
 bioamass : /path/to/bioamass_v1.0
 ```
 
+Then run:
+
+```
+cd examples
+python load_bioamass.py
+```
 
 ## Mocap data
     
