@@ -10,16 +10,12 @@ import trimesh
 from aitviewer.configuration import CONFIG as C
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.rigid_bodies import RigidBodies
+from aitviewer.renderables.markers import Markers
 from aitviewer.scene.node import Node
-
+from aitviewer.utils.colors import vertex_colors_from_weights
 from aitviewer.utils import to_numpy as c2c
-from scipy.spatial.transform import Rotation as R
 
 import nimblephysics as nimble
-import nimblephysics_libs
-
-from aitviewer.utils.colors import vertex_colors_from_weights
-from aitviewer.renderables.markers import Markers
 import pickle as pkl
 
 def load_osim(osim_path, geometry_path=C.osim_geometry):
@@ -68,9 +64,6 @@ class OSIMSequence(Node):
         :param kwargs: Remaining arguments for rendering.
         """
         self.osim_path = osim_path
-        
-        
-        
         self.osim = osim
         self.motion = motion
 
@@ -86,7 +79,6 @@ class OSIMSequence(Node):
         super(OSIMSequence, self).__init__(n_frames=motion.shape[0], **kwargs)
 
         self._render_kwargs = kwargs
-        # kwargs['position'] = [0,0,0]
 
         # The node names of the skeleton model, the associated mesh and the template indices
         self.node_names = [n.getName() for n in osim.skeleton.getBodyNodes()]
