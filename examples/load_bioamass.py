@@ -8,18 +8,15 @@ See https://skel.is.tue.mpg.de/license.html for licensing and contact informatio
 """
 
 import os
-from aitviewer.renderables.osim import OSIMSequence
-
 import numpy as np
 
 from aitviewer.configuration import CONFIG as C
-from aitviewer.renderables.point_clouds import PointClouds
+from aitviewer.renderables.osim import OSIMSequence
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
 
 if __name__ == "__main__":
-    # Load an AMASS sequence and make sure it's sampled at 60 fps. This automatically loads the SMPL-H model.
-    # We set transparency to 0.5 and render the joint coordinates systems.
+
     subj_name = '01'
     seq_name = '03'
     
@@ -52,11 +49,10 @@ if __name__ == "__main__":
     
     to_display.append(osim_seq)
     
-    # Display in the viewer.
+    # Display in the viewer
     v = Viewer()
     v.run_animations = True
     v.scene.camera.position = np.array([10.0, 2.5, 0.0])
-    import ipdb; ipdb.set_trace()
     v.scene.add(*to_display)
     
     if seq_amass is not None:

@@ -1,6 +1,11 @@
-# Code Developed by:
-# Marilyn Keller marilyn.keller@tuebingen.mpg.de
-# Do not share or distribute without permission of the author
+"""
+Copyright©2023 Max-Planck-Gesellschaft zur Förderung
+der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
+for Intelligent Systems. All rights reserved.
+
+Author: Marilyn Keller
+See https://skel.is.tue.mpg.de/license.html for licensing and contact information.
+"""
 
 import os
 import shutil
@@ -200,7 +205,6 @@ class OSIMSequence(Node):
         for node_name in node_names:
             mesh_list = []
             body_node = self.osim.skeleton.getBodyNode(node_name)
-            # scale = body_node.getScale()
             # print(f' Loading meshes for node: {node_name}')
             num_shape_nodes = body_node.getNumShapeNodes()
             if num_shape_nodes == 0:
@@ -208,19 +212,10 @@ class OSIMSequence(Node):
             for shape_node_i in range(num_shape_nodes):
                 shape_node = body_node.getShapeNode(shape_node_i)
                 submesh_path = shape_node.getShape().getMeshPath()
-                #Get the scaling for this meshes
+                # Get the scaling for this meshes
                 scale = shape_node.getShape().getScale()
-                # offset = shape_node.getRelativeTransform().matrix()
                 offset = shape_node.getRelativeTranslation()
-                # print(offset)
-                # print(offset[:3,3])
                 # Load the mesh
-                # import ipdb; ipdb.set_trace()
-                # if not os.path.exists(submesh_path):
-                    
-                #     path_split = submesh_path.split('Geometry')
-                #     path_split[0] = '/home/mkeller2/Marilyn/Code/tml_skel/osim_models/fused_osso_v2/'
-                #     submesh_path = 'Geometry'.join(path_split)
                 try:
                     submesh = trimesh.load_mesh(submesh_path, process=False)
                     # print(f'Loaded mesh {submesh_path}')
@@ -240,9 +235,8 @@ class OSIMSequence(Node):
                     # faces_as_array = submesh_poly.faces.reshape((submesh_poly.n_faces, 4))[:, 1:] 
                     # submesh = trimesh.Trimesh(submesh_poly.points, faces_as_array) 
 
-                    #Scale the bone to match .osim subject scaling
+                    # Scale the bone to match .osim subject scaling
                     submesh.vertices[:] = submesh.vertices * scale
-                    # submesh.vertices[:] += offset[:3, 3]
                     submesh.vertices[:] += offset
                     # print(f'submesh_path: {submesh_path}, Nb vertices: {submesh.vertices.shape[0]}')
                     mesh_list.append(submesh)
@@ -301,10 +295,7 @@ class OSIMSequence(Node):
             osim = load_osim(osim_path)
             
         assert osim is not None, "Could not load osim file: {}".format(osim_path)
-
-        # motion = np.zeros((1, len(osim.skeleton.getBodyNodes())))
         motion = osim.skeleton.getPositions()[np.newaxis,:]
-        # import ipdb; ipdb.set_trace()
 
         return cls(osim, motion,
                     osim_path = osim_path,
@@ -337,6 +328,7 @@ class OSIMSequence(Node):
         """
         Load an osim sequence from a folder returned by AddBiomechanics
         ab_folder: the folder returned by AddBiomechanics, ex: '/home/kellerm/Data/AddBiomechanics/CMU/01/smpl_head_manual'
+        trial: Trial name
         start_frame: the first frame to load
         end_frame: the last frame to load
         fps_out: the output fps
@@ -358,7 +350,6 @@ class OSIMSequence(Node):
         """Creates a OSIM sequence from addbiomechanics return data
         osim_path: .osim file path
         mot_file : .mot file path
-        mask_joints: list of pose parameters to set to zero (N_j)
         start_frame: first frame to use in the sequence
         end_frame: last frame to use in the sequence
         fps_out: frames per second of the output sequence
@@ -389,15 +380,12 @@ class OSIMSequence(Node):
             if fps_out is not None:
                 assert fps_in%fps_out == 0, 'fps_out must be a interger divisor of fps_in'
                 mask = np.arange(0, motion.shape[0], fps_in//fps_out)
-                # motion = resample_positions(motion, fps_in, fps_out)
+                # motion = resample_positions(motion, fps_in, fps_out) #TODO: restore this 
                 motion = motion[mask]
                 
             del mot
 
         return cls(osim, motion, osim_path=osim_path, fps=fps_out, fps_in=fps_in, **kwargs)
-
-
-
 
 
     def fk(self):
@@ -418,9 +406,9 @@ class OSIMSequence(Node):
 
             pose = self.motion[frame_id, :]
             # If the pose did not change, use the previous frame verts
-            # if np.all(pose == prev_pose):
-            #     verts[frame_id] = prev_verts
-            #     continue
+            if np.all(pose == prev_pose):
+                verts[frame_id] = prev_verts
+                continue
 
             # Pose osim
             self.osim.skeleton.setPositions(self.motion[frame_id, :])
@@ -436,40 +424,13 @@ class OSIMSequence(Node):
 
                     part_verts = mesh.vertices
 
-
                     # pose part
                     transfo = self.osim.skeleton.getBodyNode(node_name).getWorldTransform()
-                    # if frame_id == 0:
-                    #     print(node_name, transfo.matrix())
-                    # part_verts = np.matmul(part_verts,transfo.matrix().T)[:,0:3]
                     
-                    # This was an attempt at interpolating the spine, but the rotation should be interpolated between the parent and child rotation, which is not trivial
-                    # if node_name in ['thorax', 'lumbar_body', 'cervical', 'head']:
-                    #     from scipy.spatial.transform import Rotation as R
-                    #     from scipy.spatial.transform import Slerp
-                    #     # import ipdb; ipdb.set_trace()
-                    #     up_val = (part_verts[:,1] - np.min(part_verts[:,1])) / (np.max(part_verts[:,1]) - np.min(part_verts[:,1]))
-                    #     # up_val = (part_verts[:,1]) / (np.max(part_verts[:,1]) - np.min(part_verts[:,1]))
-                    #     R1 = R.identity().as_matrix()
-                    #     R2 = transfo.rotation().T
-                    #     key_rots = R.from_matrix([R1, R2])
-                    #     key_times = [0, 1]
-                    #     slerp = Slerp(key_times, key_rots)
-                    #     R_up = slerp(up_val).as_matrix()
-                     
-                    #     # part_verts = np.matmul(part_verts, R_up.T)[:,0:3]
-                    #     part_verts = np.einsum('ij,ijk->ik', part_verts, R_up)
-                    #     part_verts += transfo.translation()
-                    # else:
-                    #   # Add a row of homogenous coordinates 
-                    #   part_verts = np.concatenate([part_verts, np.ones((mesh.vertices.shape[0], 1))], axis=1)
-                    #   part_verts = np.matmul(part_verts, transfo.matrix().T)[:,0:3]  
-                                         
                     # Add a row of homogenous coordinates 
                     part_verts = np.concatenate([part_verts, np.ones((mesh.vertices.shape[0], 1))], axis=1)
                     part_verts = np.matmul(part_verts, transfo.matrix().T)[:,0:3]
                         
-
                     # Update the part in the full mesh       
                     id_start, id_end = self.indices_dict[node_name]
                     verts[frame_id, id_start :id_end, :] = part_verts
@@ -483,8 +444,6 @@ class OSIMSequence(Node):
             prev_pose = pose
             
         faces = self.template.faces
-
-        # joints = np.array([(1,0,0), (0,1,0), (0,0,1)])
 
         return c2c(verts), c2c(faces), markers, joints, joints_ori
 
