@@ -1,15 +1,15 @@
 # Access SMPL models.
-smplx_models: "/ps/project/rib_cage_breathing/TML/Data/smplx_models"
+smplx_models: "/Users/mkeller2/Data"
 star_models: "../data/star_models"
 supr_models: "../data/supr_models"
-osim_geometry : "/is/cluster/work/mkeller2/Data/TML/Release/v1.0/skel_models_v1.0/Geometry"
+osim_geometry : "/Users/mkeller2/Data/skel_models_v1.0/Geometry"
 
 # Access to datasets.
 datasets:
   amass:
     "/is/cluster/work/mkeller2/Data/TML/AMASS"
   bioamass:
-    "/is/cluster/work/mkeller2/Data/TML/Release/v1.0/bioamass_v1.0"
+    "/Users/mkeller2/Data/bioamass_v1.0"
   mocap:
     "/is/cluster/work/mkeller2/Data/TML/AMASS_mocap" 
 
