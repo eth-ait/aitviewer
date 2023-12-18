@@ -1,6 +1,7 @@
 # aitviewer - SKEL
 
-This fork of AitViewer enables the vizualization of Marker sequences, OpenSim models sequences and the SKEL model.
+This fork of AitViewer enables the vizualization of Marker sequences, OpenSim models sequences, the BSM model and the SKEL model.
+For more info on those model, check our [project page](https://skel.is.tue.mpg.de).
 
 aitviewer is a set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS. See the official page at [https://eth-ait.github.io/aitviewer](https://eth-ait.github.io/aitviewer/) for all the details.
 
@@ -80,6 +81,10 @@ If you use this software, please cite the following work and software:
   year = {2022}
 }
 ```
+
+## Licencing
+
+For use of SKEL and BSM, please refer to our project page https://skel.is.tue.mpg.de/license.html.
 
 ## Contact 
 
