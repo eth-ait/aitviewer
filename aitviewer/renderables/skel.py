@@ -1,6 +1,12 @@
 """
-# Copyright (C) 2023 Max Planck Institute, Marilyn Keller
+Copyright©2023 Max-Planck-Gesellschaft zur Förderung
+der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
+for Intelligent Systems. All rights reserved.
+
+Author: Marilyn Keller
+See https://skel.is.tue.mpg.de/license.html for licensing and contact information.
 """
+
 import numpy as np
 import pickle as pkl
 import torch
@@ -63,8 +69,8 @@ class SKELSequence(Node):
 
     def __init__(self,
                  poses_body,
-                 poses_type,
                  skel_layer,
+                 poses_type='skel',
                  betas=None,
                  trans=None,
                  device=C.device,
@@ -76,7 +82,6 @@ class SKELSequence(Node):
                  z_up=False,
                  fps=None,
                  fps_in = None,
-                 fps_out = None,
                  show_joint_arrows = True,
                  visual = True,
                  post_fk_func=None,
@@ -86,10 +91,9 @@ class SKELSequence(Node):
                  **kwargs):
         """
         Initializer.
-        :param poses_body: An array (numpy ar pytorch) of shape (F, N_JOINTS*3) containing the pose parameters of the
+        :param poses_body: An array (numpy ar pytorch) of shape (F, 46) containing the pose parameters of the
           body, i.e. without hands or face parameters.
-        :param smpl_layer: The SMPL layer that maps parameters to joint positions and/or dense surfaces.
-        :param poses_root: An array (numpy or pytorch) of shape (F, 3) containing the global root orientation.
+        :skel_layer: The SKEL layer that maps parameters to joint positions and/or body and meshes surfaces.
         :param betas: An array (numpy or pytorch) of shape (N_BETAS, ) containing the shape parameters.
         :param trans: An array (numpy or pytorch) of shape (F, 3) containing a global translation that is applied to
           all joints and vertices.
@@ -112,7 +116,6 @@ class SKELSequence(Node):
         """
         assert len(poses_body.shape) == 2
               
-        import ipdb; ipdb.set_trace()
         super(SKELSequence, self).__init__(n_frames=poses_body.shape[0], **kwargs)
         self.skel_layer = skel_layer
         self.post_fk_func = post_fk_func
@@ -170,18 +173,6 @@ class SKELSequence(Node):
 
             self._add_node(self.skeleton_seq)
 
-            # # First convert the relative joint angles to global joint angles in rotation matrix form.
-            # global_oris = local_to_global(self.poses,
-            #                                 self.skeleton[:, 0], output_format='rotmat')
-            # global_oris = global_oris.reshape((self.n_frames, -1, 3, 3))
-            # # if self._z_up:
-            #     # to_y_up = torch.Tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]]).to(global_oris.device, dtype=global_oris.dtype)
-            #     # import ipdb; ipdb.set_trace()
-            #     # global_oris = torch.matmul(to_y_up.T.unsqueeze(0), global_oris.unsqueeze(-1)).squeeze(-1)
-            # global_oris = c2c(global_oris)
-
-            # self.joints_ori = global_oris 
-            # import ipdb; ipdb.set_trace()
             global_oris = self.joints_ori
                 
             if show_joint_arrows is False:
@@ -205,9 +196,8 @@ class SKELSequence(Node):
 
         kwargs = self._render_kwargs.copy()
         kwargs['name'] = 'Skin'
-        # kwargs['skin_color'] = kwargs.get('color', (200 / 255, 160 / 255, 160 / 255, 125/255))
         if skinning_weights_color == True:
-            # import ipdb; ipdb.set_trace() 
+
             skin_colors = skining_weights_to_color(skel_layer.weights.cpu().numpy()) 
             self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, is_selectable=False, vertex_colors=skin_colors , **kwargs)
         else:
@@ -218,7 +208,6 @@ class SKELSequence(Node):
         
         kwargs = self._render_kwargs.copy()
         kwargs['name'] = 'Bones'
-        # kwargs['skel_color'] = kwargs.get('color', (160 / 255, 160 / 255, 160 / 255, 255/255))
         self.bones_mesh_seq = Meshes(self.skel_vertices, self.skel_faces, is_selectable=False, color=skel_color, **kwargs)
         # self.bones_mesh_seq.position = self.position
         # self.bones_mesh_seq.rotation = self.rotation
@@ -229,10 +218,6 @@ class SKELSequence(Node):
         self._skel_view_mode_color = self.bones_mesh_seq.color
         self._view_mode_joint_angles = self._show_joint_angles
         
-        # For AMASS, a root translation is added to the mesh, we need to apply it if we want to get the same joints as the ones displayed
-        # rot_joints, rot_joints_ori = self.get_rotated_global_joint()
-        # self.rbs2 = RigidBodies(rot_joints, rot_joints_ori, length=0.15, name='test rotated joints', color=(1,0,0,1))
-        # self._add_node(self.rbs2)
         
         
     def get_rotated_global_joint(self):
@@ -252,39 +237,6 @@ class SKELSequence(Node):
     def rotated_skel_vertices(self):
         return np.matmul(self.skel_vertices, self.rotation.T) + self.position
     
-    
-    @classmethod
-    def from_dyna(cls, path, fps_in=0, fps_out=0, vertex_scale=1.0, **kwargs):
-        # Initialize from a directory containing mesh data.
-
-        import ipdb ; ipdb.set_trace()
-        files = os.listdir(path)
-        files.sort()
-        
-        mesh_paths = [ os.path.join(path, f) for f in files if (f.endswith('.ply') or f.endswith('.obj')) ]
-        
-        if fps_in != fps_out:
-            mask = np.arange(0, len(mesh_paths), int(fps_in//fps_out))
-            mesh_paths = [ mesh_paths[i] for i in mask ]
-            
-        vertices, faces, vertex_normals, vertex_colors = [], [], [], []
-        for i in tqdm.tqdm(range(len(mesh_paths))):
-            m = trimesh.load(mesh_paths[i])
-            
-            # Scale and rotate the mesh
-            v = m.vertices * vertex_scale
-            # import ipdb ; ipdb.set_trace()
-            # if rotation is not None:
-            #     v = np.matmul(v, rotation)
-            # if translation is not None:
-            #     v -= translation.T
-                     
-            vertices.append(v)
-            faces.append(m.faces)
-            vertex_normals.append(m.vertex_normals)
-            vertex_colors.append(m.visual.vertex_colors / 255.0)
-        return cls(vertices, faces, vertex_normals, vertex_colors=vertex_colors, **kwargs)
- 
     @classmethod
     def from_skel_aligned(cls, skel_layer, fps_in, pkl_data_path, start_frame=None, end_frame=None, log=True, fps_out=None, z_up=False, 
                    device=C.device, poses_type='skel', **kwargs):
@@ -312,9 +264,7 @@ class SKELSequence(Node):
         else:
             fps_out = fps_in
             
-        # import ipdb; ipdb.set_trace()
         i_beta_end = skel_layer.num_betas 
-        # import ipdb; ipdb.set_trace()
         return cls(poses_body=poses,
                    skel_layer=skel_layer,
                    betas=betas[:, :i_beta_end],
@@ -327,121 +277,7 @@ class SKELSequence(Node):
                    poses_type = poses_type,
                     **kwargs)           
 
-    @classmethod
-    def from_amass(cls, skel_layer, npz_data_path, start_frame=None, end_frame=None, log=True, fps_out=None, z_up=False, 
-                   unpose_hands=False, device=C.device,  mask_params=None, q_poses=None, **kwargs):
-        
-        """Load a sequence downloaded from the AMASS website."""
-        body_data = np.load(npz_data_path)
 
-        if log:
-            print('Data keys available: {}'.format(list(body_data.keys())))
-            print('{:>6d} poses of size {:>4d}.'.format(body_data['poses'].shape[0], body_data['poses'].shape[1]))
-            print('{:>6d} trans of size {:>4d}.'.format(body_data['trans'].shape[0], body_data['trans'].shape[1]))
-            print('{:>6d} shape of size {:>4d}.'.format(1, body_data['betas'].shape[0]))
-            print('Gender {}'.format(body_data['gender']))
-            print('FPS {}'.format(body_data['mocap_framerate']))
-            
-        gender = body_data['gender'].item()
-        # import ipdb; ipdb.set_trace()
-        if not isinstance(gender, str):
-            gender = gender.item().decode("utf-8")
-
-        # import ipdb; ipdb.set_trace()
-        assert gender == skel_layer.gender, f"skel layer has gender {skel_layer.gender} while data has gender {gender}"
-
-        sf = start_frame or 0
-        ef = end_frame or body_data['poses'].shape[0]
-        poses = body_data['poses'][sf:ef]
-        trans = body_data['trans'][sf:ef]
-
-        fps_in = body_data['mocap_framerate'].tolist()
-        
-        if 'SSM' in npz_data_path:
-            fps_in = 60 # The SSM dataset files say 120 fps but it looks accelerated so I assume it's 60 fps
-        
-        if fps_out is not None:
-            if fps_in != fps_out:
-                ps = np.reshape(poses, [poses.shape[0], -1, 3])
-                ps_new = resample_rotations(ps, fps_in, fps_out)
-                poses = np.reshape(ps_new, [-1, poses.shape[1]])
-                trans = resample_positions(trans, fps_in, fps_out)
-        else:
-            fps_out = fps_in
-            
-
-        i_pose_end = skel_layer.nb_pose_params
-        i_beta_end = skel_layer.num_betas 
-        
-        import ipdb; ipdb.set_trace()
-        if mask_params is not None:
-            # Set all the params not in the mask to zero
-            # import ipdb; ipdb.set_trace()
-            poses_0 = poses.copy()
-            poses[:, np.logical_not(mask_params)] = 0
-            poses[:,:3] = poses_0[:,:3]
-            # poses[:,:3] = poses_0[:,:3]
-            trans[:] = trans[0]
-            
-        # q_poses[:] = 0
-        trans[:] = 0
-            
-        # if q_poses is not None:
-        #     poses[:,12] = q_poses[:,16] # knie extension
-        #     poses[:,13:15] = 0 # knie other angles
-        # import ipdb; ipdb.set_trace()
-        return cls(poses_body=q_poses[:, :i_pose_end],
-                   skel_layer=skel_layer,
-                   betas=body_data['betas'][np.newaxis,:i_beta_end],
-                   trans=trans,
-                   z_up=z_up,
-                   gender=body_data['gender'].item(),
-                   device = device,
-                   fps = fps_out,
-                   fps_in = fps_in,
-                    **kwargs)
-
-    @classmethod
-    def from_3dpw(cls, pkl_data_path, smplx_neutral=False, **kwargs):
-        """Load a 3DPW sequence which might contain multiple people."""
-        with open(pkl_data_path, 'rb') as p:
-            body_data = pkl.load(p, encoding='latin1')
-        num_people = len(body_data['poses'])
-
-        if smplx_neutral:
-            smpl_layer = SMPLLayer(model_type='smplx', gender='neutral', num_betas=10, flat_hand_mean=True, device=C.device)
-
-        poses_key = 'poses_smplx' if smplx_neutral else 'poses'
-        trans_key = 'trans_smplx' if smplx_neutral else 'trans'
-        betas_key = 'betas_smplx' if smplx_neutral else 'betas'
-
-        name = kwargs.get('name', '3DPW')
-
-        seqs = []
-        for i in range(num_people):
-            gender = body_data['genders'][i]
-            if not smplx_neutral:
-                smpl_layer = SMPLLayer(model_type='smpl', gender='female' if gender == 'f' else 'male', device=C.device,
-                                       num_betas=10)
-
-            # Extract the 30 Hz data that is already aligned with the image data.
-            poses = body_data[poses_key][i]
-            trans = body_data[trans_key][i]
-            betas = body_data[betas_key][i]
-
-            if len(betas.shape) == 1:
-                betas = betas[np.newaxis]
-
-            poses_body = poses[:, 3:]
-            poses_root = poses[:, :3]
-            trans_root = trans
-
-            kwargs['name'] = name + " S{}".format(i)
-            seq = cls(poses_body=poses_body, poses_root=poses_root, trans=trans_root,
-                      smpl_layer=smpl_layer, betas=betas, **kwargs)
-            seqs.append(seq)
-
-        return seqs
 
     @classmethod
     def t_pose(cls, skel_layer, betas=None, frames=1, is_rigged=True, show_joint_angles=False, device=C.device, **kwargs):
@@ -450,35 +286,10 @@ class SKELSequence(Node):
         if betas is not None:
             assert betas.shape[0] == 1
 
-        poses = np.zeros([frames, skel_layer.num_q_params])  # including hands and global root
-        # import ipdb; ipdb.set_trace()
-        # poses = skel_layer.q_tpose  # including hands and global root
+        poses = np.zeros([frames, skel_layer.num_q_params]) 
         return cls(poses, skel_layer=skel_layer, betas=betas, is_rigged=is_rigged, show_joint_angles=show_joint_angles, device=device, **kwargs)
 
-    @classmethod
-    def from_npz(cls, file: Union[IO, str], smpl_layer: SMPLLayer=None, **kwargs):
-        """Creates a SMPL sequence from a .npz file exported through the 'export' function."""
-        if smpl_layer is None:
-            smpl_layer = SMPLLayer(model_type='smplh', gender='neutral')
 
-        data = np.load(file)
-
-        return cls(
-            smpl_layer=smpl_layer,
-            poses_body=data['poses_body'],
-            poses_root=data['poses_root'],
-            betas=data['betas'],
-            trans=data['trans'],
-            **kwargs,
-        )
-
-    def export_to_npz(self, file: Union[IO, str]):
-        np.savez(file,
-            poses_body=c2c(self.poses_body),
-            poses_root=c2c(self.poses_root),
-            betas=c2c(self.betas),
-            trans=c2c(self.trans),
-        )
     @property
     def color(self):
         return self.mesh_seq.color
@@ -544,18 +355,11 @@ class SKELSequence(Node):
         joints = skel_output.joints
         joints_ori = skel_output.joints_ori
         
-        # skeleton = self.skel_layer.kintree_table.T[1:]       
         skeleton = self.skel_layer.kintree_table.T 
-        # import pdb; pdb.set_trace()
         skeleton[0, 0] = -1     
                 
-        # Apply post_fk_func if specified.
-        # if self.post_fk_func:
-        #     skin_verts, skel_verts = self.post_fk_func(self, verts, joints, current_frame_only)
-
         skin_f = self.skel_layer.skin_f
         skel_f = self.skel_layer.skel_f
-        # joints = joints[:, :skeleton.shape[0]]
 
         if current_frame_only:
             return c2c(skin_verts)[0], c2c(skin_f)[0], c2c(skel_verts)[0], c2c(skel_f)[0], c2c(joints)[0], c2c(joints_ori)[0], c2c(skeleton)
@@ -615,7 +419,6 @@ class SKELSequence(Node):
             self.joints[self.current_frame_id] = joints
 
             if self._is_rigged:
-                # import ipdb; ipdb.set_trace()
                 self.skeleton_seq.current_joint_positions = joints
 
             # Use current frame data.
@@ -718,7 +521,6 @@ class SKELSequence(Node):
                 imgui.tree_pop()
 
     def gui_mode_edit(self, imgui):
-        import ipdb
         kin_skel = self.skeleton
 
         tree = {}

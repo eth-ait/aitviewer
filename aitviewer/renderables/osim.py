@@ -1,6 +1,11 @@
-# Code Developed by:
-# Marilyn Keller marilyn.keller@tuebingen.mpg.de
-# Do not share or distribute without permission of the author
+"""
+Copyright©2023 Max-Planck-Gesellschaft zur Förderung
+der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
+for Intelligent Systems. All rights reserved.
+
+Author: Marilyn Keller
+See https://skel.is.tue.mpg.de/license.html for licensing and contact information.
+"""
 
 import os
 import shutil
