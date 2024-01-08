@@ -3,6 +3,17 @@ import random
 
 import numpy as np
 
+            
+def skining_weights_to_color(skinning_weights, alpha):
+    """ Given a skinning weight matrix NvxNj, return a color matrix of shape Nv*3. For each joint Ji i in [0, Nj] , 
+    the color is colors[i]"""
+    
+    joints_ids = np.arange(0, skinning_weights.shape[1])
+    colors = vertex_colors_from_weights(joints_ids, scale_to_range_1=True, alpha=alpha, shuffle=True, seed = 1)
+    
+    weights_color = np.matmul(skinning_weights, colors)
+    return weights_color
+        
 
 def vertex_colors_from_weights(weights, scale_to_range_1=True, alpha=None, shuffle=False, seed=0):
     """

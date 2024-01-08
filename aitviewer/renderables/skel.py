@@ -33,7 +33,7 @@ from aitviewer.utils import to_numpy as c2c
 from scipy.spatial.transform import Rotation
 from typing import Union, IO
 
-from aitviewer.utils.colors import vertex_colors_from_weights
+from aitviewer.utils.colors import skining_weights_to_color, vertex_colors_from_weights
 
 SKEL_JOINT_NAMES = [ 
  'pelvis',
@@ -88,6 +88,7 @@ class SKELSequence(Node):
                  skin_color = (200 / 255, 160 / 255, 160 / 255, 125/255),
                  skel_color = (160 / 255, 160 / 255, 160 / 255, 255/255),
                  skinning_weights_color = False,
+                 skin_coloring = None, # "pose_offsets"
                  **kwargs):
         """
         Initializer.
@@ -112,6 +113,7 @@ class SKELSequence(Node):
           Shapes are:
             if current_frame_only is False: vertices (F, V, 3) and joints (F, N_JOINTS, 3)
             if current_frame_only is True:  vertices (1, V, 3) and joints (1, N_JOINTS, 3)
+        :param skin_coloring: Coloring model of SKEL. Must be in ['pose_offsets', 'skin_weights'].
         :param kwargs: Remaining arguments for rendering.
         """
         assert len(poses_body.shape) == 2
@@ -154,7 +156,17 @@ class SKELSequence(Node):
         self._edit_pose_dirty = False
 
         # Nodes
-        self.skin_vertices, self.skin_faces, self.skel_vertices, self.skel_faces, self.joints, self.joints_ori, self.skeleton = self.fk()
+        skel_output = self.fk()
+        
+        self.skin_vertices = skel_output.skin_verts
+        self.skel_vertices = skel_output.skel_verts
+        self.skin_faces = skel_output.skin_f
+        self.skel_faces = skel_output.skel_f
+        self.joints = skel_output.joints
+        self.joints_ori = skel_output.joints_ori 
+        self.skeleton = skel_output.skeleton
+        
+        self.skel_output = skel_output
         
         if self._z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
@@ -162,7 +174,6 @@ class SKELSequence(Node):
         if visual == False:
             return
 
-        # import ipdb; ipdb.set_trace()
         if self._is_rigged:
             # Must first add skeleton, otherwise transparency does not work correctly.
             # Overriding given color with a custom color for the skeleton.
@@ -182,23 +193,21 @@ class SKELSequence(Node):
 
             self.rbs = RigidBodies(self.joints, global_oris, length=arrow_length, name='Joint Angles', color=(1.0, 177 / 255, 1 / 255, 1.0))
             self._add_node(self.rbs, enabled=self._show_joint_angles)
-            
-        def skining_weights_to_color(skinning_weights):
-            """ Given a skinning weight matrix NvxNj, return a color matrix of shape Nv*3. For each joint Ji i in [0, Nj] , 
-            the color is colors[i]"""
-            
-            joints_ids = np.arange(0, skinning_weights.shape[1])
-            colors = vertex_colors_from_weights(joints_ids, scale_to_range_1=True, alpha=skin_color[-1], shuffle=True, seed = 1)
-            
-            weights_color = np.matmul(skinning_weights, colors)
-            return weights_color
+
 
 
         kwargs = self._render_kwargs.copy()
         kwargs['name'] = 'Skin'
         if skinning_weights_color == True:
-
-            skin_colors = skining_weights_to_color(skel_layer.weights.cpu().numpy()) 
+            skin_colors = skining_weights_to_color(skel_layer.weights.cpu().numpy(), alpha = skin_color[-1]) 
+            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, is_selectable=False, vertex_colors=skin_colors , **kwargs)
+        elif skin_coloring == 'pose_offsets':
+            values = self.skel_output.pose_offsets.cpu().numpy()
+            skin_colors = values/np.max(np.abs(values))
+            #append an alpha channel
+            # import ipdb; ipdb.set_trace()
+            # current_alpha_value = skin_color[-1]
+            skin_colors = np.concatenate([skin_colors, np.ones([skin_colors.shape[0], skin_colors.shape[1], 1])], axis=-1)
             self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, is_selectable=False, vertex_colors=skin_colors , **kwargs)
         else:
             self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, is_selectable=False, color=skin_color , **kwargs)
@@ -350,21 +359,35 @@ class SKELSequence(Node):
                                         trans=trans,
                                         poses_type=self.poses_type)
         
-        skin_verts = skel_output.skin_verts
-        skel_verts = skel_output.skel_verts
-        joints = skel_output.joints
-        joints_ori = skel_output.joints_ori
+        # skin_verts = skel_output.skin_verts
+        # skel_verts = skel_output.skel_verts
+        # joints = skel_output.joints
+        # joints_ori = skel_output.joints_ori
         
-        skeleton = self.skel_layer.kintree_table.T 
-        skeleton[0, 0] = -1     
                 
-        skin_f = self.skel_layer.skin_f
-        skel_f = self.skel_layer.skel_f
 
         if current_frame_only:
-            return c2c(skin_verts)[0], c2c(skin_f)[0], c2c(skel_verts)[0], c2c(skel_f)[0], c2c(joints)[0], c2c(joints_ori)[0], c2c(skeleton)
+            # return c2c(skin_verts)[0], c2c(skin_f)[0], c2c(skel_verts)[0], c2c(skel_f)[0], c2c(joints)[0], c2c(joints_ori)[0], c2c(skeleton)
+            for att in ['skin_verts', 'skel_verts', 'joints', 'joints_ori']:
+                att_value = getattr(skel_output, att)
+                setattr(skel_output, att, c2c(att_value)[0])
         else:
-            return c2c(skin_verts), c2c(skin_f), c2c(skel_verts), c2c(skel_f), c2c(joints), c2c(joints_ori), c2c(skeleton)
+            # return c2c(skin_verts), c2c(skin_f), c2c(skel_verts), c2c(skel_f), c2c(joints), c2c(joints_ori), c2c(skeleton)
+            for att in ['skin_verts', 'skel_verts', 'joints', 'joints_ori']:
+                try:
+                    att_value = getattr(skel_output, att)
+                    setattr(skel_output, att, c2c(att_value))
+                except:
+                    import ipdb; ipdb.set_trace()
+                    
+        skel_output.skin_f = c2c(self.skel_layer.skin_f)
+        skel_output.skel_f = c2c(self.skel_layer.skel_f)
+        
+        skeleton = self.skel_layer.kintree_table.T 
+        skeleton[0, 0] = -1   
+        skel_output.skeleton = c2c(skeleton)  
+        
+        return skel_output
 
 
     def interpolate(self, frame_ids):
@@ -411,15 +434,16 @@ class SKELSequence(Node):
         current_frame_only = kwargs.get('current_frame_only', False)
 
         # Use the edited pose if in edit mode.
-        skin_vertices, skin_faces, skel_vertices, skel_faces, joints, joints_ori, skeleton = self.fk(current_frame_only)
+        # skin_vertices, skin_faces, skel_vertices, skel_faces, joints, joints_ori, skeleton = self.fk(current_frame_only)
+        skel_output = self.fk(current_frame_only)
 
         if current_frame_only:
-            self.skin_vertices[self.current_frame_id] = skin_vertices
-            self.skel_vertices[self.current_frame_id] = skel_vertices
-            self.joints[self.current_frame_id] = joints
+            self.skin_vertices[self.current_frame_id] = skel_output.skin_verts
+            self.skel_vertices[self.current_frame_id] = skel_output.skel_verts
+            self.joints[self.current_frame_id] = skel_output.joints
 
             if self._is_rigged:
-                self.skeleton_seq.current_joint_positions = joints
+                self.skeleton_seq.current_joint_positions = skel_output.joints
 
             # Use current frame data.
             if self._edit_mode:
@@ -428,17 +452,17 @@ class SKELSequence(Node):
                 pose = self.poses_body[self.current_frame_id]
 
             # Update rigid bodies.
-            global_oris = joints_ori
+            global_oris = skel_output.joints_ori
             self.rbs.current_rb_ori = c2c(global_oris)
             self.rbs.current_rb_pos = self.joints[self.current_frame_id]
 
             # Update mesh.
-            self.skin_mesh_seq.current_vertices = skin_vertices
-            self.bones_mesh_seq.current_vertices = skel_vertices
+            self.skin_mesh_seq.current_vertices = skel_output.skin_verts
+            self.bones_mesh_seq.current_vertices = skel_output.skel_verts
         else:
-            self.skin_vertices = skin_vertices
-            self.skel_vertices = skel_vertices
-            self.joints = joints
+            self.skin_vertices = skel_output.skin_verts
+            self.skel_vertices = skel_output.skel_verts
+            self.joints = skel_output.joints
 
             # Update skeleton.
             if self._is_rigged:
@@ -453,13 +477,15 @@ class SKELSequence(Node):
                 poses_root = self.poses_root
 
             # Update rigid bodies.
-            global_oris = joints_ori
+            global_oris = skel_output.joints_ori
             self.rbs.rb_ori = c2c(global_oris)
             self.rbs.rb_pos = self.joints
 
             # Update mesh
-            self.skin_mesh_seq.vertices = skin_vertices
-            self.bones_mesh_seq.vertices = skel_vertices
+            self.skin_mesh_seq.vertices = skel_output.skin_verts
+            self.bones_mesh_seq.vertices = skel_output.skel_verts
+            
+        self.skel_output = skel_output
 
         super().redraw(**kwargs)
 
