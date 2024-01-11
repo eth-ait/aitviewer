@@ -31,35 +31,14 @@ from aitviewer.utils import local_to_global
 from aitviewer.utils import interpolate_positions
 from aitviewer.utils import to_numpy as c2c
 from scipy.spatial.transform import Rotation
-from typing import Union, IO
+
+try:
+    from skel.skel_model import SKEL
+    from skel.kin_skel import skel_joints_name
+except ImportError as e:
+    raise ImportError(f"Could not import SKEL. Please install it from https://github.com/MarilynKeller/skel.git")
 
 from aitviewer.utils.colors import skining_weights_to_color, vertex_colors_from_weights
-
-SKEL_JOINT_NAMES = [ 
- 'pelvis',
- 'femur_r',
- 'tibia_r',
- 'talus_r',
- 'calcn_r',
- 'toes_r',
- 'femur_l',
- 'tibia_l',
- 'talus_l',
- 'calcn_l',
- 'toes_l',
- 'lumbar_body',
- 'thorax',
- 'head',
- 'scapula_r',
- 'humerus_r',
- 'ulna_r',
- 'radius_r',
- 'hand_r',
- 'scapula_l',
- 'humerus_l',
- 'ulna_l',
- 'radius_l',
- 'hand_l']
 
 
 class SKELSequence(Node):
@@ -247,28 +226,33 @@ class SKELSequence(Node):
         return np.matmul(self.skel_vertices, self.rotation.T) + self.position
     
     @classmethod
-    def from_skel_aligned(cls, skel_layer, fps_in, pkl_data_path, start_frame=None, end_frame=None, log=True, fps_out=None, z_up=False, 
-                   device=C.device, poses_type='skel', **kwargs):
+    def from_pkl(cls, skel_seq_pkl, fps_in, start_frame=None, end_frame=None, log=True, fps_out=None, z_up=False, 
+                   device=C.device, poses_type='skel', **kwargs):    
+        """Load a SKEL sequence from a pkl."""
         
-        """Load a sequence downloaded from the AMASS website."""
-        skel_data = pkl.load(open(pkl_data_path, 'rb'))          
-        gender = skel_data['gender']
+        assert skel_seq_pkl.endswith('.pkl'), f"skel_seq_pkl must be a pkl file, got {skel_seq_pkl}"
+        skel_data = pkl.load(open(skel_seq_pkl, 'rb'))    
+        
+        for key in ['poses', 'trans', 'betas', 'gender']:
+            assert key in skel_data, f"The loaded skel sequence dictionary must contain {key}. Loaded dictionary has keys: {skel_data.keys()}"
 
-        # import ipdb; ipdb.set_trace()
+              
+        gender = skel_data['gender']
+        skel_layer = SKEL(model_path=C.skel_models, gender=gender)
+
         assert gender == skel_layer.gender, f"skel layer has gender {skel_layer.gender} while data has gender {gender}"
 
         sf = start_frame or 0
-        ef = end_frame or skel_data['pose'].shape[0]
-        poses = skel_data['pose'][sf:ef]
+        ef = end_frame or skel_data['poses'].shape[0]
+        poses = skel_data['poses'][sf:ef]
         trans = skel_data['trans'][sf:ef]
         betas = skel_data['betas'][sf:ef]
 
-        # import ipdb; ipdb.set_trace()
         if fps_out is not None:
             if fps_in != fps_out:
                 betas = resample_positions(betas, fps_in, fps_out)
                 poses = resample_positions(poses, fps_in, fps_out) # Linear interpolation
-                print("WARNING: poses resampled with linear interpolation, this is wrong but of for int fps ratio")
+                print("WARNING: poses resampled with linear interpolation, this is wrong but ok for int fps ratio")
                 trans = resample_positions(trans, fps_in, fps_out)
         else:
             fps_out = fps_in
@@ -279,7 +263,6 @@ class SKELSequence(Node):
                    betas=betas[:, :i_beta_end],
                    trans=trans,
                    z_up=z_up,
-                   gender=gender,
                    device = device,
                    fps = fps_out,
                    fps_in = fps_in,
@@ -523,8 +506,8 @@ class SKELSequence(Node):
 
     def _gui_joint(self, imgui, j, tree=None):
         name = "unknown"
-        if j < len(SKEL_JOINT_NAMES):
-            name = SKEL_JOINT_NAMES[j]
+        if j < len(skel_joints_name):
+            name = skel_joints_name[j]
 
         if tree:
             e = imgui.tree_node(f'{j} - {name}')
