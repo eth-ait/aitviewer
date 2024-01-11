@@ -70,9 +70,11 @@ If you use this software, please cite the following work and software:
 ```
 @inproceedings{keller2023skel,
   title = {From Skin to Skeleton: Towards Biomechanically Accurate 3D Digital Humans},
-  author = {Keller, Marilyn and Werling, Keenon and Shin, Soyong and Delp, Scott and Pujades, Sergi 
-            and C. Karen, Liu and Black, Michael J.},
+  author = {Keller, Marilyn and Werling, Keenon and Shin, Soyong and Delp, Scott and 
+            Pujades, Sergi and C. Karen, Liu and Black, Michael J.},
   booktitle = {ACM ToG, Proc.~SIGGRAPH Asia},
+  volume = {42},
+  number = {6},
   month = dec,
   year = {2023},
 }
