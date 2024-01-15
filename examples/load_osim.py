@@ -77,6 +77,8 @@ def display_model_in_viewer(osim: Optional[str] = None,
         v.scene.add(marker_seq)
         
     v.playback_fps = args.fps
+    
+    v.run_animations = True
 
     v.run()
     

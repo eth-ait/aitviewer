@@ -25,6 +25,9 @@ import pickle as pkl
 
 def load_osim(osim_path, geometry_path=C.osim_geometry):
     """Load an osim file"""
+    
+    assert os.path.exists(osim_path), f'Could not find osim file {osim_path}'
+    
     # Check that there is a Geometry folder at the same level as the osim file
     file_geometry_path = os.path.join(os.path.dirname(osim_path), 'Geometry')
     
@@ -406,7 +409,7 @@ class OSIMSequence(Node):
 
             pose = self.motion[frame_id, :]
             # If the pose did not change, use the previous frame verts
-            if np.all(pose == prev_pose):
+            if np.all(pose == prev_pose) and frame_id != 0:
                 verts[frame_id] = prev_verts
                 continue
 
@@ -442,6 +445,7 @@ class OSIMSequence(Node):
 
             prev_verts = verts[frame_id]
             prev_pose = pose
+
             
         faces = self.template.faces
 
