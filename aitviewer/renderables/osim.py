@@ -291,7 +291,6 @@ class OSIMSequence(Node):
     def a_pose(cls, osim_path = None, **kwargs):
         """Creates a OSIM sequence whose single frame is a OSIM mesh in rest pose."""
         # Load osim file
-        import ipdb; ipdb.set_trace()
         if osim_path is None:
             osim : nimble.biomechanics.OpenSimFile = nimble.models.RajagopalHumanBodyModel()
             osim_path = "RajagopalHumanBodyModel.osim" # This is not a real path, but it is needed to instantiate the sequence object
