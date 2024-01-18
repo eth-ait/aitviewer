@@ -53,10 +53,6 @@ if __name__ == "__main__":
     v = Viewer()
     v.run_animations = True
     v.scene.camera.position = np.array([10.0, 2.5, 0.0])
-<<<<<<< HEAD
-=======
-    import ipdb; ipdb.set_trace()
->>>>>>> skel
     v.scene.add(*to_display)
     
     if seq_amass is not None:

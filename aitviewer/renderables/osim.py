@@ -25,12 +25,14 @@ import pickle as pkl
 
 def load_osim(osim_path, geometry_path=C.osim_geometry):
     """Load an osim file"""
-    
+       
     assert os.path.exists(osim_path), f'Could not find osim file {osim_path}'
+    osim_path = os.path.abspath(osim_path)
     
     # Check that there is a Geometry folder at the same level as the osim file
     file_geometry_path = os.path.join(os.path.dirname(osim_path), 'Geometry')
     
+    import ipdb; ipdb.set_trace()
     if not os.path.exists(file_geometry_path):
         print(f'WARNING: No Geometry folder found at {file_geometry_path}, using {geometry_path} instead')
         # Create a copy of the osim file at the same level as the geometry folder
@@ -295,7 +297,6 @@ class OSIMSequence(Node):
             osim : nimble.biomechanics.OpenSimFile = nimble.models.RajagopalHumanBodyModel()
             osim_path = "RajagopalHumanBodyModel.osim" # This is not a real path, but it is needed to instantiate the sequence object
         else:
-            osim_path = os.path.abspath(osim_path)
             osim = load_osim(osim_path)
             
         assert osim is not None, "Could not load osim file: {}".format(osim_path)
@@ -423,6 +424,9 @@ class OSIMSequence(Node):
             assert list(self.osim.skeleton.getMarkerMapWorldPositions(self.osim.markersMap).keys()) == self.markers_labels, "Marker labels are not in the same order"
 
             for ni, node_name in enumerate(self.node_names):
+                if ('thorax' in node_name) or ('lumbar' in node_name):
+                    # We do not display the spine as the riggidly rigged mesh can't represent the constant curvature of the spine
+                    continue
                 mesh = self.meshes_dict[node_name]
                 if mesh is not None:
 

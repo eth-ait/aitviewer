@@ -1,11 +1,16 @@
 # aitviewer - SKEL
 
 This fork of AitViewer enables the vizualization of Marker sequences, OpenSim models sequences, the BSM model and the SKEL model.
-For more info on those model, check our [project page](https://skel.is.tue.mpg.de).
+
+This repo contain a visualization tool. If you are interested in the SKEL model code, please refer to the [SKEL repository](https://download.is.tue.mpg.de/skel/main_paper.pdf). 
+
+For more info on SKEL, BSM and BioaAmass, check our [project page](https://skel.is.tue.mpg.de) and our [paper](https://download.is.tue.mpg.de/skel/main_paper.pdf).
 
 aitviewer is a set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS. See the official page at [https://eth-ait.github.io/aitviewer](https://eth-ait.github.io/aitviewer/) for all the details.
 
-![aitviewer osim vizu](assets/bioamass_screenshot.png)
+![aitviewer skel gif](assets/skel_sequence.gif)
+⇧ *aitviewer-Skel enables isualization of motion sequences of the SKEL model.*
+
 
 ## Installation
 
@@ -36,7 +41,24 @@ python load_osim.py --osim /path/to/bsm.osim --mot /path/to/trial.mot
 
 ## SKEL model
 
-(Coming soon)
+You can download the SKEL model from the dowload page at [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de). 
+Edit then the file aitviewer/aitvconfig.yaml` to point to the SKEL folder:
+```skel_models: "/path/to/skel_models_v1.0"```
+
+Install the SKEL loader by following the guidelines here: https://github.com/MarilynKeller/SKEL 
+
+Vizualize the SKEL model's shape space:
+
+```
+python examples/load_SKEL.py
+```
+
+Vizualize a SKEL sequence. You can find a sample SKEL motion in `skel_models_v1.0/sample_motion/ ` and the corresponding SMPL motion.
+
+```
+python examples/load_SKEL.py -s 'skel_models_v1.1/sample_motion/01_01_poses_skel.pkl' --z_up
+```
+
 
 ## BioAmass Dataset
 
@@ -50,7 +72,7 @@ bioamass : /path/to/bioamass_v1.0
 To visualize a sequence from the BioAmass dataset, run:
 
 ```
-python load_bioamass.py
+python examples/load_bioamass.py
 ```
 
 ## Mocap data
@@ -62,7 +84,6 @@ To visualize an example mocap sequence, run:
 ```python load_markers.py```
 
  
-
 
 ## Citation
 If you use this software, please cite the following work and software:
