@@ -32,7 +32,6 @@ def load_osim(osim_path, geometry_path=C.osim_geometry):
     # Check that there is a Geometry folder at the same level as the osim file
     file_geometry_path = os.path.join(os.path.dirname(osim_path), 'Geometry')
     
-    import ipdb; ipdb.set_trace()
     if not os.path.exists(file_geometry_path):
         print(f'WARNING: No Geometry folder found at {file_geometry_path}, using {geometry_path} instead')
         # Create a copy of the osim file at the same level as the geometry folder

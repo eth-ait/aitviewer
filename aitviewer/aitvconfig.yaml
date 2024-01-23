@@ -1,5 +1,5 @@
 # Access SMPL models.
-smplx_models: "/ps/project/rib_cage_breathing/TML/Data/smplx_models"
+smplx_models: "/ps/project/delete_rib_cage_breathing/TML/Data/smplx_models"
 star_models: "../data/star_models"
 supr_models: "../data/supr_models"
 skel_models: "/is/cluster/work/mkeller2/Data/TML/Release/v1.0/skel_models_v1.1"
