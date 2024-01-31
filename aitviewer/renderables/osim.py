@@ -23,7 +23,7 @@ from aitviewer.utils import to_numpy as c2c
 import nimblephysics as nimble
 import pickle as pkl
 
-def load_osim(osim_path, geometry_path=C.osim_geometry):
+def load_osim(osim_path, geometry_path=C.osim_geometry, ignore_geometry=False):
     """Load an osim file"""
        
     assert os.path.exists(osim_path), f'Could not find osim file {osim_path}'
@@ -32,8 +32,11 @@ def load_osim(osim_path, geometry_path=C.osim_geometry):
     # Check that there is a Geometry folder at the same level as the osim file
     file_geometry_path = os.path.join(os.path.dirname(osim_path), 'Geometry')
     
-    if not os.path.exists(file_geometry_path):
-        print(f'WARNING: No Geometry folder found at {file_geometry_path}, using {geometry_path} instead')
+    if not os.path.exists(file_geometry_path) or ignore_geometry:
+        if ignore_geometry and os.path.exists(file_geometry_path):
+            print(f'WARNING: Ignoring geometry folder at {file_geometry_path}')
+        else:
+            print(f'WARNING: No Geometry folder found at {file_geometry_path}, using {geometry_path} instead')
         # Create a copy of the osim file at the same level as the geometry folder
         tmp_osim_file = os.path.join(geometry_path, '..', 'tmp.osim')
         if os.path.exists(tmp_osim_file):
@@ -350,17 +353,18 @@ class OSIMSequence(Node):
 
 
     @classmethod
-    def from_files(cls, osim_path, mot_file, start_frame=None, end_frame=None, fps_out: int=None, ignore_fps=False, **kwargs):
+    def from_files(cls, osim_path, mot_file, start_frame=None, end_frame=None, fps_out: int=None, ignore_fps=False, ignore_geometry=False,**kwargs):
         """Creates a OSIM sequence from addbiomechanics return data
         osim_path: .osim file path
         mot_file : .mot file path
         start_frame: first frame to use in the sequence
         end_frame: last frame to use in the sequence
         fps_out: frames per second of the output sequence
+        ignore_geometry : use the aitconfig.osim_geometry folder instead of the one next to the osim file
         """
 
         # Load osim file
-        osim = load_osim(osim_path)
+        osim = load_osim(osim_path, ignore_geometry=ignore_geometry)
 
         # Load the .mot file
         mot: nimble.biomechanics.OpenSimMot = nimble.biomechanics.OpenSimParser.loadMot(
@@ -376,7 +380,8 @@ class OSIMSequence(Node):
         # estimate fps_in
         ts = np.array(mot.timestamps)   
         fps_estimated = 1/np.mean(ts[1:] - ts[:-1])
-        fps_in = int(round(fps_estimated))
+        fps_in = int(round(fps_estimated)) 
+        print(f'Estimated fps for the .mot sequence: {fps_estimated}, rounded to {fps_in}')
         
         if not ignore_fps:
             assert abs(1 - fps_estimated/fps_in) < 1e-5 , f"FPS estimation might be bad, {fps_estimated} rounded to {fps_in}, check."
@@ -384,10 +389,14 @@ class OSIMSequence(Node):
             if fps_out is not None:
                 assert fps_in%fps_out == 0, 'fps_out must be a interger divisor of fps_in'
                 mask = np.arange(0, motion.shape[0], fps_in//fps_out)
+                print(f'Resampling from {fps_in} to {fps_out} fps. Keeping every {fps_in//fps_out}th frame')
                 # motion = resample_positions(motion, fps_in, fps_out) #TODO: restore this 
-                motion = motion[mask]
+                motion = motion[mask]   
+        
                 
             del mot
+        else:
+            fps_out = fps_in
 
         return cls(osim, motion, osim_path=osim_path, fps=fps_out, fps_in=fps_in, **kwargs)
 
@@ -423,9 +432,9 @@ class OSIMSequence(Node):
             assert list(self.osim.skeleton.getMarkerMapWorldPositions(self.osim.markersMap).keys()) == self.markers_labels, "Marker labels are not in the same order"
 
             for ni, node_name in enumerate(self.node_names):
-                if ('thorax' in node_name) or ('lumbar' in node_name):
-                    # We do not display the spine as the riggidly rigged mesh can't represent the constant curvature of the spine
-                    continue
+                # if ('thorax' in node_name) or ('lumbar' in node_name):
+                #     # We do not display the spine as the riggidly rigged mesh can't represent the constant curvature of the spine
+                #     continue
                 mesh = self.meshes_dict[node_name]
                 if mesh is not None:
 

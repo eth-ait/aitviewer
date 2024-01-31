@@ -17,7 +17,7 @@ from typing import Optional
 
 def display_model_in_viewer(osim: Optional[str] = None, 
                             mot: Optional[str] = None, 
-                            fps: int = 30,
+                            fps: Optional[int] = None,
                             color_parts: bool = False, color_markers: bool = False, mocap: Optional[str] = None,
                             joints: bool = False):
     """
@@ -75,8 +75,9 @@ def display_model_in_viewer(osim: Optional[str] = None,
         assert args.mocap.endswith(".c3d"), "Mocap file must be in .c3d format."
         marker_seq = Markers.from_c3d(args.mocap, fps_out=args.fps, color=[0,255,0,255])
         v.scene.add(marker_seq)
-        
-    v.playback_fps = args.fps
+    
+    if args.fps is not None:          
+        v.playback_fps = args.fps
     
     v.run_animations = True
 
@@ -89,7 +90,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--osim', type=str,  help='Path to the osim file. If no file is specified, the default Rajagopal gait model will be loaded from nimble', default=None)
     parser.add_argument('--mot', type=str,  help='Path to the motion file', default=None)
-    parser.add_argument('--fps', type =int, default=30,  help='Generating the meshes for all the frames can take a long time and a lot of memory. Use a low fps to avoid this problem.')
+    parser.add_argument('--fps', type =int, default=None,  help='Generating the meshes for all the frames can take a long time and a lot of memory. Use a low fps to avoid this problem.')
     
     parser.add_argument('--color_parts', action='store_true',  help='Color the skeleton by parts, as defined in the .osim file.')
     parser.add_argument('--color_markers', action='store_true',  help='Each marker is attached to a skeleton part. This option colors the markers to match the parent part color.')
