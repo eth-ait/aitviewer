@@ -9,7 +9,7 @@ For more info on SKEL, BSM and BioaAmass, check our [project page](https://skel.
 aitviewer is a set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS. See the official page at [https://eth-ait.github.io/aitviewer](https://eth-ait.github.io/aitviewer/) for all the details.
 
 ![aitviewer skel gif](assets/skel_sequence.gif)
-⇧ *aitviewer-Skel enables isualization of motion sequences of the SKEL model.*
+⇧ *aitviewer-Skel enables visualization of motion sequences of the SKEL model.*
 
 
 ## Installation
