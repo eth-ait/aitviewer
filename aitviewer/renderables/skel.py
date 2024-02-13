@@ -66,8 +66,8 @@ class SKELSequence(Node):
                  post_fk_func=None,
                  skin_color = (200 / 255, 160 / 255, 160 / 255, 125/255),
                  skel_color = (160 / 255, 160 / 255, 160 / 255, 255/255),
-                 skinning_weights_color = False,
-                 skin_coloring = None, # "pose_offsets"
+                 skin_coloring = None, # "pose_offsets", "skinning_weights"
+                 skel_coloring = None, # "skinning_weights", "bone_label"
                  **kwargs):
         """
         Initializer.
@@ -92,7 +92,8 @@ class SKELSequence(Node):
           Shapes are:
             if current_frame_only is False: vertices (F, V, 3) and joints (F, N_JOINTS, 3)
             if current_frame_only is True:  vertices (1, V, 3) and joints (1, N_JOINTS, 3)
-        :param skin_coloring: Coloring model of SKEL. Must be in ['pose_offsets', 'skin_weights'].
+        :param skin_coloring: Coloring the skin mesh of SKEL per vertex. Must be in ['skinning_weights', 'pose_offsets'].
+        :param skel_coloring: Coloring the bones mesh of SKEL per vertex. Must be in ['skinning_weights', 'bone_label'].
         :param kwargs: Remaining arguments for rendering.
         """
         assert len(poses_body.shape) == 2
@@ -159,8 +160,9 @@ class SKELSequence(Node):
             kwargs = self._render_kwargs.copy()
             color = (1.0, 177 / 255, 1 / 255, 1.0)
             
-            self.skeleton_seq = Skeletons(self.joints, self.skeleton, color=color, name='Kin tree')
-
+            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_affine=False, color=color, name='Kin tree')
+            # self.skeleton_seq.position = self.position
+            # self.skeleton_seq.rotation = self.rotation
             self._add_node(self.skeleton_seq)
 
             global_oris = self.joints_ori
@@ -174,31 +176,42 @@ class SKELSequence(Node):
             self._add_node(self.rbs, enabled=self._show_joint_angles)
 
 
-
+        # Instantiate the Skin submesh with proper colouring
         kwargs = self._render_kwargs.copy()
-        kwargs['name'] = 'Skin'
-        if skinning_weights_color == True:
+        mesh_name = 'Skin'
+        skin_colors = None
+        if skin_coloring == 'skinning_weights':
             skin_colors = skining_weights_to_color(skel_layer.weights.cpu().numpy(), alpha = skin_color[-1]) 
-            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, is_selectable=False, vertex_colors=skin_colors , **kwargs)
         elif skin_coloring == 'pose_offsets':
             values = self.skel_output.pose_offsets.cpu().numpy()
             skin_colors = values/np.max(np.abs(values))
             #append an alpha channel
-            # import ipdb; ipdb.set_trace()
-            # current_alpha_value = skin_color[-1]
             skin_colors = np.concatenate([skin_colors, np.ones([skin_colors.shape[0], skin_colors.shape[1], 1])], axis=-1)
-            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, is_selectable=False, vertex_colors=skin_colors , **kwargs)
+            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, gui_affine=False, is_selectable=False, vertex_colors=skin_colors)
+
+        if skin_colors is None:    
+            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, gui_affine=False, is_selectable=False, color=skin_color, name=mesh_name)
         else:
-            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, is_selectable=False, color=skin_color , **kwargs)
-        # self.skin_mesh_seq.position = self.position
-        # self.skin_mesh_seq.rotation = self.rotation
+            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, gui_affine=False, is_selectable=False, vertex_colors=skin_colors, name=mesh_name)
+            
         self._add_node(self.skin_mesh_seq)
         
-        kwargs = self._render_kwargs.copy()
-        kwargs['name'] = 'Bones'
-        self.bones_mesh_seq = Meshes(self.skel_vertices, self.skel_faces, is_selectable=False, color=skel_color, **kwargs)
-        # self.bones_mesh_seq.position = self.position
-        # self.bones_mesh_seq.rotation = self.rotation
+        # Instantiate the Bones submesh with proper colouring
+        mesh_name = 'Bones'
+        skel_colors=None
+        if skel_coloring == 'skinning_weights':
+            skel_colors = skining_weights_to_color(skel_layer.skel_weights.cpu().numpy(), alpha = 255) 
+        elif skel_coloring == 'bone_label':
+            skel_colors = skining_weights_to_color(skel_layer.skel_weights_rigid.cpu().numpy(), alpha = 255) 
+            
+        if skel_colors is None:  
+            self.bones_mesh_seq = Meshes(self.skel_vertices, self.skel_faces, gui_affine=False, is_selectable=False, color=skel_color, name=mesh_name)
+        else:
+            draw_bones_outline = False
+            if skin_coloring == 'skinning_weights' and (skel_coloring == 'skinning_weights' or skel_coloring == 'bone_label'):
+                draw_bones_outline = True # For better visibility of the bones 
+            self.bones_mesh_seq = Meshes(self.skel_vertices, self.skel_faces, gui_affine=False, is_selectable=False, vertex_colors=skel_colors, name=mesh_name, draw_outline=draw_bones_outline)
+
         self._add_node(self.bones_mesh_seq)
 
         # Save view mode state to restore when exiting edit mode.
