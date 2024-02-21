@@ -239,12 +239,32 @@ class SKELSequence(Node):
         return np.matmul(self.skel_vertices, self.rotation.T) + self.position
     
     @classmethod
-    def from_pkl(cls, skel_seq_pkl, fps_in, start_frame=None, end_frame=None, log=True, fps_out=None, z_up=False, 
+    def from_file(cls, skel_seq_file, fps_in, start_frame=None, end_frame=None, log=True, fps_out=None, z_up=False, 
                    device=C.device, poses_type='skel', **kwargs):    
         """Load a SKEL sequence from a pkl."""
         
-        assert skel_seq_pkl.endswith('.pkl'), f"skel_seq_pkl must be a pkl file, got {skel_seq_pkl}"
-        skel_data = pkl.load(open(skel_seq_pkl, 'rb'))    
+        if skel_seq_file.endswith('.pkl'):
+            skel_data = pkl.load(open(skel_seq_file, 'rb'))  
+        elif skel_seq_file.endswith('.npz'):
+            # Compatibility with PS fitting pipeline
+            skel_data = np.load(skel_seq_file)
+            skel_data = {key: skel_data[key] for key in skel_data.files}
+            if 'poses' not in skel_data and 'pose' in skel_data and 'global_orient' in skel_data:
+                skel_data['poses'] = np.concatenate([skel_data['global_orient'], skel_data['pose'],], axis=1)
+            if 'trans' not in skel_data and 'transl' in skel_data:
+                skel_data['trans'] = skel_data['transl']
+                del skel_data['transl']
+            if 'gender' not in skel_data:
+                print('Warning: no gender found in the npz file, assuming female.')
+                skel_data['gender'] = 'female'
+            if skel_data['betas'].shape[0] == 1:
+                skel_data['betas'] = skel_data['betas'].repeat(skel_data['poses'].shape[0], axis=0)        
+        
+            import ipdb; ipdb.set_trace()
+                
+        else:
+            raise ValueError(f"skel_seq_file must be a pkl or npz file, got {skel_seq_file}")
+        
         
         for key in ['poses', 'trans', 'betas', 'gender']:
             assert key in skel_data, f"The loaded skel sequence dictionary must contain {key}. Loaded dictionary has keys: {skel_data.keys()}"
