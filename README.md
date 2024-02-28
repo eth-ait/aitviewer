@@ -55,7 +55,8 @@ if __name__ == '__main__':
 
 ## Projects using the aitviewer
 A sampling of projects using the aitviewer. Let us know if you want to be added to this list!
-- Zhang et al., [ArtiGrasp: Physically Plausible Synthesis of Bi-Manual Dexterous Grasping and Articulation](https://eth-ait.github.io/artigrasp/), 3DV 2024
+- Braun et al., [Physically Plausible Full-Body Hand-Object Interaction Synthesis](https://eth-ait.github.io/phys-fullbody-grasp/), 3DV 2024
+- Zhang and Christen et al., [ArtiGrasp: Physically Plausible Synthesis of Bi-Manual Dexterous Grasping and Articulation](https://eth-ait.github.io/artigrasp/), 3DV 2024
 - Kaufmann et al., [EMDB: The Electromagnetic Database of Global 3D Human Pose and Shape in the Wild](https://ait.ethz.ch/emdb), ICCV 2023
 - Shen and Guo et al., [X-Avatar: Expressive Human Avatars](https://skype-line.github.io/projects/X-Avatar/), CVPR 2023
 - Sun et al., [TRACE: 5D Temporal Regression of Avatars with Dynamic Cameras in 3D Environments](https://www.yusun.work/TRACE/TRACE.html), CVPR 2023
