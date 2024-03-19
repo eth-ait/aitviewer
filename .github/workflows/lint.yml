@@ -8,6 +8,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: psf/black@stable
+        with:
+          black-version: 23.3.0
   isort:
     runs-on: ubuntu-latest
     steps:
