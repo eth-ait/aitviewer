@@ -376,6 +376,15 @@ class Scene(Node):
                     imgui.spacing()
                     imgui.spacing()
 
+            imgui.spacing()
+            imgui.spacing()
+            imgui.spacing()
+            imgui.same_line(spacing=8)
+            imgui.begin_group()
+            if imgui.collapsing_header("Stats")[0]:
+                s.gui_stats(imgui)
+            imgui.end_group()
+
     def gui(self, imgui):
         imgui.text(f"FPS: {self.fps:.1f}")
         # Background color

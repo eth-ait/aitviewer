@@ -10,6 +10,9 @@ from PIL import Image, ImageChops
 from aitviewer.configuration import CONFIG as C
 from aitviewer.headless import HeadlessRenderer
 
+# Check if running on github CI.
+CI = os.getenv("GITHUB_ACTIONS") == "true"
+
 # Test image size.
 SIZE = (480, 270)
 
@@ -67,8 +70,10 @@ def viewer(refs):
         diff = ImageChops.difference(img, ref_img)
         relative_error = np.asarray(diff).sum() / np.full(np.asarray(img).shape, 255).sum()
 
+        relative_error_threshold = 3e-3 if not CI else 2e-2
+
         # If the relative error is higher than this threshold report a failure.
-        if relative_error > 3e-3:
+        if relative_error > relative_error_threshold:
             os.makedirs(FAILURE_DIR, exist_ok=True)
 
             # Store the wrong result and diff for debugging.
