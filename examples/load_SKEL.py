@@ -45,7 +45,6 @@ if __name__ == "__main__":
 
         skel_seq = SKELSequence(skel_layer=skel_model, betas=betas, poses_body=pose, poses_type='skel', 
                                 trans=trans, is_rigged=True, show_joint_angles=True, name='SKEL', z_up=False,
-                                skinning_weights_color=False,
                                 )
         cam_pose = None
         
