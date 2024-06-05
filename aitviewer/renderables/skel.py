@@ -610,7 +610,7 @@ class SKELSequence(Node):
             self.export_to_npz(path)
             print(f'Exported SMPL sequence to "{path}"')
 
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         if self.edit_mode and self._edit_joint is not None:
             self._gui_joint(imgui, self._edit_joint)
         else:
@@ -624,7 +624,7 @@ class SKELSequence(Node):
             imgui.spacing()
             imgui.separator()
             imgui.spacing()
-            super().gui_context_menu(imgui)
+            super().gui_context_menu(imgui, x, y)
                 
     def on_selection(self, node, instance_id, tri_id):
         if self.edit_mode:
