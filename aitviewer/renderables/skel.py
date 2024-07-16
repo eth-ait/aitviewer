@@ -612,14 +612,38 @@ class SKELSequence(Node):
             imgui.text(f"{j} - {name}")
 
         if e:
-            aa = self._edit_pose[j * 3 : (j + 1) * 3]
-            euler = aa2euler_numpy(aa.cpu().numpy(), degrees=True)
-            u, euler = imgui.drag_float3(f"##joint{j}", *euler, 0.1, format="%.2f")
-            if u:
-                aa = euler2aa_numpy(np.array(euler), degrees=True)
-                self._edit_pose[j * 3 : (j + 1) * 3] = torch.from_numpy(aa)
-                self._edit_pose_dirty = True
-                self.redraw(current_frame_only=True)
+            start_param = [
+                0,3,6,7,8,9,10,13,14,15,16,17,20,23,26,29,32,33,34,36,39,42,43,44,46
+            ]
+            aa = self._edit_pose[start_param[j]: start_param[j+1]]
+            if len(aa) == 1:
+                angle = np.degrees(aa.cpu().numpy())
+                u, angle = imgui.drag_float(f'##joint{j}', angle, 0.1, format='%.2f')
+                if u:
+                    aa = np.array(np.radians(angle))
+                    self._edit_pose[start_param[j]: start_param[j + 1]] = torch.from_numpy(aa)
+                    self._edit_pose_dirty = True
+                    self.redraw(current_frame_only=True)
+            elif len(aa) == 2:
+                angles = np.degrees(aa.cpu().numpy())
+                u, angles = imgui.drag_float2(f'##joint{j}', *angles, 0.1, format='%.2f')
+                if u:
+                    aa = np.radians(np.array(angles))
+                    self._edit_pose[start_param[j]: start_param[j + 1]] = torch.from_numpy(aa)
+                    self._edit_pose_dirty = True
+                    self.redraw(current_frame_only=True)
+            elif len(aa) == 3:
+                euler = aa2euler_numpy(aa.cpu().numpy(), degrees=True)
+                u, euler = imgui.drag_float3(f'##joint{j}', *euler, 0.1, format='%.2f')
+                if u:
+                    aa = euler2aa_numpy(np.array(euler), degrees=True)
+                    self._edit_pose[start_param[j]: start_param[j + 1]] = torch.from_numpy(aa)
+                    self._edit_pose_dirty = True
+                    self.redraw(current_frame_only=True)
+            if tree:
+                for c in tree.get(j, []):
+                    self._gui_joint(imgui, c, tree)
+                imgui.tree_pop()
             if tree:
                 for c in tree.get(j, []):
                     self._gui_joint(imgui, c, tree)
@@ -673,7 +697,7 @@ class SKELSequence(Node):
             self.export_to_npz(path)
             print(f'Exported SMPL sequence to "{path}"')
 
-    def gui_context_menu(self, imgui):
+    def gui_context_menu(self, imgui, x: int, y: int):
         if self.edit_mode and self._edit_joint is not None:
             self._gui_joint(imgui, self._edit_joint)
         else:
@@ -687,7 +711,8 @@ class SKELSequence(Node):
             imgui.spacing()
             imgui.separator()
             imgui.spacing()
-            super().gui_context_menu(imgui)
+
+            super().gui_context_menu(imgui, x, y)             
 
     def on_selection(self, node, instance_id, tri_id):
         if self.edit_mode:

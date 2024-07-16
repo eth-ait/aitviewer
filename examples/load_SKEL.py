@@ -57,6 +57,7 @@ if __name__ == "__main__":
             z_up=False,
             skinning_weights_color=False,
         )
+
         cam_pose = None
 
     else:
