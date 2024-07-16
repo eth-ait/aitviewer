@@ -8,6 +8,7 @@ See https://skel.is.tue.mpg.de/license.html for licensing and contact informatio
 """
 
 import os
+
 import numpy as np
 
 from aitviewer.configuration import CONFIG as C

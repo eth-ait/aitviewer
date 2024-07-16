@@ -7,34 +7,37 @@ Author: Marilyn Keller
 See https://skel.is.tue.mpg.de/license.html for licensing and contact information.
 """
 
-import numpy as np
+import os
 import pickle as pkl
+
+import numpy as np
 import torch
 import tqdm
 import trimesh
-import os
+from scipy.spatial.transform import Rotation
 
 from aitviewer.configuration import CONFIG as C
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.renderables.meshes import Meshes
-from aitviewer.renderables.skeletons import Skeletons
 from aitviewer.renderables.rigid_bodies import RigidBodies
+from aitviewer.renderables.skeletons import Skeletons
 from aitviewer.scene.node import Node
-from aitviewer.utils.decorators import hooked
-from aitviewer.utils.so3 import aa2euler_numpy, aa2rot_torch as aa2rot, euler2aa_numpy
-from aitviewer.utils.so3 import rot2aa_torch as rot2aa
-from aitviewer.utils.so3 import interpolate_rotations
-from aitviewer.utils.so3 import resample_rotations
-from aitviewer.utils import resample_positions
-from aitviewer.utils import to_torch
-from aitviewer.utils import local_to_global
-from aitviewer.utils import interpolate_positions
+from aitviewer.utils import interpolate_positions, local_to_global, resample_positions
 from aitviewer.utils import to_numpy as c2c
-from scipy.spatial.transform import Rotation
+from aitviewer.utils import to_torch
+from aitviewer.utils.decorators import hooked
+from aitviewer.utils.so3 import aa2euler_numpy
+from aitviewer.utils.so3 import aa2rot_torch as aa2rot
+from aitviewer.utils.so3 import (
+    euler2aa_numpy,
+    interpolate_rotations,
+    resample_rotations,
+)
+from aitviewer.utils.so3 import rot2aa_torch as rot2aa
 
 try:
-    from skel.skel_model import SKEL
     from skel.kin_skel import skel_joints_name
+    from skel.skel_model import SKEL
 except ImportError as e:
     raise ImportError(f"Could not import SKEL. Please install it from https://github.com/MarilynKeller/skel.git")
 

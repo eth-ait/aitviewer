@@ -8,20 +8,22 @@ See https://skel.is.tue.mpg.de/license.html for licensing and contact informatio
 """
 
 import os
+import pickle as pkl
 import shutil
+
+import nimblephysics as nimble
 import numpy as np
 import tqdm
 import trimesh
+
 from aitviewer.configuration import CONFIG as C
+from aitviewer.renderables.markers import Markers
 from aitviewer.renderables.meshes import Meshes
 from aitviewer.renderables.rigid_bodies import RigidBodies
-from aitviewer.renderables.markers import Markers
 from aitviewer.scene.node import Node
-from aitviewer.utils.colors import vertex_colors_from_weights
 from aitviewer.utils import to_numpy as c2c
+from aitviewer.utils.colors import vertex_colors_from_weights
 
-import nimblephysics as nimble
-import pickle as pkl
 
 def load_osim(osim_path, geometry_path=C.osim_geometry, ignore_geometry=False):
     """Load an osim file"""

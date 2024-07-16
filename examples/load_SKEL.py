@@ -11,9 +11,10 @@ import os
 
 import numpy as np
 import torch
-from aitviewer.viewer import Viewer
-from aitviewer.renderables.skel import SKELSequence
+
 from aitviewer.configuration import CONFIG as C
+from aitviewer.renderables.skel import SKELSequence
+from aitviewer.viewer import Viewer
 
 try:
     from skel.skel_model import SKEL

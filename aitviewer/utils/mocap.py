@@ -3,6 +3,7 @@
 
 import nimblephysics as nimble
 
+
 def clean_CMU_mocap_labels(c3dFile: nimble.biomechanics.C3D):
     "Rename all the labels with the pattern AAAA-XX and replace them by AAAA"
 

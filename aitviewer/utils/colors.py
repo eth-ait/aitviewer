@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 
-            
+
 def skining_weights_to_color(skinning_weights, alpha):
     """ Given a skinning weight matrix NvxNj, return a color matrix of shape Nv*3. For each joint Ji i in [0, Nj] , 
     the color is colors[i]"""

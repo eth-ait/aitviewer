@@ -3,15 +3,16 @@
 # Marilyn Keller, marilyn.keller@tuebingen.mpg.de
 # Do not share or distribute without permission of the author
 
-import numpy as np
 import os
 import pickle as pkl
 
+import nimblephysics as nimble
+import numpy as np
 import tqdm
+
+from aitviewer.renderables.point_clouds import PointClouds
 from aitviewer.renderables.spheres import Spheres
 from aitviewer.scene.node import Node
-import nimblephysics as nimble
-from aitviewer.renderables.point_clouds import PointClouds
 from aitviewer.utils import mocap
 from aitviewer.utils.mocap import clean_CMU_mocap_labels
 

@@ -1,15 +1,14 @@
 """Visualize amass with mocap markers"""
 
-import numpy as np
 import os
 
-from aitviewer.renderables.point_clouds import PointClouds
-from aitviewer.viewer import Viewer
+import numpy as np
+
 from aitviewer.configuration import CONFIG as C
-
-from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.renderables.markers import Markers
-
+from aitviewer.renderables.point_clouds import PointClouds
+from aitviewer.renderables.smpl import SMPLSequence
+from aitviewer.viewer import Viewer
 
 if __name__ == '__main__':
 

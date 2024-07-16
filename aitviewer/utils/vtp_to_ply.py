@@ -2,7 +2,9 @@
 # Do not share or distribute without permission of the author
 import argparse
 import os
-import pyvista # required as q .vtp reader
+
+import pyvista  # required as q .vtp reader
+
 
 def convert_meshes(src_folder, dst_folder):
 

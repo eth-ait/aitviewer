@@ -3,16 +3,16 @@
 # Do not share or distribute without permission of the author
 
 import argparse
-import numpy as np
 import os
-from aitviewer.renderables.markers import Markers
+from typing import Optional
 
+import numpy as np
+
+from aitviewer.configuration import CONFIG as C
+from aitviewer.renderables.markers import Markers
 from aitviewer.renderables.osim import OSIMSequence
 from aitviewer.utils.vtp_to_ply import convert_meshes
 from aitviewer.viewer import Viewer
-from aitviewer.configuration import CONFIG as C
-
-from typing import Optional
 
 
 def display_model_in_viewer(osim: Optional[str] = None, 
