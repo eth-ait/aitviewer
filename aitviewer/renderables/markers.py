@@ -4,8 +4,6 @@
 
 import os
 import pickle as pkl
-
-import nimblephysics as nimble
 import numpy as np
 import tqdm
 
@@ -104,11 +102,18 @@ class Markers(Node):
 
         # Load the marker trajectories
         try:
+            import nimblephysics as nimble
+        except:
+            raise ImportError("Please install nimblephysics to load c3d files")
+        
+        try:
             c3dFile: nimble.biomechanics.C3D = nimble.biomechanics.C3DLoader.loadC3D(c3d_path)
         except Exception as e:
             print(f"Error loading c3d file {c3d_path}: {e}")
             raise e
+        
         c3dFile = clean_CMU_mocap_labels(c3dFile)
+
 
         # This c3dFile.markerTimesteps is cryptonite, it keeps doing weird stuff (aka changing values, or you can not edit it),
         # it behaves normaly if you make a copy

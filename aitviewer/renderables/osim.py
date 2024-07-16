@@ -11,7 +11,6 @@ import os
 import pickle as pkl
 import shutil
 
-import nimblephysics as nimble
 import numpy as np
 import tqdm
 import trimesh
@@ -24,6 +23,10 @@ from aitviewer.scene.node import Node
 from aitviewer.utils import to_numpy as c2c
 from aitviewer.utils.colors import vertex_colors_from_weights
 
+try:
+    import nimblephysics as nimble
+except ImportError:
+    raise ImportError("nimblephysics not found. Please install nimblephysics to use this module.")
 
 def load_osim(osim_path, geometry_path=C.osim_geometry, ignore_geometry=False):
     """Load an osim file"""

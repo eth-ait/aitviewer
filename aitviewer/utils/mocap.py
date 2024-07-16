@@ -1,8 +1,9 @@
 # Code Developed by Marilyn Keller, marilyn.keller@tuebingen.mpg.de
 # Do not share or distribute without permission of the author
-
-import nimblephysics as nimble
-
+try:
+    import nimblephysics as nimble
+except ImportError:
+    print("nimblephysics not found. Please install nimblephysics to use this module.")
 
 def clean_CMU_mocap_labels(c3dFile: nimble.biomechanics.C3D):
     "Rename all the labels with the pattern AAAA-XX and replace them by AAAA"
