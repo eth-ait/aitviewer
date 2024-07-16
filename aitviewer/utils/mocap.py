@@ -14,13 +14,12 @@ def clean_CMU_mocap_labels(c3dFile: nimble.biomechanics.C3D):
     for markers_dict in markerTimesteps:
         markers_dict_clean = markers_dict.copy()
         for key in markers_dict:
-            if '-' in key:
-                key_clean = key.split('-')[0]
+            if "-" in key:
+                key_clean = key.split("-")[0]
                 markers_dict_clean[key_clean] = markers_dict_clean.pop(key)
         markers_dict.clear()
         markers_dict.update(markers_dict_clean)
 
     c3dFile.markerTimesteps = markerTimesteps
-
 
     return c3dFile

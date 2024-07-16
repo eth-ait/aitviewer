@@ -49,29 +49,31 @@ class SKELSequence(Node):
     Represents a temporal sequence of SMPL poses. Can be loaded from disk or initialized from memory.
     """
 
-    def __init__(self,
-                 poses_body,
-                 skel_layer,
-                 poses_type='skel',
-                 betas=None,
-                 trans=None,
-                 device=C.device,
-                 dtype=C.f_precision,
-                 include_root=True,
-                 normalize_root=False,
-                 is_rigged=False,
-                 show_joint_angles=False,
-                 z_up=False,
-                 fps=None,
-                 fps_in = None,
-                 show_joint_arrows = True,
-                 visual = True,
-                 post_fk_func=None,
-                 skin_color = (200 / 255, 160 / 255, 160 / 255, 125/255),
-                 skel_color = (160 / 255, 160 / 255, 160 / 255, 255/255),
-                 skin_coloring = None, # "pose_offsets", "skinning_weights"
-                 skel_coloring = None, # "skinning_weights", "bone_label"
-                 **kwargs):
+    def __init__(
+        self,
+        poses_body,
+        skel_layer,
+        poses_type="skel",
+        betas=None,
+        trans=None,
+        device=C.device,
+        dtype=C.f_precision,
+        include_root=True,
+        normalize_root=False,
+        is_rigged=False,
+        show_joint_angles=False,
+        z_up=False,
+        fps=None,
+        fps_in=None,
+        show_joint_arrows=True,
+        visual=True,
+        post_fk_func=None,
+        skin_color=(200 / 255, 160 / 255, 160 / 255, 125 / 255),
+        skel_color=(160 / 255, 160 / 255, 160 / 255, 255 / 255),
+        skin_coloring=None,  # "pose_offsets", "skinning_weights"
+        skel_coloring=None,  # "skinning_weights", "bone_label"
+        **kwargs,
+    ):
         """
         Initializer.
         :param poses_body: An array (numpy ar pytorch) of shape (F, 46) containing the pose parameters of the
@@ -100,14 +102,14 @@ class SKELSequence(Node):
         :param kwargs: Remaining arguments for rendering.
         """
         assert len(poses_body.shape) == 2
-              
+
         super(SKELSequence, self).__init__(n_frames=poses_body.shape[0], **kwargs)
         self.skel_layer = skel_layer
         self.post_fk_func = post_fk_func
 
         self.device = device
-        self.fps = fps #fps of this loaded sequence
-        self.fps_in = fps_in #original fps of the sequence
+        self.fps = fps  # fps of this loaded sequence
+        self.fps_in = fps_in  # original fps of the sequence
 
         self.poses_body = to_torch(poses_body, dtype=dtype, device=device)
         self.poses_type = poses_type
@@ -132,7 +134,7 @@ class SKELSequence(Node):
             self.trans = torch.zeros_like(self.trans)
 
         # Edit mode
-        self.gui_modes.update({'edit': {'title': ' Edit', 'fn': self.gui_mode_edit, 'icon': '\u0081'}})
+        self.gui_modes.update({"edit": {"title": " Edit", "fn": self.gui_mode_edit, "icon": "\u0081"}})
 
         self._edit_joint = None
         self._edit_pose = None
@@ -140,20 +142,20 @@ class SKELSequence(Node):
 
         # Nodes
         skel_output = self.fk()
-        
+
         self.skin_vertices = skel_output.skin_verts
         self.skel_vertices = skel_output.skel_verts
         self.skin_faces = skel_output.skin_f
         self.skel_faces = skel_output.skel_f
         self.joints = skel_output.joints
-        self.joints_ori = skel_output.joints_ori 
+        self.joints_ori = skel_output.joints_ori
         self.skeleton = skel_output.skeleton
-        
+
         self.skel_output = skel_output
-        
+
         if self._z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
-            
+
         if visual == False:
             return
 
@@ -162,58 +164,94 @@ class SKELSequence(Node):
             # Overriding given color with a custom color for the skeleton.
             kwargs = self._render_kwargs.copy()
             color = (1.0, 177 / 255, 1 / 255, 1.0)
-            
-            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_affine=False, color=color, name='Kin tree')
+
+            self.skeleton_seq = Skeletons(self.joints, self.skeleton, gui_affine=False, color=color, name="Kin tree")
             # self.skeleton_seq.position = self.position
             # self.skeleton_seq.rotation = self.rotation
             self._add_node(self.skeleton_seq)
 
             global_oris = self.joints_ori
-                
+
             if show_joint_arrows is False:
                 arrow_length = 0
             else:
                 arrow_length = 0.1
 
-            self.rbs = RigidBodies(self.joints, global_oris, length=arrow_length, name='Joint Angles', color=(1.0, 177 / 255, 1 / 255, 1.0))
+            self.rbs = RigidBodies(
+                self.joints, global_oris, length=arrow_length, name="Joint Angles", color=(1.0, 177 / 255, 1 / 255, 1.0)
+            )
             self._add_node(self.rbs, enabled=self._show_joint_angles)
-
 
         # Instantiate the Skin submesh with proper colouring
         kwargs = self._render_kwargs.copy()
-        mesh_name = 'Skin'
+        mesh_name = "Skin"
         skin_colors = None
-        if skin_coloring == 'skinning_weights':
-            skin_colors = skining_weights_to_color(skel_layer.weights.cpu().numpy(), alpha = skin_color[-1]) 
-        elif skin_coloring == 'pose_offsets':
+        if skin_coloring == "skinning_weights":
+            skin_colors = skining_weights_to_color(skel_layer.weights.cpu().numpy(), alpha=skin_color[-1])
+        elif skin_coloring == "pose_offsets":
             values = self.skel_output.pose_offsets.cpu().numpy()
-            skin_colors = values/np.max(np.abs(values))
-            #append an alpha channel
-            skin_colors = np.concatenate([skin_colors, np.ones([skin_colors.shape[0], skin_colors.shape[1], 1])], axis=-1)
-            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, gui_affine=False, is_selectable=False, vertex_colors=skin_colors)
+            skin_colors = values / np.max(np.abs(values))
+            # append an alpha channel
+            skin_colors = np.concatenate(
+                [skin_colors, np.ones([skin_colors.shape[0], skin_colors.shape[1], 1])], axis=-1
+            )
+            self.skin_mesh_seq = Meshes(
+                self.skin_vertices, self.skin_faces, gui_affine=False, is_selectable=False, vertex_colors=skin_colors
+            )
 
-        if skin_colors is None:    
-            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, gui_affine=False, is_selectable=False, color=skin_color, name=mesh_name)
+        if skin_colors is None:
+            self.skin_mesh_seq = Meshes(
+                self.skin_vertices,
+                self.skin_faces,
+                gui_affine=False,
+                is_selectable=False,
+                color=skin_color,
+                name=mesh_name,
+            )
         else:
-            self.skin_mesh_seq = Meshes(self.skin_vertices, self.skin_faces, gui_affine=False, is_selectable=False, vertex_colors=skin_colors, name=mesh_name)
-            
+            self.skin_mesh_seq = Meshes(
+                self.skin_vertices,
+                self.skin_faces,
+                gui_affine=False,
+                is_selectable=False,
+                vertex_colors=skin_colors,
+                name=mesh_name,
+            )
+
         self._add_node(self.skin_mesh_seq)
-        
+
         # Instantiate the Bones submesh with proper colouring
-        mesh_name = 'Bones'
-        skel_colors=None
-        if skel_coloring == 'skinning_weights':
-            skel_colors = skining_weights_to_color(skel_layer.skel_weights.cpu().numpy(), alpha = 255) 
-        elif skel_coloring == 'bone_label':
-            skel_colors = skining_weights_to_color(skel_layer.skel_weights_rigid.cpu().numpy(), alpha = 255) 
-            
-        if skel_colors is None:  
-            self.bones_mesh_seq = Meshes(self.skel_vertices, self.skel_faces, gui_affine=False, is_selectable=False, color=skel_color, name=mesh_name)
+        mesh_name = "Bones"
+        skel_colors = None
+        if skel_coloring == "skinning_weights":
+            skel_colors = skining_weights_to_color(skel_layer.skel_weights.cpu().numpy(), alpha=255)
+        elif skel_coloring == "bone_label":
+            skel_colors = skining_weights_to_color(skel_layer.skel_weights_rigid.cpu().numpy(), alpha=255)
+
+        if skel_colors is None:
+            self.bones_mesh_seq = Meshes(
+                self.skel_vertices,
+                self.skel_faces,
+                gui_affine=False,
+                is_selectable=False,
+                color=skel_color,
+                name=mesh_name,
+            )
         else:
             draw_bones_outline = False
-            if skin_coloring == 'skinning_weights' and (skel_coloring == 'skinning_weights' or skel_coloring == 'bone_label'):
-                draw_bones_outline = True # For better visibility of the bones 
-            self.bones_mesh_seq = Meshes(self.skel_vertices, self.skel_faces, gui_affine=False, is_selectable=False, vertex_colors=skel_colors, name=mesh_name, draw_outline=draw_bones_outline)
+            if skin_coloring == "skinning_weights" and (
+                skel_coloring == "skinning_weights" or skel_coloring == "bone_label"
+            ):
+                draw_bones_outline = True  # For better visibility of the bones
+            self.bones_mesh_seq = Meshes(
+                self.skel_vertices,
+                self.skel_faces,
+                gui_affine=False,
+                is_selectable=False,
+                vertex_colors=skel_colors,
+                name=mesh_name,
+                draw_outline=draw_bones_outline,
+            )
 
         self._add_node(self.bones_mesh_seq)
 
@@ -221,102 +259,128 @@ class SKELSequence(Node):
         self._skin_view_mode_color = self.skin_mesh_seq.color
         self._skel_view_mode_color = self.bones_mesh_seq.color
         self._view_mode_joint_angles = self._show_joint_angles
-        
-        
-        
+
     def get_rotated_global_joint(self):
-        rot_smpl_joints = np.matmul(self.joints, self.rotation.T) 
-        
+        rot_smpl_joints = np.matmul(self.joints, self.rotation.T)
+
         rot_joints_ori = np.zeros_like(self.joints_ori)
         for joint_idx in range(self.joints_ori.shape[1]):
-            rot_joints_ori[:,joint_idx,:,:] = np.matmul( self.rotation, self.joints_ori[:,joint_idx,:,:])    
-        
-        return rot_smpl_joints, rot_joints_ori     
-        
+            rot_joints_ori[:, joint_idx, :, :] = np.matmul(self.rotation, self.joints_ori[:, joint_idx, :, :])
+
+        return rot_smpl_joints, rot_joints_ori
+
     @property
     def rotated_vertices(self):
         return np.matmul(self.vertices, self.rotation.T) + self.position
-    
+
     @property
     def rotated_skel_vertices(self):
         return np.matmul(self.skel_vertices, self.rotation.T) + self.position
-    
+
     @classmethod
-    def from_file(cls, skel_seq_file, fps_in, start_frame=None, end_frame=None, log=True, fps_out=None, z_up=False, 
-                   device=C.device, poses_type='skel', **kwargs):    
+    def from_file(
+        cls,
+        skel_seq_file,
+        fps_in,
+        start_frame=None,
+        end_frame=None,
+        log=True,
+        fps_out=None,
+        z_up=False,
+        device=C.device,
+        poses_type="skel",
+        **kwargs,
+    ):
         """Load a SKEL sequence from a pkl."""
-        
-        if skel_seq_file.endswith('.pkl'):
-            skel_data = pkl.load(open(skel_seq_file, 'rb'))  
-        elif skel_seq_file.endswith('.npz'):
+
+        if skel_seq_file.endswith(".pkl"):
+            skel_data = pkl.load(open(skel_seq_file, "rb"))
+        elif skel_seq_file.endswith(".npz"):
             # Compatibility with PS fitting pipeline
             skel_data = np.load(skel_seq_file)
             skel_data = {key: skel_data[key] for key in skel_data.files}
-            if 'poses' not in skel_data and 'pose' in skel_data and 'global_orient' in skel_data:
-                skel_data['poses'] = np.concatenate([skel_data['global_orient'], skel_data['pose'],], axis=1)
-            if 'trans' not in skel_data and 'transl' in skel_data:
-                skel_data['trans'] = skel_data['transl']
-                del skel_data['transl']
-            if 'gender' not in skel_data:
-                print('Warning: no gender found in the npz file, assuming female.')
-                skel_data['gender'] = 'female'
-            if skel_data['betas'].shape[0] == 1:
-                skel_data['betas'] = skel_data['betas'].repeat(skel_data['poses'].shape[0], axis=0)        
-        
-            import ipdb; ipdb.set_trace()
-                
+            if "poses" not in skel_data and "pose" in skel_data and "global_orient" in skel_data:
+                skel_data["poses"] = np.concatenate(
+                    [
+                        skel_data["global_orient"],
+                        skel_data["pose"],
+                    ],
+                    axis=1,
+                )
+            if "trans" not in skel_data and "transl" in skel_data:
+                skel_data["trans"] = skel_data["transl"]
+                del skel_data["transl"]
+            if "gender" not in skel_data:
+                print("Warning: no gender found in the npz file, assuming female.")
+                skel_data["gender"] = "female"
+            if skel_data["betas"].shape[0] == 1:
+                skel_data["betas"] = skel_data["betas"].repeat(skel_data["poses"].shape[0], axis=0)
+
+            import ipdb
+
+            ipdb.set_trace()
+
         else:
             raise ValueError(f"skel_seq_file must be a pkl or npz file, got {skel_seq_file}")
-        
-        
-        for key in ['poses', 'trans', 'betas', 'gender']:
-            assert key in skel_data, f"The loaded skel sequence dictionary must contain {key}. Loaded dictionary has keys: {skel_data.keys()}"
 
-              
-        gender = skel_data['gender']
+        for key in ["poses", "trans", "betas", "gender"]:
+            assert (
+                key in skel_data
+            ), f"The loaded skel sequence dictionary must contain {key}. Loaded dictionary has keys: {skel_data.keys()}"
+
+        gender = skel_data["gender"]
         skel_layer = SKEL(model_path=C.skel_models, gender=gender)
 
         assert gender == skel_layer.gender, f"skel layer has gender {skel_layer.gender} while data has gender {gender}"
 
         sf = start_frame or 0
-        ef = end_frame or skel_data['poses'].shape[0]
-        poses = skel_data['poses'][sf:ef]
-        trans = skel_data['trans'][sf:ef]
-        betas = skel_data['betas'][sf:ef]
+        ef = end_frame or skel_data["poses"].shape[0]
+        poses = skel_data["poses"][sf:ef]
+        trans = skel_data["trans"][sf:ef]
+        betas = skel_data["betas"][sf:ef]
 
         if fps_out is not None:
             if fps_in != fps_out:
                 betas = resample_positions(betas, fps_in, fps_out)
-                poses = resample_positions(poses, fps_in, fps_out) # Linear interpolation
+                poses = resample_positions(poses, fps_in, fps_out)  # Linear interpolation
                 print("WARNING: poses resampled with linear interpolation, this is wrong but ok for int fps ratio")
                 trans = resample_positions(trans, fps_in, fps_out)
         else:
             fps_out = fps_in
-            
-        i_beta_end = skel_layer.num_betas 
-        return cls(poses_body=poses,
-                   skel_layer=skel_layer,
-                   betas=betas[:, :i_beta_end],
-                   trans=trans,
-                   z_up=z_up,
-                   device = device,
-                   fps = fps_out,
-                   fps_in = fps_in,
-                   poses_type = poses_type,
-                    **kwargs)           
 
-
+        i_beta_end = skel_layer.num_betas
+        return cls(
+            poses_body=poses,
+            skel_layer=skel_layer,
+            betas=betas[:, :i_beta_end],
+            trans=trans,
+            z_up=z_up,
+            device=device,
+            fps=fps_out,
+            fps_in=fps_in,
+            poses_type=poses_type,
+            **kwargs,
+        )
 
     @classmethod
-    def t_pose(cls, skel_layer, betas=None, frames=1, is_rigged=True, show_joint_angles=False, device=C.device, **kwargs):
+    def t_pose(
+        cls, skel_layer, betas=None, frames=1, is_rigged=True, show_joint_angles=False, device=C.device, **kwargs
+    ):
         """Creates a SKEL sequence whose single frame is a SKEL mesh in T-Pose."""
-        
+
         if betas is not None:
             assert betas.shape[0] == 1
 
-        poses = np.zeros([frames, skel_layer.num_q_params]) 
-        return cls(poses, skel_layer=skel_layer, betas=betas, is_rigged=is_rigged, show_joint_angles=show_joint_angles, device=device, **kwargs)
-
+        poses = np.zeros([frames, skel_layer.num_q_params])
+        return cls(
+            poses,
+            skel_layer=skel_layer,
+            betas=betas,
+            is_rigged=is_rigged,
+            show_joint_angles=show_joint_angles,
+            device=device,
+            **kwargs,
+        )
 
     @property
     def color(self):
@@ -333,7 +397,7 @@ class SKELSequence(Node):
     @property
     def current_bounds(self):
         return self.skin_mesh_seq.current_bounds
-    
+
     @property
     def vertex_normals(self):
         return self.skin_mesh_seq.vertex_normals
@@ -341,11 +405,11 @@ class SKELSequence(Node):
     @property
     def poses(self):
         return self.poses_body
-    
+
     @property
     def _edit_mode(self):
-        return self.selected_mode == 'edit'
-    
+        return self.selected_mode == "edit"
+
     def fk(self, current_frame_only=False):
         """Get joints and/or vertices from the poses."""
         if current_frame_only:
@@ -354,7 +418,6 @@ class SKELSequence(Node):
                 poses_body = self._edit_pose[None, :]
             else:
                 poses_body = self.poses_body[self.current_frame_id][None, :]
-
 
             trans = self.trans[self.current_frame_id][None, :]
 
@@ -373,41 +436,37 @@ class SKELSequence(Node):
             trans = self.trans
             betas = self.betas
 
-        skel_output = self.skel_layer(poses=poses_body,
-                                        betas=betas,
-                                        trans=trans,
-                                        poses_type=self.poses_type)
-        
+        skel_output = self.skel_layer(poses=poses_body, betas=betas, trans=trans, poses_type=self.poses_type)
+
         # skin_verts = skel_output.skin_verts
         # skel_verts = skel_output.skel_verts
         # joints = skel_output.joints
         # joints_ori = skel_output.joints_ori
-        
-                
 
         if current_frame_only:
             # return c2c(skin_verts)[0], c2c(skin_f)[0], c2c(skel_verts)[0], c2c(skel_f)[0], c2c(joints)[0], c2c(joints_ori)[0], c2c(skeleton)
-            for att in ['skin_verts', 'skel_verts', 'joints', 'joints_ori']:
+            for att in ["skin_verts", "skel_verts", "joints", "joints_ori"]:
                 att_value = getattr(skel_output, att)
                 setattr(skel_output, att, c2c(att_value)[0])
         else:
             # return c2c(skin_verts), c2c(skin_f), c2c(skel_verts), c2c(skel_f), c2c(joints), c2c(joints_ori), c2c(skeleton)
-            for att in ['skin_verts', 'skel_verts', 'joints', 'joints_ori']:
+            for att in ["skin_verts", "skel_verts", "joints", "joints_ori"]:
                 try:
                     att_value = getattr(skel_output, att)
                     setattr(skel_output, att, c2c(att_value))
                 except:
-                    import ipdb; ipdb.set_trace()
-                    
+                    import ipdb
+
+                    ipdb.set_trace()
+
         skel_output.skin_f = c2c(self.skel_layer.skin_f)
         skel_output.skel_f = c2c(self.skel_layer.skel_f)
-        
-        skeleton = self.skel_layer.kintree_table.T 
-        skeleton[0, 0] = -1   
-        skel_output.skeleton = c2c(skeleton)  
-        
-        return skel_output
 
+        skeleton = self.skel_layer.kintree_table.T
+        skeleton[0, 0] = -1
+        skel_output.skeleton = c2c(skeleton)
+
+        return skel_output
 
     def interpolate(self, frame_ids):
         """
@@ -424,8 +483,9 @@ class SKELSequence(Node):
         all_poses = torch.cat([self.poses_root, self.poses_body], dim=-1)
         ps = np.reshape(all_poses.cpu().numpy(), (self.n_frames, -1, 3))
         ps_interp = interpolate_rotations(ps[mask_avail], all_ids[mask_avail], ids)
-        all_poses[ids] = torch.from_numpy(ps_interp.reshape(len(ids), -1)).to(dtype=self.betas.dtype,
-                                                                              device=self.betas.device)
+        all_poses[ids] = torch.from_numpy(ps_interp.reshape(len(ids), -1)).to(
+            dtype=self.betas.dtype, device=self.betas.device
+        )
         self.poses_root = all_poses[:, :3]
         self.poses_body = all_poses[:, 3:]
 
@@ -450,7 +510,7 @@ class SKELSequence(Node):
             self._edit_pose_dirty = False
 
     def redraw(self, **kwargs):
-        current_frame_only = kwargs.get('current_frame_only', False)
+        current_frame_only = kwargs.get("current_frame_only", False)
 
         # Use the edited pose if in edit mode.
         # skin_vertices, skin_faces, skel_vertices, skel_faces, joints, joints_ori, skeleton = self.fk(current_frame_only)
@@ -503,7 +563,7 @@ class SKELSequence(Node):
             # Update mesh
             self.skin_mesh_seq.vertices = skel_output.skin_verts
             self.bones_mesh_seq.vertices = skel_output.skel_verts
-            
+
         self.skel_output = skel_output
 
         super().redraw(**kwargs)
@@ -522,7 +582,7 @@ class SKELSequence(Node):
             return
         self._selected_mode = selected_mode
 
-        if self.selected_mode == 'edit':
+        if self.selected_mode == "edit":
             self.rbs.enabled = True
             self.rbs.is_selectable = False
             self._edit_pose = self.poses[self.current_frame_id].clone()
@@ -531,10 +591,10 @@ class SKELSequence(Node):
             self.skin_mesh_seq.backface_fragmap = True
             self.bones_mesh_seq.backface_fragmap = True
             self.rbs.color = (1, 0, 0.5, 1.0)
-            
+
             self._skin_view_mode_color = self.skin_mesh_seq.color
             self.skin_mesh_seq.color = (*self._skin_view_mode_color[:3], min(self._skin_view_mode_color[3], 0.5))
-            
+
             self._skel_view_mode_color = self.bones_mesh_seq.color
             self.bones_mesh_seq.color = (*self._skel_view_mode_color[:3], min(self._skel_view_mode_color[3], 0.5))
 
@@ -546,18 +606,18 @@ class SKELSequence(Node):
             name = skel_joints_name[j]
 
         if tree:
-            e = imgui.tree_node(f'{j} - {name}')
+            e = imgui.tree_node(f"{j} - {name}")
         else:
             e = True
-            imgui.text(f'{j} - {name}')
+            imgui.text(f"{j} - {name}")
 
         if e:
-            aa = self._edit_pose[j * 3: (j + 1) * 3]
+            aa = self._edit_pose[j * 3 : (j + 1) * 3]
             euler = aa2euler_numpy(aa.cpu().numpy(), degrees=True)
-            u, euler = imgui.drag_float3(f'##joint{j}', *euler, 0.1, format='%.2f')
+            u, euler = imgui.drag_float3(f"##joint{j}", *euler, 0.1, format="%.2f")
             if u:
                 aa = euler2aa_numpy(np.array(euler), degrees=True)
-                self._edit_pose[j * 3: (j + 1) * 3] = torch.from_numpy(aa)
+                self._edit_pose[j * 3 : (j + 1) * 3] = torch.from_numpy(aa)
                 self._edit_pose_dirty = True
                 self.redraw(current_frame_only=True)
             if tree:
@@ -618,17 +678,17 @@ class SKELSequence(Node):
             self._gui_joint(imgui, self._edit_joint)
         else:
             if imgui.radio_button("View mode", not self.edit_mode):
-                self.selected_mode = 'view'
+                self.selected_mode = "view"
                 imgui.close_current_popup()
             if imgui.radio_button("Edit mode", self.edit_mode):
-                self.selected_mode = 'edit'
+                self.selected_mode = "edit"
                 imgui.close_current_popup()
 
             imgui.spacing()
             imgui.separator()
             imgui.spacing()
             super().gui_context_menu(imgui)
-                
+
     def on_selection(self, node, instance_id, tri_id):
         if self.edit_mode:
             # Index of the joint that is currently being edited.
