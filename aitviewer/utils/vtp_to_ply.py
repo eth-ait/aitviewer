@@ -2,7 +2,9 @@
 # Do not share or distribute without permission of the author
 import argparse
 import os
-import pyvista # required as q .vtp reader
+
+import pyvista  # required as q .vtp reader
+
 
 def convert_meshes(src_folder, dst_folder):
 
@@ -38,15 +40,20 @@ def convert_meshes(src_folder, dst_folder):
         mesh.save(target + filename + ".ply")
         print("Converted mesh: " + target + filename + ".ply")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
 
     # Parse a vtp file and convert it to a ply file
-    parser = argparse.ArgumentParser(description='Convert a folder of vtp files to a folder of ply files')
-    parser.add_argument('src_folder', help='folder containing the vtp files to convert', default="/home/kellerm/Dropbox/MPI/TML/Fullbody_TLModels_v2.0_OS4x/Geometry/", type=str)
-    parser.add_argument('dst_folder', help='folder to save the ply files', default=None, type=str)
+    parser = argparse.ArgumentParser(description="Convert a folder of vtp files to a folder of ply files")
+    parser.add_argument(
+        "src_folder",
+        help="folder containing the vtp files to convert",
+        default="/home/kellerm/Dropbox/MPI/TML/Fullbody_TLModels_v2.0_OS4x/Geometry/",
+        type=str,
+    )
+    parser.add_argument("dst_folder", help="folder to save the ply files", default=None, type=str)
 
     args = parser.parse_args()
-    
+
     src_folder = args.src_folder
     dst_folder = args.dst_folder
-    
