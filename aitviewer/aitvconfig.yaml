@@ -2,11 +2,14 @@
 smplx_models: "../data/smplx_models"
 star_models: "../data/star_models"
 supr_models: "../data/supr_models"
+skel_models: "../data/skel_models"
+osim_geometry : "../data/skel_models/Geometry"
 
 # Access to datasets.
 datasets:
-  amass:
-    "../data/amass"
+  amass: "../data/amass"
+  bioamass: "../data/bioamass"
+  amass_mocap: '../data/amass_mocap'
 
 # Pytorch configuration.
 device: "cuda:0"
@@ -40,5 +43,5 @@ window_type: "pyqt5"
 z_up: False
 
 # Server for remote connections.
-server_enabled: False
+server_enabled: True
 server_port: 8417
