@@ -2,6 +2,7 @@
 
 import os
 import pickle as pkl
+
 import numpy as np
 import tqdm
 
@@ -96,7 +97,7 @@ class Markers(Node):
         **kwargs,
     ):
         """Load a sequence from an npz file. The filename becomes the name of the sequence"""
-                
+
         markers_array, markers_labels, fps_in = load_markers(c3d_path, nb_markers_expected)
         print(f"fps_in={fps_in} fps_out={fps_out} markers_array.shape={markers_array.shape}")
 

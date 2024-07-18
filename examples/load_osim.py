@@ -76,7 +76,7 @@ def display_model_in_viewer(
     v.scene.add(osim_seq)
 
     v.lock_to_node(osim_seq, (5, 2, 0), smooth_sigma=5.0)
-    
+
     if args.mocap is not None:
         # check that the mocap file is in .c3d format
         assert args.mocap.endswith(".c3d"), "Mocap file must be in .c3d format."

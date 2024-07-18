@@ -29,7 +29,7 @@ if __name__ == "__main__":
     markers_pc = Markers.from_c3d(c3d_file_path, color=c, fps_out=fps_out, point_size=15, nb_markers_expected=41)
 
     # Amass sequence
-    c = (149 / 255, 85 / 255, 149 / 255, 0.5)  
+    c = (149 / 255, 85 / 255, 149 / 255, 0.5)
     seq_amass = SMPLSequence.from_amass(
         npz_data_path=os.path.join(C.datasets.amass, seq_path),
         fps_out=fps_out,

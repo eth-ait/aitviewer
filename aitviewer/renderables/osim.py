@@ -21,9 +21,8 @@ try:
 except ImportError:
     raise ImportError("nimblephysics not found. Please install nimblephysics to use this module.")
 
-def load_osim(osim_path, 
-                geometry_path=os.path.join(C.skel_models, 'Geometry'),
-                ignore_geometry=False):
+
+def load_osim(osim_path, geometry_path=os.path.join(C.skel_models, "Geometry"), ignore_geometry=False):
     """Load an osim file"""
 
     assert os.path.exists(osim_path), f"Could not find osim file {os.path.abspath(osim_path)}"
@@ -375,7 +374,7 @@ class OSIMSequence(Node):
         fps_out: frames per second of the output sequence
         ignore_geometry : use the aitconfig.osim_geometry folder instead of the one next to the osim file
         """
-        
+
         # Nimblephysics does not like relative paths
         osim_path = os.path.abspath(osim_path)
         mot_file = os.path.abspath(mot_file)

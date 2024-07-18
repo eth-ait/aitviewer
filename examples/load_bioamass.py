@@ -17,7 +17,7 @@ if __name__ == "__main__":
     c = (149 / 255, 85 / 255, 149 / 255, 0.5)
 
     to_display = []
-    
+
     amass_file = os.path.join(C.datasets.amass, f"CMU/{subj_name}/{subj_name}_{seq_name}_poses.npz")
     osim_file = os.path.join(C.datasets.bioamass, f"CMU/{subj_name}/ab_fits/Models/optimized_scale_and_markers.osim")
     mot_file = os.path.join(C.datasets.bioamass, f"CMU/{subj_name}/ab_fits/IK/{seq_name}_ik.mot")
