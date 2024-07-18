@@ -92,7 +92,6 @@ def display_model_in_viewer(
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
         description="Load an OpenSim model and a motion file and display it in the viewer."
     )

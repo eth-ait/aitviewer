@@ -10,7 +10,6 @@ from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
 
 if __name__ == "__main__":
-
     subj_name = "01"
     seq_name = "03"
 

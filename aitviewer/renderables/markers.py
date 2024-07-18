@@ -56,7 +56,6 @@ class Markers(Node):
 
         # todo fix color bug
         for mi, marker_name in enumerate(self.markers_labels):
-
             if colors is not None:
                 color = tuple(colors[mi])
 
@@ -158,7 +157,6 @@ class Markers(Node):
         markers_array = synthetic_markers.marker_trajectory
 
         if fps_out is not None and abs(1 - fps_in / fps_out) > 1e-4:
-
             assert (
                 fps_in % fps_out == 0
             ), f"fps_out must be a interger divisor of fps_in, but got fps_in={fps_in} fps_out={fps_out}"
@@ -226,7 +224,6 @@ class Markers(Node):
 
     @classmethod
     def from_file(cls, mocap_file, **kwargs):
-
         if mocap_file.endswith(".c3d"):
             return cls.from_c3d(mocap_file, **kwargs)
         elif mocap_file.endswith(".npz"):

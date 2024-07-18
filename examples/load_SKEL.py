@@ -17,7 +17,6 @@ except Exception as e:
     raise e
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="Load a SKEL model and display it.")
     parser.add_argument("-s", "--motion_file", type=str, help="Path to a skel motion file", default=None)
     parser.add_argument("-z", "--z_up", help="Rotate the mesh 90 deg", action="store_true")
@@ -53,7 +52,6 @@ if __name__ == "__main__":
         cam_pose = None
 
     else:
-
         assert os.path.exists(
             args.motion_file
         ), f"Could not find {args.motion_file}, please provide a valid path to a skel motion file."

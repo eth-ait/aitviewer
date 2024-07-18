@@ -172,7 +172,6 @@ class OSIMSequence(Node):
         return vertex_colors
 
     def per_part_marker_colors(self):
-
         colors = vertex_colors_from_weights(np.arange(len(self.node_names)), alpha=1, shuffle=True)
 
         # Try to load a saved rigging file
@@ -266,7 +265,6 @@ class OSIMSequence(Node):
         print(self.meshes_dict)
 
     def create_template(self):
-
         part_meshes = []
         for node_name in self.node_names:
             mesh = self.meshes_dict[node_name]
@@ -456,7 +454,6 @@ class OSIMSequence(Node):
                 #     continue
                 mesh = self.meshes_dict[node_name]
                 if mesh is not None:
-
                     part_verts = mesh.vertices
 
                     # pose part
