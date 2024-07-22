@@ -10,7 +10,7 @@ from aitviewer.renderables.point_clouds import PointClouds
 from aitviewer.renderables.spheres import Spheres
 from aitviewer.scene.node import Node
 from aitviewer.utils.mocap import load_markers
-
+from aitviewer.configuration import CONFIG as C
 
 class Markers(Node):
     """
@@ -28,6 +28,7 @@ class Markers(Node):
         radius=0.0075,
         color=(0.0, 0.0, 1.0, 1.0),
         as_spheres=True,
+        z_up = False,
         **kwargs,
     ):
         """
@@ -49,6 +50,12 @@ class Markers(Node):
         self.markers_labels = markers_labels
         self.marker_trajectory = points  # FxMx3
         self.color = color
+        
+        self._z_up = z_up
+        
+        if self._z_up and not C.z_up:
+            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
+
 
         if self.marker_trajectory.shape[1] > 200:
             as_spheres = False
@@ -75,8 +82,6 @@ class Markers(Node):
                     color=color,
                     **kwargs,
                 )
-            markers_seq.position = [0, 0, 0]
-            markers_seq.rotation = self.rotation
             markers_seq.enabled = False
             self._add_node(markers_seq)
 

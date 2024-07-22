@@ -68,6 +68,7 @@ class OSIMSequence(Node):
         is_rigged=False,
         show_joint_angles=False,
         viewer=True,
+        z_up=False,
         **kwargs,
     ):
         """
@@ -88,6 +89,7 @@ class OSIMSequence(Node):
 
         self._show_joint_angles = show_joint_angles
         self._is_rigged = is_rigged or show_joint_angles
+        self._z_up = z_up
 
         assert len(motion.shape) == 2
         super(OSIMSequence, self).__init__(n_frames=motion.shape[0], **kwargs)
@@ -113,12 +115,14 @@ class OSIMSequence(Node):
 
         if viewer == False:
             return
+        
+        if self._z_up and not C.z_up:
+            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
+
 
         if self._show_joint_angles:
             global_oris = self.joints_ori
             self.rbs = RigidBodies(self.joints, global_oris, length=0.01, name="Joint Angles")
-            self.rbs.position = self.position
-            self.rbs.rotation = self.rotation
             self._add_node(self.rbs)
 
         # Add meshes
@@ -128,8 +132,6 @@ class OSIMSequence(Node):
         if color_skeleton_per_part:
             kwargs["vertex_colors"] = self.per_part_bone_colors()
         self.mesh_seq = Meshes(self.vertices, self.faces, **kwargs)
-        self.mesh_seq.position = self.position
-        self.mesh_seq.rotation = self.rotation
         self._add_node(self.mesh_seq)
 
         # Add markers
@@ -152,8 +154,6 @@ class OSIMSequence(Node):
         self.markers_seq = Markers(
             points=self.marker_trajectory, markers_labels=self.markers_labels, point_size=10.0, **kwargs
         )
-        self.markers_seq.position = self.position
-        self.markers_seq.rotation = self.rotation
         self._add_node(self.markers_seq)
 
     def color_by_vertex_id(self):
