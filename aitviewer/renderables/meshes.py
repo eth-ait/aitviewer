@@ -707,6 +707,19 @@ class Meshes(Node):
             if imgui.button("Show Normals ##show_normals{}".format(self.unique_name)):
                 self._show_normals()
 
+    @hooked
+    def gui_stats(self, imgui):
+        for k, v in {
+            "Vertices": self.vertices.shape[1],
+            "Faces": self.faces.shape[0],
+            "Vertex colors": "yes" if self._vertex_colors is not None else "no",
+            "UVs": "yes" if self.uv_coords is not None else "no",
+            "Face normals": "yes" if self._face_normals is not None else "no",
+            "Face colors": "yes" if self._face_colors is not None else "no",
+            "Texture": "yes" if self.has_texture else "no",
+        }.items():
+            imgui.text(f"{k}: {v}")
+
     def gui_context_menu(self, imgui, x: int, y: int):
         _, self.flat_shading = imgui.menu_item("Flat shading", "F", selected=self.flat_shading, enabled=True)
         _, self.draw_edges = imgui.menu_item("Draw edges", "E", selected=self.draw_edges, enabled=True)

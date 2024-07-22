@@ -1,13 +1,11 @@
-# Code Developed by Marilyn Keller, marilyn.keller@tuebingen.mpg.de
-# Do not share or distribute without permission of the author
+# Copyright (C) 2024 Max Planck Institute for Intelligent Systems, Marilyn Keller, marilyn.keller@tuebingen.mpg.de
 import argparse
 import os
 
-import pyvista  # required as q .vtp reader
+import pyvista  # required as a .vtp reader
 
 
 def convert_meshes(src_folder, dst_folder):
-
     src = src_folder
     if src[-1] != "/":
         src += "/"
@@ -22,7 +20,6 @@ def convert_meshes(src_folder, dst_folder):
 
     # for each file in src
     for filename in os.listdir(src):
-
         ext = os.path.splitext(filename)[-1]
         if ext not in [".vtp", ".obj"]:
             print("Skipping " + filename)
@@ -42,7 +39,6 @@ def convert_meshes(src_folder, dst_folder):
 
 
 if __name__ == "__main__":
-
     # Parse a vtp file and convert it to a ply file
     parser = argparse.ArgumentParser(description="Convert a folder of vtp files to a folder of ply files")
     parser.add_argument(

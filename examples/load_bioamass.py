@@ -1,11 +1,4 @@
-"""
-Copyright©2023 Max-Planck-Gesellschaft zur Förderung
-der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
-for Intelligent Systems. All rights reserved.
-
-Author: Marilyn Keller
-See https://skel.is.tue.mpg.de/license.html for licensing and contact information.
-"""
+# Copyright (C) 2024 Max Planck Institute for Intelligent Systems, Marilyn Keller, marilyn.keller@tuebingen.mpg.de
 
 import os
 
@@ -17,7 +10,6 @@ from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
 
 if __name__ == "__main__":
-
     subj_name = "01"
     seq_name = "03"
 
@@ -25,11 +17,13 @@ if __name__ == "__main__":
 
     to_display = []
 
+    amass_file = os.path.join(C.datasets.amass, f"CMU/{subj_name}/{subj_name}_{seq_name}_poses.npz")
+    osim_file = os.path.join(C.datasets.bioamass, f"CMU/{subj_name}/ab_fits/Models/optimized_scale_and_markers.osim")
+    mot_file = os.path.join(C.datasets.bioamass, f"CMU/{subj_name}/ab_fits/IK/{seq_name}_ik.mot")
+
     if os.path.exists(C.datasets.amass):
         seq_amass = SMPLSequence.from_amass(
-            npz_data_path=os.path.join(
-                C.datasets.amass, f"CMU/{subj_name}/{subj_name}_{seq_name}_poses.npz"
-            ),  # AMASS/CMU/01/01_01_poses.npz
+            npz_data_path=amass_file,
             fps_out=30.0,
             color=c,
             name=f"AMASS {subj_name} {seq_name}",
@@ -40,15 +34,8 @@ if __name__ == "__main__":
         seq_amass = None
         print(f"Could not find AMASS dataset at {C.datasets.amass}. Skipping loading SMPL body.")
 
-    osim_path = os.path.join(
-        C.datasets.bioamass, f"CMU/{subj_name}/ab_fits/Models/optimized_scale_and_markers.osim"
-    )  # bioamass_v1.0/CMU/11/ab_fits/Models/optimized_scale_and_markers.osim
-    mot_file = os.path.join(
-        C.datasets.bioamass, f"CMU/{subj_name}/ab_fits/IK/{seq_name}_ik.mot"
-    )  # bioamass_v1.0/CMU/11/ab_fits/IK/01_ik.mot
-
     osim_seq = OSIMSequence.from_files(
-        osim_path=osim_path,
+        osim_path=osim_file,
         mot_file=mot_file,
         name=f"BSM {subj_name} {seq_name}",
         fps_out=30,

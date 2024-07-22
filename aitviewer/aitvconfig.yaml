@@ -11,11 +11,11 @@ datasets:
     "/is/cluster/work/mkeller2/Data/TML/AMASS"
   bioamass:
     "/is/cluster/work/mkeller2/Data/TML/Release/v1.0/bioamass_v1.0"
-  mocap:
+  amass_mocap:
     "/is/cluster/work/mkeller2/Data/TML/AMASS_mocap" 
 
 # Pytorch configuration.
-device: "cpu"
+device: "cuda:0"
 f_precision: 32
 i_precision: 64
 

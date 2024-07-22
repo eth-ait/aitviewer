@@ -1,6 +1,4 @@
-# Code Developed by:
-# Marilyn Keller marilyn.keller@tuebingen.mpg.de
-# Do not share or distribute without permission of the author
+# Copyright (C) 2024 Max Planck Institute for Intelligent Systems, Marilyn Keller, marilyn.keller@tuebingen.mpg.de
 
 import argparse
 import os
@@ -77,7 +75,7 @@ def display_model_in_viewer(
     v = Viewer()
     v.scene.add(osim_seq)
 
-    v.lock_to_node(osim_seq, (2, 0.7, 2), smooth_sigma=5.0)
+    v.lock_to_node(osim_seq, (5, 2, 0), smooth_sigma=5.0)
 
     if args.mocap is not None:
         # check that the mocap file is in .c3d format
@@ -94,7 +92,6 @@ def display_model_in_viewer(
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
         description="Load an OpenSim model and a motion file and display it in the viewer."
     )

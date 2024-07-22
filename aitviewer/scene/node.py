@@ -327,36 +327,39 @@ class Node(object):
     def current_frame_id(self, frame_id):
         # Check if the frame changed.
         last_frame_id = self._current_frame_id if self._enabled_frames is None else self._internal_frame_id
-        if self.n_frames == 1 or frame_id == last_frame_id:
-            return
 
-        self.on_before_frame_update()
-        if self._enabled_frames is None:
-            if frame_id < 0:
-                self._current_frame_id = 0
-            elif frame_id >= len(self):
-                self._current_frame_id = len(self) - 1
+        updated = self.n_frames != 1 and frame_id != last_frame_id
+        if updated:
+            self.on_before_frame_update()
+            if self._enabled_frames is None:
+                if frame_id < 0:
+                    self._current_frame_id = 0
+                elif frame_id >= len(self):
+                    self._current_frame_id = len(self) - 1
+                else:
+                    self._current_frame_id = frame_id
             else:
-                self._current_frame_id = frame_id
-        else:
-            # If an enabled_frames is present use it to get the current frame.
-            if frame_id < 0:
-                self._internal_frame_id = 0
-            elif frame_id >= self._enabled_frames.shape[0]:
-                self._internal_frame_id = self._enabled_frames.shape[0] - 1
-            else:
-                self._internal_frame_id = frame_id
-            self._current_frame_id = self._enabled_frame_id[self._internal_frame_id]
-            # Update enabled using the mask.
-            self.enabled = self._enabled_frames[self._internal_frame_id]
+                # If an enabled_frames is present use it to get the current frame.
+                if frame_id < 0:
+                    self._internal_frame_id = 0
+                elif frame_id >= self._enabled_frames.shape[0]:
+                    self._internal_frame_id = self._enabled_frames.shape[0] - 1
+                else:
+                    self._internal_frame_id = frame_id
+                self._current_frame_id = self._enabled_frame_id[self._internal_frame_id]
+                # Update enabled using the mask.
+                self.enabled = self._enabled_frames[self._internal_frame_id]
 
         # Update frame id of all children nodes.
         for n in self.nodes:
-            n.current_frame_id = self._current_frame_id
+            n.current_frame_id = frame_id
 
-        self.on_frame_update()
-        if self.parent and (self._positions.shape[0] > 1 or self._rotations.shape[0] > 1 or self._scales.shape[0] > 1):
-            self.update_transform(self.parent.model_matrix)
+        if updated:
+            self.on_frame_update()
+            if self.parent and (
+                self._positions.shape[0] > 1 or self._rotations.shape[0] > 1 or self._scales.shape[0] > 1
+            ):
+                self.update_transform(self.parent.model_matrix)
 
     def next_frame(self):
         self.current_frame_id = self.current_frame_id + 1 if self.current_frame_id < len(self) - 1 else 0
@@ -439,6 +442,15 @@ class Node(object):
         See https://pyimgui.readthedocs.io/en/latest/reference/imgui.core.html for available elements to render
         """
         pass
+
+    def gui_stats(self, imgui):
+        """
+        Render GUI for stats about the node, rendered at the bottom of the scene hierarchy.
+        Should be implemented with @hooked decorator to print stats from parent classes.
+        :param imgui: imgui context.
+        See https://pyimgui.readthedocs.io/en/latest/reference/imgui.core.html for available elements to render
+        """
+        imgui.text(f"Frames: {self.n_frames}")
 
     def gui_modes(self, imgui):
         """Render GUI with toolbar (tools) for this particular node"""

@@ -1,11 +1,4 @@
-"""
-Copyright©2023 Max-Planck-Gesellschaft zur Förderung
-der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
-for Intelligent Systems. All rights reserved.
-
-Author: Marilyn Keller
-See https://skel.is.tue.mpg.de/license.html for licensing and contact information.
-"""
+# Copyright (C) 2024 Max Planck Institute for Intelligent Systems, Marilyn Keller, marilyn.keller@tuebingen.mpg.de
 
 import argparse
 import os
@@ -24,23 +17,22 @@ except Exception as e:
     raise e
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="Load a SKEL model and display it.")
     parser.add_argument("-s", "--motion_file", type=str, help="Path to a skel motion file", default=None)
     parser.add_argument("-z", "--z_up", help="Rotate the mesh 90 deg", action="store_true")
 
     args = parser.parse_args()
 
-    skel_model = SKEL(gender="female", model_path=C.skel_models)
+    skel_model = SKEL(gender="female", model_path=C.skel_models).to(C.device)
 
     if args.motion_file is None:
         F = 120
-        pose = torch.zeros(F, 46)
-        betas = torch.zeros(F, 10)
+        pose = torch.zeros(F, 46).to(C.device)
+        betas = torch.zeros(F, 10).to(C.device)
         betas[: F // 2, 0] = torch.linspace(-2, 2, F // 2)  # Vary beta0 between -2 and 2
         betas[F // 2 :, 1] = torch.linspace(-2, 2, F // 2)  # Vary beta1 between -2 and 2
 
-        trans = torch.zeros(F, 3)
+        trans = torch.zeros(F, 3).to(C.device)
 
         # Test SKEL forward pass
         skel_output = skel_model(pose, betas, trans)
@@ -55,13 +47,11 @@ if __name__ == "__main__":
             show_joint_angles=True,
             name="SKEL",
             z_up=False,
-            skinning_weights_color=False,
+            skin_coloring="skinning_weights",  # "pose_offsets", "skinning_weights"
         )
-
         cam_pose = None
 
     else:
-
         assert os.path.exists(
             args.motion_file
         ), f"Could not find {args.motion_file}, please provide a valid path to a skel motion file."

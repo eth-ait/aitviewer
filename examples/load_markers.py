@@ -11,7 +11,6 @@ from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
 
 if __name__ == "__main__":
-
     # Display in the viewer.
     v = Viewer()
 
@@ -22,22 +21,20 @@ if __name__ == "__main__":
     seq_trial = "03"
 
     seq_path = f"CMU/{seq_subj}/{seq_subj}_{seq_trial}_poses.npz"
-    c3d_file = f"../AMASS_mocap/CMU/subjects/{seq_subj}/{seq_subj}_{seq_trial}.c3d"
-    c3d_file_path = os.path.join(C.datasets.amass, c3d_file)
+    c3d_file = f"CMU/subjects/{seq_subj}/{seq_subj}_{seq_trial}.c3d"
+    c3d_file_path = os.path.join(C.datasets.amass_mocap, c3d_file)
 
     c = (85 / 255, 85 / 255, 255 / 255, 1)
     markers_pc = Markers.from_c3d(c3d_file_path, color=c, fps_out=fps_out, point_size=15, nb_markers_expected=41)
 
     # Amass sequence
-    c = (149 / 255, 150 / 255, 0 / 255, 0.9)
+    c = (149 / 255, 85 / 255, 149 / 255, 0.5)
     seq_amass = SMPLSequence.from_amass(
         npz_data_path=os.path.join(C.datasets.amass, seq_path),
         fps_out=fps_out,
         color=c,
-        name="AMASS Running",
-        show_joint_angles=False,
-        is_rigged=False,
-        device="cpu",
+        name="AMASS SMPL sequence",
+        show_joint_angles=True,
     )
 
     v.run_animations = True

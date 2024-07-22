@@ -1,11 +1,4 @@
-"""
-Copyright©2023 Max-Planck-Gesellschaft zur Förderung
-der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
-for Intelligent Systems. All rights reserved.
-
-Author: Marilyn Keller
-See https://skel.is.tue.mpg.de/license.html for licensing and contact information.
-"""
+# Copyright (C) 2024 Max Planck Institute for Intelligent Systems, Marilyn Keller, marilyn.keller@tuebingen.mpg.de
 
 import os
 import pickle as pkl
@@ -28,10 +21,11 @@ try:
 except ImportError:
     raise ImportError("nimblephysics not found. Please install nimblephysics to use this module.")
 
-def load_osim(osim_path, geometry_path=C.osim_geometry, ignore_geometry=False):
+
+def load_osim(osim_path, geometry_path=os.path.join(C.skel_models, "Geometry"), ignore_geometry=False):
     """Load an osim file"""
 
-    assert os.path.exists(osim_path), f"Could not find osim file {osim_path}"
+    assert os.path.exists(osim_path), f"Could not find osim file {os.path.abspath(osim_path)}"
     osim_path = os.path.abspath(osim_path)
 
     # Check that there is a Geometry folder at the same level as the osim file
@@ -49,7 +43,7 @@ def load_osim(osim_path, geometry_path=C.osim_geometry, ignore_geometry=False):
             os.remove(tmp_osim_file)
         shutil.copyfile(osim_path, tmp_osim_file)
         print(f"Copied {osim_path} to {tmp_osim_file}")
-        osim_path = tmp_osim_file
+        osim_path = os.path.abspath(tmp_osim_file)
 
     osim: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.parseOsim(osim_path)
     assert osim is not None, "Could not load osim file: {}".format(osim_path)
@@ -101,7 +95,8 @@ class OSIMSequence(Node):
         self._render_kwargs = kwargs
 
         # The node names of the skeleton model, the associated mesh and the template indices
-        self.node_names = [n.getName() for n in osim.skeleton.getBodyNodes()]
+        body_nodes = [osim.skeleton.getBodyNode(i) for i in range(osim.skeleton.getNumBodyNodes())]
+        self.node_names = [n.getName() for n in body_nodes]
 
         self.meshes_dict = {}
         self.indices_dict = {}
@@ -115,10 +110,6 @@ class OSIMSequence(Node):
 
         # Nodes
         self.vertices, self.faces, self.marker_trajectory, self.joints, self.joints_ori = self.fk()
-
-        # TODO: fix that. This triggers a segfault at destruction so I hardcode it
-        # self.joints_labels = [J.getName() for J in self.osim.skeleton.getJoints()]
-        # self.joints_labels = ['ground_pelvis', 'hip_r', 'walker_knee_r', 'ankle_r', 'subtalar_r', 'mtp_r', 'hip_l', 'walker_knee_l', 'ankle_l', 'subtalar_l', 'mtp_l', 'back', 'neck', 'acromial_r', 'elbow_r', 'radioulnar_r', 'radius_hand_r', 'acromial_l', 'elbow_l', 'radioulnar_l', 'radius_hand_l']
 
         if viewer == False:
             return
@@ -181,7 +172,6 @@ class OSIMSequence(Node):
         return vertex_colors
 
     def per_part_marker_colors(self):
-
         colors = vertex_colors_from_weights(np.arange(len(self.node_names)), alpha=1, shuffle=True)
 
         # Try to load a saved rigging file
@@ -275,7 +265,6 @@ class OSIMSequence(Node):
         print(self.meshes_dict)
 
     def create_template(self):
-
         part_meshes = []
         for node_name in self.node_names:
             mesh = self.meshes_dict[node_name]
@@ -306,8 +295,10 @@ class OSIMSequence(Node):
         """Creates a OSIM sequence whose single frame is a OSIM mesh in rest pose."""
         # Load osim file
         if osim_path is None:
-            osim: nimble.biomechanics.OpenSimFile = nimble.models.RajagopalHumanBodyModel()
-            osim_path = "RajagopalHumanBodyModel.osim"  # This is not a real path, but it is needed to instantiate the sequence object
+            # osim: nimble.biomechanics.OpenSimFile = nimble.models.RajagopalHumanBodyModel()
+            # osim_path = "RajagopalHumanBodyModel.osim"  # This is not a real path, but it is needed to instantiate the sequence object
+            osim_path = os.path.join(C.skel_models, "bsm.osim")
+            osim = load_osim(osim_path)
         else:
             osim = load_osim(osim_path)
 
@@ -381,6 +372,10 @@ class OSIMSequence(Node):
         fps_out: frames per second of the output sequence
         ignore_geometry : use the aitconfig.osim_geometry folder instead of the one next to the osim file
         """
+
+        # Nimblephysics does not like relative paths
+        osim_path = os.path.abspath(osim_path)
+        mot_file = os.path.abspath(mot_file)
 
         # Load osim file
         osim = load_osim(osim_path, ignore_geometry=ignore_geometry)
@@ -459,7 +454,6 @@ class OSIMSequence(Node):
                 #     continue
                 mesh = self.meshes_dict[node_name]
                 if mesh is not None:
-
                     part_verts = mesh.vertices
 
                     # pose part
