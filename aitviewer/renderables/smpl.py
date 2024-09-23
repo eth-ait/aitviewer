@@ -145,7 +145,6 @@ class SMPLSequence(Node):
         # Nodes
         self.vertices, self.joints, self.faces, self.skeleton = self.fk()
 
-
         if self._is_rigged:
             self.skeleton_seq = Skeletons(
                 self.joints,
@@ -176,7 +175,6 @@ class SMPLSequence(Node):
 
         if self._z_up and not C.z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
-
 
         if self.smpl_layer.model_type != "mano":
             self.rbs = RigidBodies(self.joints, global_oris, length=0.1, gui_affine=False, name="Joint Angles")
@@ -406,15 +404,15 @@ class SMPLSequence(Node):
             poses_right_hand = self.poses_right_hand
             trans = self.trans
             betas = self.betas
-        
+
         if self.smpl_layer.model_type == "mano":
             verts, joints = self.smpl_layer(
-            hand_pose=poses_body,
-            betas=betas,
-            global_orient=poses_root,
-            trans=trans,
-            mano=True,
-        )
+                hand_pose=poses_body,
+                betas=betas,
+                global_orient=poses_root,
+                trans=trans,
+                mano=True,
+            )
         else:
             verts, joints = self.smpl_layer(
                 poses_root=poses_root,
@@ -429,7 +427,11 @@ class SMPLSequence(Node):
         if self.post_fk_func:
             verts, joints = self.post_fk_func(self, verts, joints, current_frame_only)
 
-        skeleton = self.smpl_layer.skeletons()["body"].T if not self.smpl_layer.model_type == "mano" else self.smpl_layer.skeletons()["all"].T 
+        skeleton = (
+            self.smpl_layer.skeletons()["body"].T
+            if not self.smpl_layer.model_type == "mano"
+            else self.smpl_layer.skeletons()["all"].T
+        )
         faces = self.smpl_layer.bm.faces.astype(np.int64)
         joints = joints[:, : skeleton.shape[0]]
 

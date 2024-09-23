@@ -51,7 +51,7 @@ class Meshes(Node):
         draw_edges=False,
         draw_outline=False,
         instance_transforms=None,
-        z_up = False,
+        z_up=False,
         icon="\u008d",
         **kwargs,
     ):

@@ -266,7 +266,6 @@ class SMPLLayer(nn.Module, ABC):
         if trans is None:
             trans = torch.zeros([batch_size, 3]).to(dtype=hand_pose.dtype, device=device)
 
-
         # Batch shapes if they don't match batch dimension.
         if len(betas.shape) == 1 or betas.shape[0] == 1:
             betas = betas.repeat(hand_pose.shape[0], 1)
@@ -281,14 +280,12 @@ class SMPLLayer(nn.Module, ABC):
             trans = torch.matmul(first_root_ori.unsqueeze(0), trans.unsqueeze(-1)).squeeze()
             trans = trans - trans[0:1]
 
-
         output = self.bm(
             hand_pose=hand_pose,
             betas=betas,
             global_orient=global_orient,
             transl=trans,
         )
-
 
         return output.vertices, output.joints
 
@@ -297,7 +294,7 @@ class SMPLLayer(nn.Module, ABC):
         Forward pass using forward kinematics
         """
 
-        if 'mano' in kwargs.keys():
+        if "mano" in kwargs.keys():
             return self.fk_mano(*args, **kwargs)
         else:
             return self.fk(*args, **kwargs)
