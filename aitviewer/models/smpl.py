@@ -236,8 +236,65 @@ class SMPLLayer(nn.Module, ABC):
 
         return output.vertices, output.joints
 
+    def fk_mano(
+        self,
+        hand_pose,
+        betas,
+        global_orient=None,
+        trans=None,
+        normalize_root=False,
+        mano=True,
+    ):
+        """
+        Convert mano pose data (joint angles and shape parameters) to positional data (joint and mesh vertex positions).
+        :param hand_pose: A tensor of shape (N, N_JOINTS*3), i.e. joint angles in angle-axis format or PCA format (N, N_PCA_COMPONENTS). This contains all
+          body joints which are not the root.
+        :param betas: A tensor of shape (N, N_BETAS) containing the betas/shape parameters.
+        :param global_orient: Orientation of the root or None. If specified expected shape is (N, 3).
+        :param trans: translation that is applied to vertices and joints or None, this is the 'transl' parameter
+          of the MANO Model. If specified expected shape is (N, 3).
+        :param normalize_root: If set, it will normalize the root such that its orientation is the identity in the
+          first frame and its position starts at the origin.
+        :return: The resulting vertices and joints.
+        """
+
+        batch_size = hand_pose.shape[0]
+        device = hand_pose.device
+
+        if global_orient is None:
+            global_orient = torch.zeros([batch_size, 3]).to(dtype=hand_pose.dtype, device=device)
+        if trans is None:
+            trans = torch.zeros([batch_size, 3]).to(dtype=hand_pose.dtype, device=device)
+
+        # Batch shapes if they don't match batch dimension.
+        if len(betas.shape) == 1 or betas.shape[0] == 1:
+            betas = betas.repeat(hand_pose.shape[0], 1)
+        betas = betas[:, : self.num_betas]
+
+        if normalize_root:
+            # Make everything relative to the first root orientation.
+            root_ori = aa2rot(global_orient)
+            first_root_ori = torch.inverse(root_ori[0:1])
+            root_ori = torch.matmul(first_root_ori, root_ori)
+            global_orient = rot2aa(root_ori)
+            trans = torch.matmul(first_root_ori.unsqueeze(0), trans.unsqueeze(-1)).squeeze()
+            trans = trans - trans[0:1]
+
+        output = self.bm(
+            hand_pose=hand_pose,
+            betas=betas,
+            global_orient=global_orient,
+            transl=trans,
+        )
+
+        return output.vertices, output.joints
+
     def forward(self, *args, **kwargs):
         """
         Forward pass using forward kinematics
         """
-        return self.fk(*args, **kwargs)
+
+        if "mano" in kwargs.keys():
+            return self.fk_mano(*args, **kwargs)
+        else:
+            return self.fk(*args, **kwargs)

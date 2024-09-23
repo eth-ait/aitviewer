@@ -157,11 +157,18 @@ class SMPLSequence(Node):
 
         # First convert the relative joint angles to global joint angles in rotation matrix form.
         if self.smpl_layer.model_type != "flame":
-            global_oris = local_to_global(
-                torch.cat([self.poses_root, self.poses_body], dim=-1),
-                self.skeleton[:, 0],
-                output_format="rotmat",
-            )
+            if self.smpl_layer.model_type != "mano":
+                global_oris = local_to_global(
+                    torch.cat([self.poses_root, self.poses_body, self.poses_left_hand, self.poses_right_hand], dim=-1),
+                    self.skeleton[:, 0],
+                    output_format="rotmat",
+                )
+            else:
+                global_oris = local_to_global(
+                    torch.cat([self.poses_root, self.poses_body], dim=-1),
+                    self.skeleton[:, 0],
+                    output_format="rotmat",
+                )
             global_oris = c2c(global_oris.reshape((self.n_frames, -1, 3, 3)))
         else:
             global_oris = np.tile(np.eye(3), self.joints.shape[:-1])[np.newaxis]
@@ -169,8 +176,9 @@ class SMPLSequence(Node):
         if self._z_up and not C.z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
-        self.rbs = RigidBodies(self.joints, global_oris, length=0.1, gui_affine=False, name="Joint Angles")
-        self._add_node(self.rbs, enabled=self._show_joint_angles)
+        if self.smpl_layer.model_type != "mano":
+            self.rbs = RigidBodies(self.joints, global_oris, length=0.1, gui_affine=False, name="Joint Angles")
+            self._add_node(self.rbs, enabled=self._show_joint_angles)
 
         self.mesh_seq = Meshes(
             self.vertices,
@@ -397,20 +405,33 @@ class SMPLSequence(Node):
             trans = self.trans
             betas = self.betas
 
-        verts, joints = self.smpl_layer(
-            poses_root=poses_root,
-            poses_body=poses_body,
-            poses_left_hand=poses_left_hand,
-            poses_right_hand=poses_right_hand,
-            betas=betas,
-            trans=trans,
-        )
+        if self.smpl_layer.model_type == "mano":
+            verts, joints = self.smpl_layer(
+                hand_pose=poses_body,
+                betas=betas,
+                global_orient=poses_root,
+                trans=trans,
+                mano=True,
+            )
+        else:
+            verts, joints = self.smpl_layer(
+                poses_root=poses_root,
+                poses_body=poses_body,
+                poses_left_hand=poses_left_hand,
+                poses_right_hand=poses_right_hand,
+                betas=betas,
+                trans=trans,
+            )
 
         # Apply post_fk_func if specified.
         if self.post_fk_func:
             verts, joints = self.post_fk_func(self, verts, joints, current_frame_only)
 
-        skeleton = self.smpl_layer.skeletons()["body"].T
+        skeleton = (
+            self.smpl_layer.skeletons()["body"].T
+            if not self.smpl_layer.model_type == "mano"
+            else self.smpl_layer.skeletons()["all"].T
+        )
         faces = self.smpl_layer.bm.faces.astype(np.int64)
         joints = joints[:, : skeleton.shape[0]]
 

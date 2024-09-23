@@ -51,6 +51,7 @@ class Meshes(Node):
         draw_edges=False,
         draw_outline=False,
         instance_transforms=None,
+        z_up=False,
         icon="\u008d",
         **kwargs,
     ):
@@ -146,6 +147,9 @@ class Meshes(Node):
 
         self.clip_control = np.array((0, 0, 0), np.int32)
         self.clip_value = np.array((0, 0, 0), np.float32)
+
+        if z_up:
+            self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
 
     @classmethod
     def instanced(cls, *args, positions=None, rotations=None, scales=None, **kwargs):
