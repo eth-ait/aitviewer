@@ -103,6 +103,11 @@ def get_simple_unlit_program():
 
 
 @functools.lru_cache()
+def get_point_cloud_program():
+    return load_program("point_clouds.glsl")
+
+
+@functools.lru_cache()
 def get_cylinder_program():
     return load_program("cylinder.glsl")
 
@@ -160,6 +165,7 @@ def clear_shader_cache():
         get_fragmap_program,
         get_depth_only_program,
         get_simple_unlit_program,
+        get_point_cloud_program,
         get_cylinder_program,
         get_screen_texture_program,
         get_chessboard_program,

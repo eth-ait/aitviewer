@@ -724,7 +724,7 @@ class PinholeCamera(Camera):
             positions.shape[0] == 1 or targets.shape[0] == 1 or positions.shape[0] == targets.shape[0]
         ), f"position and target array shape mismatch: {positions.shape} and {targets.shape}"
 
-        if world_up:
+        if world_up is not None:
             self._world_up = world_up
         else:
             self._world_up = np.array([0.0, 0.0, 1.0]) if C.z_up else np.array([0.0, 1.0, 0.0])

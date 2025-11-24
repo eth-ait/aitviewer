@@ -8,6 +8,7 @@ from aitviewer.scene.node import Node
 from aitviewer.shaders import (
     get_fragmap_program,
     get_outline_program,
+    get_point_cloud_program,
     get_simple_unlit_program,
 )
 from aitviewer.utils.decorators import hooked
@@ -23,6 +24,9 @@ class PointClouds(Node):
         points,
         colors=None,
         point_size=5.0,
+        adaptive_point_size=False,
+        min_point_size=1.0,
+        max_point_size=20.0,
         color=(0.0, 0.0, 1.0, 1.0),
         z_up=False,
         icon="\u008c",
@@ -34,6 +38,9 @@ class PointClouds(Node):
         :param points: Sequence of points (F, P, 3)
         :param colors: Sequence of Colors (F, C, 4) or None. If None, all points are colored according to `color`.
         :param point_size: Initial point size.
+        :param adaptive_point_size: If True, points are rendered with adaptive sizing using a dedicated shader.
+        :param min_point_size: Minimum point size (in pixels) for adaptive rendering.
+        :param max_point_size: Maximum point size (in pixels) for adaptive rendering.
         :param color: Default color applied to all points of all frames if `colors` is not provided.
         :param z_up: If true the point cloud rotation matrix is initialized to convert from z-up to y-up data.
         """
@@ -51,9 +58,17 @@ class PointClouds(Node):
 
         self.colors = colors
         self.point_size = point_size
+        self.adaptive_point_size = adaptive_point_size
+        self.min_point_size = min_point_size
+        self.max_point_size = max_point_size
+        if self.adaptive_point_size:
+            if not (self.min_point_size > 0.0 and self.max_point_size > self.min_point_size):
+                raise ValueError("Adaptive point sizes require 0 < min_point_size < max_point_size.")
+
         self.max_n_points = max([p.shape[0] for p in self.points])
 
         self.vao = VAO("points", mode=moderngl.POINTS)
+        self._ctx = None
 
         if z_up and not C.z_up:
             self.rotation = np.matmul(np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]), self.rotation)
@@ -165,9 +180,14 @@ class PointClouds(Node):
     # noinspection PyAttributeOutsideInit
     @Node.once
     def make_renderable(self, ctx):
+        self._ctx = ctx
         ctx.point_size = self.point_size
 
-        self.prog = get_simple_unlit_program()
+        if self.adaptive_point_size:
+            ctx.enable(moderngl.PROGRAM_POINT_SIZE)
+            self.prog = get_point_cloud_program()
+        else:
+            self.prog = get_simple_unlit_program()
         self.outline_program = get_outline_program("mesh_positions.vs.glsl")
         self.fragmap_program = get_fragmap_program("mesh_positions.vs.glsl")
 
@@ -183,6 +203,18 @@ class PointClouds(Node):
 
     def render(self, camera, **kwargs):
         self.set_camera_matrices(self.prog, camera, **kwargs)
+        if self.adaptive_point_size:
+            model_view_matrix = camera.get_view_matrix() @ self.model_matrix
+            projection_matrix = camera.get_projection_matrix()
+            projection_scale = float(projection_matrix[1, 1])
+            is_ortho = int(getattr(camera, "is_ortho", False))
+
+            self.prog["model_view_matrix"].write(model_view_matrix.T.astype("f4").tobytes())
+            self.prog["base_point_size"].value = self.point_size
+            self.prog["min_point_size"].value = self.min_point_size
+            self.prog["max_point_size"].value = self.max_point_size
+            self.prog["projection_scale"].value = projection_scale
+            self.prog["orthographic"].value = is_ortho
         # Draw only as many points as we have set in the buffer.
         self.vao.render(self.prog, vertices=len(self.current_points))
 
@@ -190,8 +222,48 @@ class PointClouds(Node):
         if self.is_renderable:
             self.positions_vao.render(prog, vertices=len(self.current_points))
 
+    def gui(self, imgui):
+        changed, point_size = imgui.drag_float(
+            "Point Size##{}".format(self.unique_name),
+            self.point_size,
+            0.1,
+            min_value=0.1,
+            max_value=500.0,
+            format="%.2f",
+        )
+        if changed:
+            self.point_size = point_size
+            if self._ctx is not None and self.is_renderable and not self.adaptive_point_size:
+                self._ctx.point_size = self.point_size
+
+        if self.adaptive_point_size:
+            changed_min, min_point_size = imgui.drag_float(
+                "Min Point Size##{}".format(self.unique_name),
+                self.min_point_size,
+                0.1,
+                min_value=0.1,
+                max_value=max(self.min_point_size + 0.1, self.max_point_size),
+                format="%.2f",
+            )
+            if changed_min:
+                self.min_point_size = max(0.1, min(min_point_size, self.max_point_size - 0.1))
+
+            changed_max, max_point_size = imgui.drag_float(
+                "Max Point Size##{}".format(self.unique_name),
+                self.max_point_size,
+                0.1,
+                min_value=max(self.min_point_size + 0.1, 0.2),
+                max_value=1000.0,
+                format="%.2f",
+            )
+            if changed_max:
+                self.max_point_size = max(self.min_point_size + 0.1, max_point_size)
+
+        super().gui(imgui)
+
     @hooked
     def release(self):
         if self.is_renderable:
             self.vao.release()
             self.positions_vao.release(buffer=False)
+        self._ctx = None
