@@ -22,6 +22,12 @@ class ImGuiRenderer(ModernglWindowRenderer):
 
         super().key_event(key, action, modifiers)
 
+    def mouse_scroll_event(self, x_offset, y_offset):
+        # imgui 2.0.0 removed the mouse_wheel_h attribute.
+        if hasattr(self.io, "mouse_wheel_h"):
+            self.io.mouse_wheel_h = x_offset
+        self.io.mouse_wheel = y_offset
+
     def render(self, draw_data):
         # HACK: we set the modifiers here every frame because key_event is not called when
         # the window loses and regains focus (e.g. when changing focus with alt+tab)

@@ -1968,3 +1968,36 @@ class Viewer(moderngl_window.WindowConfig):
         self.scene.current_frame_id = saved_curr_frame
         self.run_animations = saved_run_animations
         self._last_frame_rendered_at = self.timer.time
+
+    # ── moderngl-window >= 3.0 event bridge ─────────────────────────
+    # moderngl-window 3.x renamed all event callbacks with an on_ prefix.
+    # aitviewer still defines the old names, so we bridge them here.
+    def on_render(self, time, frame_time):
+        self.render(time, frame_time)
+
+    def on_key_event(self, key, action, modifiers):
+        self.key_event(key, action, modifiers)
+
+    def on_mouse_position_event(self, x, y, dx, dy):
+        self.mouse_position_event(x, y, dx, dy)
+
+    def on_mouse_press_event(self, x, y, button):
+        self.mouse_press_event(x, y, button)
+
+    def on_mouse_release_event(self, x, y, button):
+        self.mouse_release_event(x, y, button)
+
+    def on_mouse_drag_event(self, x, y, dx, dy):
+        self.mouse_drag_event(x, y, dx, dy)
+
+    def on_mouse_scroll_event(self, x_offset, y_offset):
+        self.mouse_scroll_event(x_offset, y_offset)
+
+    def on_unicode_char_entered(self, char):
+        self.unicode_char_entered(char)
+
+    def on_resize(self, width, height):
+        self.resize(width, height)
+
+    def on_files_dropped_event(self, x, y, paths):
+        self.files_dropped_event(x, y, paths)

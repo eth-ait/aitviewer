@@ -157,19 +157,27 @@ class SMPLSequence(Node):
 
         # First convert the relative joint angles to global joint angles in rotation matrix form.
         if self.smpl_layer.model_type != "flame":
-            if self.smpl_layer.model_type != "mano":
-                global_oris = local_to_global(
-                    torch.cat([self.poses_root, self.poses_body, self.poses_left_hand, self.poses_right_hand], dim=-1),
-                    self.skeleton[:, 0],
-                    output_format="rotmat",
+            has_hands = self.poses_left_hand is not None and self.poses_right_hand is not None
+            if self.smpl_layer.model_type != "mano" and has_hands:
+                all_poses = torch.cat(
+                    [self.poses_root, self.poses_body, self.poses_left_hand, self.poses_right_hand], dim=-1
                 )
+                # Use the full skeleton (body + hands) for local_to_global so that
+                # parent indices match the concatenated pose tensor.
+                full_skeleton = self.smpl_layer.skeletons()["all"].T
+                parents_for_l2g = c2c(full_skeleton[:, 0])
+                global_oris = local_to_global(all_poses, parents_for_l2g, output_format="rotmat")
+                # Trim back to body-only joints for downstream use.
+                n_body = self.skeleton.shape[0]
+                global_oris = global_oris.reshape((self.n_frames, -1, 3, 3))[:, :n_body]
+                global_oris = c2c(global_oris)
             else:
                 global_oris = local_to_global(
                     torch.cat([self.poses_root, self.poses_body], dim=-1),
                     self.skeleton[:, 0],
                     output_format="rotmat",
                 )
-            global_oris = c2c(global_oris.reshape((self.n_frames, -1, 3, 3)))
+                global_oris = c2c(global_oris.reshape((self.n_frames, -1, 3, 3)))
         else:
             global_oris = np.tile(np.eye(3), self.joints.shape[:-1])[np.newaxis]
 

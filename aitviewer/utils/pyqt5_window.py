@@ -88,6 +88,9 @@ class PyQt5Window(Window):
         self._widget.showEvent = self.show_event
         self._widget.hideEvent = self.hide_event
 
+        # moderngl-window >= 3.0 expects self._ctx to exist before init_mgl_context.
+        self._ctx = None
+
         # Attach to the context
         self.init_mgl_context()
 
