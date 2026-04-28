@@ -1,76 +1,107 @@
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Tests](https://github.com/eth-ait/aitviewer/actions/workflows/tests.yml/badge.svg)](https://github.com/eth-ait/aitviewer/actions/workflows/tests.yml)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10013305.svg)](https://doi.org/10.5281/zenodo.10013305)
+# aitviewer - SKEL
 
-# [![aitviewer](assets/aitviewer_logo.svg)](https://github.com/eth-ait/aitviewer)
-A set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS. See the official page at [https://eth-ait.github.io/aitviewer](https://eth-ait.github.io/aitviewer/) for all the details.
+This fork of AitViewer enables the vizualization of Marker sequences, OpenSim models sequences, the BSM model and the SKEL model.
+
+This repo contain a visualization tool. If you are interested in the SKEL model code, please refer to the [SKEL repository](https://download.is.tue.mpg.de/skel/main_paper.pdf). 
+
+For more info on SKEL, BSM and BioaAmass, check our [project page](https://skel.is.tue.mpg.de) and our [paper](https://download.is.tue.mpg.de/skel/main_paper.pdf).
+
+aitviewer is a set of tools to visualize and interact with sequences of 3D data with cross-platform support on Windows, Linux, and macOS. See the official page at [https://eth-ait.github.io/aitviewer](https://eth-ait.github.io/aitviewer/) for all the details.
+
+![aitviewer skel gif](assets/skel_sequence.gif)
+⇧ *aitviewer-Skel enables visualization of motion sequences of the SKEL model.*
+
 
 ## Installation
-Basic Installation:
-```commandline
-pip install aitviewer
-```
-Note that this does not install the GPU-version of PyTorch automatically. If your environment already contains it, you should be good to go, otherwise install it manually.
 
-Or install locally (if you need to extend or modify code)
-```commandline
-git clone git@github.com:eth-ait/aitviewer.git
-cd aitviewer
+Clone this repository and install it using:
+```
+git clone https://github.com/MarilynKeller/aitviewer-skel.git
+cd aitviewer-skel
 pip install -e .
 ```
 
-On macOS with Apple Silicon it is recommended to use PyQt6. Please check [this issue](https://github.com/eth-ait/aitviewer/issues/22) for installation instructions.
+To set up the paths to SMPLX and AMASS, please refer to the [aitviewer instructions](https://eth-ait.github.io/aitviewer/frontend.html#configure-the-viewer)
 
-For more advanced installation and for installing SMPL body models, please refer to the [documentation](https://eth-ait.github.io/aitviewer/parametric_human_models/supported_models.html) .
+## BSM model
 
-## Features
-* Native Python interface, easy to use and hack.
-* Load [SMPL[-H/-X]](https://smpl.is.tue.mpg.de/) / [MANO](https://mano.is.tue.mpg.de/) / [FLAME](https://flame.is.tue.mpg.de/) / [STAR](https://github.com/ahmedosman/STAR) / [SUPR](https://github.com/ahmedosman/SUPR) sequences and display them in an interactive viewer.
-* Headless mode for server rendering of videos/images.
-* Remote mode for non-blocking integration of visualization code.
-* Render 3D data on top of images via weak-perspective or OpenCV camera models.
-* Animatable camera paths.
-* Edit SMPL sequences and poses manually.
-* Prebuilt renderable primitives (cylinders, spheres, point clouds, etc).
-* Built-in extensible GUI (based on Dear ImGui).
-* Export screenshots, videos and turntable views (as mp4/gif)
-* High-Performance ModernGL-based rendering pipeline (running at 100fps+ on most laptops).
+You can download the BSM model `bsm.osim` from the dowload page at [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de). To visualize it, run:
 
-![aitviewer SMPL Editing](https://user-images.githubusercontent.com/5639197/188625764-351100e9-992e-430c-b170-69d4f142f5dd.gif)
+```python load_osim.py --osim /path/to/bsm.osim```
 
+You can find motion sequences in the BioAmass dataset at [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de).
 
+To visualize an OpenSim motion sequence:
 
-## Quickstart
-Display an SMPL T-pose (Requires SMPL models):
-```py
-from aitviewer.renderables.smpl import SMPLSequence
-from aitviewer.viewer import Viewer
+```
+python load_osim.py --osim /path/to/bsm.osim --mot /path/to/trial.mot
+```
 
-if __name__ == '__main__':
-    v = Viewer()
-    v.scene.add(SMPLSequence.t_pose())
-    v.run()
+![aitviewer osim vizu](assets/osim_apose.png)
+
+## SKEL model
+
+You can download the SKEL model from the dowload page at [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de). 
+Edit then the file aitviewer/aitvconfig.yaml` to point to the SKEL folder:
+```skel_models: "/path/to/skel_models_v1.0"```
+
+Install the SKEL loader by following the guidelines here: https://github.com/MarilynKeller/SKEL 
+
+Vizualize the SKEL model's shape space:
+
+```
+python examples/load_SKEL.py
+```
+
+Vizualize a SKEL sequence. You can find a sample SKEL motion in `skel_models_v1.0/sample_motion/ ` and the corresponding SMPL motion.
+
+```
+python examples/load_SKEL.py -s 'skel_models_v1.1/sample_motion/01_01_poses_skel.pkl' --z_up
 ```
 
 
-## Projects using the aitviewer
-A sampling of projects using the aitviewer. Let us know if you want to be added to this list!
-- Fan et al., [HOLD: Category-agnostic 3D Reconstruction of Interacting Hands and Objects from Video](https://github.com/zc-alexfan/hold), CVPR 2024
-- Braun et al., [Physically Plausible Full-Body Hand-Object Interaction Synthesis](https://eth-ait.github.io/phys-fullbody-grasp/), 3DV 2024
-- Zhang and Christen et al., [ArtiGrasp: Physically Plausible Synthesis of Bi-Manual Dexterous Grasping and Articulation](https://eth-ait.github.io/artigrasp/), 3DV 2024
-- Kaufmann et al., [EMDB: The Electromagnetic Database of Global 3D Human Pose and Shape in the Wild](https://ait.ethz.ch/emdb), ICCV 2023
-- Shen and Guo et al., [X-Avatar: Expressive Human Avatars](https://skype-line.github.io/projects/X-Avatar/), CVPR 2023
-- Sun et al., [TRACE: 5D Temporal Regression of Avatars with Dynamic Cameras in 3D Environments](https://www.yusun.work/TRACE/TRACE.html), CVPR 2023
-- Fan et al., [ARCTIC: A Dataset for Dexterous Bimanual Hand-Object Manipulation](https://github.com/zc-alexfan/arctic), CVPR 2023
-- Dong and Guo et al., [PINA: Learning a Personalized Implicit Neural Avatar from a Single RGB-D Video Sequence](https://zj-dong.github.io/pina/), CVPR 2022
-- Dong et al., [Shape-aware Multi-Person Pose Estimation from Multi-view Images](https://ait.ethz.ch/projects/2021/multi-human-pose/), ICCV 2021
-- Kaufmann et al., [EM-POSE: 3D Human Pose Estimation from Sparse Electromagnetic Trackers](https://ait.ethz.ch/projects/2021/em-pose/), ICCV 2021
-- Vechev et al., [Computational Design of Kinesthetic Garments](https://ait.ethz.ch/projects/2022/cdkg/), Eurographics 2021
-- Guo et al., [Human Performance Capture from Monocular Video in the Wild](https://ait.ethz.ch/projects/2021/human-performance-capture/index.php), 3DV 2021
+## BioAmass Dataset
+
+First download the models and dataset from [https://skel.is.tue.mpg.de](https://skel.is.tue.mpg.de) and in `aitconfig.yaml` set the following paths:
+
+```
+osim_geometry : /path/to/skel_models_v1.0/Geometry
+bioamass : /path/to/bioamass_v1.0
+```
+
+To visualize a sequence from the BioAmass dataset, run:
+
+```
+python examples/load_bioamass.py
+```
+
+## Mocap data
+    
+We enable loading .c3d and .trc motion capture data. Sample CMU mocap data can be downloaded at http://mocap.cs.cmu.edu/subjects.php.  Set the path to the mocap data folder in `aitvconfig.yaml` in `datasets.mocap`.
+
+To visualize an example mocap sequence, run:
+
+```python load_markers.py```
+
+ 
 
 ## Citation
-If you use this software, please cite it as below.
-```commandline
+If you use this software, please cite the following work and software:
+
+```
+@inproceedings{keller2023skel,
+  title = {From Skin to Skeleton: Towards Biomechanically Accurate 3D Digital Humans},
+  author = {Keller, Marilyn and Werling, Keenon and Shin, Soyong and Delp, Scott and 
+            Pujades, Sergi and Liu, C. Karen and Black, Michael J.},
+  booktitle = {ACM ToG, Proc.~SIGGRAPH Asia},
+  volume = {42},
+  number = {6},
+  month = dec,
+  year = {2023},
+}
+```
+
+```
 @software{Kaufmann_Vechev_aitviewer_2022,
   author = {Kaufmann, Manuel and Vechev, Velko and Mylonopoulos, Dario},
   doi = {10.5281/zenodo.10013305},
@@ -81,9 +112,12 @@ If you use this software, please cite it as below.
 }
 ```
 
-## Contact & Contributions
-This software was developed by [Manuel Kaufmann](mailto:manuel.kaufmann@inf.ethz.ch), [Velko Vechev](mailto:velko.vechev@inf.ethz.ch) and Dario Mylonopoulos.
-For questions please create an issue.
-We welcome and encourage module and feature contributions from the community.
+## Licencing
 
-![aitviewer Sample](assets/aitviewer_collab.png)
+For use of SKEL and BSM, please refer to our project page https://skel.is.tue.mpg.de/license.html.
+
+## Contact 
+
+For any question on the OpenSim model or SKEL loading, please contact skel@tuebingen.mpg.de.
+
+For commercial licensing, please contact ps-licensing@tue.mpg.de

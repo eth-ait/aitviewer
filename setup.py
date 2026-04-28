@@ -41,9 +41,9 @@ setup(
     description="Viewing and rendering of sequences of 3D data.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/eth-ait/aitviewer",
+    url="https://github.com/eth-ait/aitviewer-skel",
     version=__version__,
-    author="Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos",
+    author="Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos, Marilyn Keller",
     packages=find_packages(),
     include_package_data=True,
     keywords=[
@@ -63,7 +63,7 @@ setup(
     install_requires=requirements,
     project_urls={
         "Documentation": "https://eth-ait.github.io/aitviewer/",
-        "Source": "https://github.com/eth-ait/aitviewer",
+        "Source": "https://github.com/eth-ait/aitviewer-skel",
         "Bug Tracker": "https://github.com/eth-ait/aitviewer/issues",
     },
 )
